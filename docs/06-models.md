@@ -13,7 +13,7 @@ All model calls go through one gateway: `server/app/llm/gateway.py`. No other mo
 **Routing rules** (enforced in the gateway, not by convention):
 - **Private saves** never reach any provider. The gateway refuses any call tagged with a `private` save ID.
 - **Profile data** only goes to `spark_open`. Any purpose that includes `profile` in its inputs can only route there.
-- **No vendor outside Meta** is used for reading or reasoning. The search API returns links only (see [Search](#search)).
+- **No vendor outside Meta** is used for reading or reasoning. The search API returns links only (see [Web search](#web-search)).
 
 ## Purposes
 
@@ -35,6 +35,10 @@ Every call declares a purpose. Each purpose fixes the model, prompt file, output
 | `when.match_moment` | Spark | `when_match_moment.v1.md` | `MomentMatch` | 30s |
 | `video.points` | Spark | `video_points.v1.md` | `VideoPoints` | 180s |
 | `prep.sheet` | Spark | `prep_sheet.v1.md` | `PrepSheet` | 120s |
+| `ask.select` | Spark | `ask_select.v1.md` | `Selection` | 30s |
+| `ask.answer` | Spark | `ask_answer.v1.md` | `Answer` | 90s |
+| `audit.contradictions` | Spark (long context) | `audit_contradictions.v1.md` | `list[ProposedContradiction]` | 180s |
+| `audit.gaps` | Spark | `audit_gaps.v1.md` | `list[ProposedGap]` | 60s |
 
 ## Gateway behaviour
 
@@ -89,7 +93,25 @@ and expects `list[Reading]` with matching IDs. Code rejects the batch if IDs are
 
 The output is always `VideoPoints {save_id, duration_s, points:[{text, t_start, t_end}]}`, validated by `verify/timestamps.py`.
 
-## Search
+## Embeddings (local)
+
+`server/app/search/embed.py`. Used for meaning-based search ([ADR 0003](adr/0003-search-ask-audit.md)).
+
+- **No Meta endpoint:** Meta's Model API shows no embeddings endpoint **(confirm in the official docs)**.
+- **The model:** we run a small open multilingual model **inside the worker and API** on CPU, through ONNX Runtime (via `fastembed`, or `optimum` + `onnxruntime`). Default: `intfloat/multilingual-e5-small`, 384 dimensions **(confirm it loads at scaffold; fallback `paraphrase-multilingual-MiniLM-L12-v2`)**.
+- **Why local:**
+  - no new vendor or account;
+  - saves never leave our servers for indexing;
+  - free;
+  - multilingual, because saves mix English, Pidgin and Yoruba words.
+- **What gets embedded:** `passage: {title}. {what}. {label}. {key facts as text}. {first 1,000 chars of the snapshot}`. Queries are embedded as `query: {text}`, the e5 convention.
+- **Not covered by the gateway rules:** this isn't a Meta model call, so it isn't budgeted or recorded in `model_calls`. The private-save rule still applies in `embed_save`, because private saves are never embedded.
+- **Speed target:** about 10–30 ms per text on CPU; 624 saves in under a minute. Measure on Day 2.
+- **Image:** the model files are downloaded at Docker build time into `/models`, so nothing is fetched at runtime.
+
+## Web search
+
+This is web search for **Is it true?**, not for searching saves.
 
 `server/app/llm/search.py`, `SearchProvider.search(query) -> list[SearchResult{url, title, snippet}]`.
 
@@ -104,6 +126,8 @@ The output is always `VideoPoints {save_id, duration_s, points:[{text, t_start, 
 | Thread rebuild | 1 long-context call, about 40k tokens in | daily |
 | Checks | 1–2 per opportunity | about 25 in the pile |
 | Prep sheet | 1 call per video, plus 1 synthesis | 16 videos for the demo |
+| Ask | 2 calls per question (pick, then answer) | about 5k tokens to pick, up to 60k to answer |
+| Audit (library) | 1 long-context call for contradictions, plus 1 for gaps | about 40–100k tokens |
 
 Record the real numbers in `model_calls` after the first full import, and update this table.
 
@@ -115,6 +139,8 @@ SPARK_OPEN_BASE, SPARK_OPEN_KEY, SPARK_OPEN_MODEL
 VIDEO_MODE=chapters_only|spark_file|spark_youtube_url
 SEARCH_PROVIDER, SEARCH_API_KEY
 YOUTUBE_API_KEY
+EMBED_MODEL=intfloat/multilingual-e5-small
+EMBED_DIM=384
 MODEL_DAILY_BUDGET_USD=10
 MODEL_USER_DAILY_BUDGET_USD=3
 SPARK_MAX_CONCURRENCY=6

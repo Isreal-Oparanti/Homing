@@ -38,7 +38,8 @@ People's saves are personal. Our own pile contains phone numbers, an account num
 - stored and shown blurred to the owner only;
 - never sent to any model (the gateway refuses, see [06](06-models.md#providers));
 - never shown in The team or in exports;
-- `private_reason` stores the *type*, never the matched value.
+- `private_reason` stores the *type*, never the matched value;
+- never embedded, never returned by search, and never used in Ask answers or audits (audits only count them).
 
 **Logs** never contain save text, snapshots, model inputs or model outputs. Only IDs, sizes and statuses.
 
@@ -71,6 +72,9 @@ Per user, kept in Postgres with a fixed window:
 | `POST /saves`, `POST /saves/file` | 60 per hour |
 | `POST /imports/whatsapp` | 3 per day |
 | `POST /moments` | 30 per day |
+| `POST /asks` | 60 per day |
+| `POST /audits` | 5 per day |
+| `GET /search` | 120 per minute |
 | Model spend | `MODEL_USER_DAILY_BUDGET_USD` |
 | Demo user | half of the above, and imports disabled (it already has the sample pile) |
 

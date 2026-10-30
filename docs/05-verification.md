@@ -98,7 +98,7 @@ Code: `agents/is_it_true.py`, helpers in `verify/sources.py`
 
 1. **Links in the post:** prefer links whose domain matches the organisation named in the reading (e.g. `afreximbank.com`, `apply.workable.com/afreximbank`), and known application hosts (`workable.com`, `greenhouse.io`, `lever.co`, `typeform.com`, `forms.gle`, `docs.google.com/forms`, `fluxx.io`, `submittable.com`).
 2. **Agent memory** for the same canonical URL or organisation name.
-3. **Search** (`SearchProvider`, see [06](06-models.md#search)): query `"{organisation} {programme name} {year} apply"`. Keep results whose domain matches the organisation or a known application host. Take the top 2 candidates.
+3. **Search** (`SearchProvider`, see [06](06-models.md#web-search)): query `"{organisation} {programme name} {year} apply"`. Keep results whose domain matches the organisation or a known application host. Take the top 2 candidates.
 4. **Aggregator sites** (opportunity blogs, X threads) are never treated as official. They can only lead to the official page.
 
 If nothing passes → `couldnt_confirm`, with *"We couldn't find the official page. Here's what the post says, unconfirmed."*
@@ -117,6 +117,19 @@ Code: `verify/timestamps.py`
 
 For video, the proof the user can check is the link to the exact second.
 
+## Answers and audits
+
+Code: `verify/citations.py`
+
+The same proof rule applies to Ask answers and audit contradictions, but here the "source" is the user's own save.
+
+- **Each citation** names a `save_id` the user owns, from the candidate set of that ask or audit. Its `quote` must match that save's snapshot text or reading text using `match_quote` (same thresholds as above).
+- **Video citations** use `verify/timestamps.py` instead of text matching.
+- **Points:** a point survives only if at least one of its citations verifies. Unverified citations are removed even when the point survives.
+- **Contradictions:** a contradiction survives only if **both** quotes verify, and they come from two different saves.
+- **"Out of date"** is shown only when backed by a check verdict (`closed`) or a stored `due_at` in the past. It's never taken from the model's text alone.
+- **Counts:** dropped points and citations are counted in `model_calls`, for evals.
+
 ## What the UI is allowed to show
 
 | Shown as | Requires |
@@ -125,3 +138,6 @@ For video, the proof the user can check is the link to the exact second.
 | "Unconfirmed" | it came from the user's own save, but has no official source |
 | A date | `parse_deadline` result. The UI states whether the time and zone were given. |
 | A verdict | `verify/verdict.py` output only |
+| A point on an answer page | at least one citation verified by `verify/citations.py` |
+| A contradiction in an audit | two verified quotes from two different saves |
+| A gap or let-go item | shown as a suggestion ("You might be missing…"), never as fact |

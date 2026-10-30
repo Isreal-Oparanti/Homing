@@ -7,7 +7,7 @@ Start with [PLAN.md](PLAN.md) for what we're building and why. These docs cover 
 | — | [PLAN.md](PLAN.md) | deciding *what* to build, or checking whether something is in scope |
 | 01 | [Architecture](01-architecture.md) | getting the big picture: services, flows, vocabulary |
 | 02 | [Data model](02-data-model.md) | touching the database or adding a field |
-| 03 | [Agents](03-agents.md) | working on any of the four questions |
+| 03 | [Agents](03-agents.md) | working on any of the four questions, or on Ask and Audit |
 | 04 | [Ingestion](04-ingestion.md) | reading a new kind of save, or the WhatsApp import |
 | 05 | [Verification](05-verification.md) | working on quotes, dates, eligibility, or labels |
 | 06 | [Models](06-models.md) | calling Meta's models, writing prompts, controlling cost |

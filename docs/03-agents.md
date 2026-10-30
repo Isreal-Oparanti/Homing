@@ -48,6 +48,9 @@ def handle_save_read(ctx: JobContext, payload: SaveReadPayload) -> None: ...
 | `user.recheck_open` | daily 06:00 user time | `is_it_true.recheck_open` | 60 | `recheck:{user_id}:{date}` |
 | `user.today` | daily 07:00 user time; after each tick | `when_needed.compose_today` | 40 | `today:{user_id}:{date}:{hour}` |
 | `tick.when` | scheduler every 10 min | `when_needed.tick` | 40 | `tick:{yyyymmddhhmm}` |
+| `save.embed` | after read (non-private only) | `search.embed.embed_save` | 30 | `embed:{save_id}:{text_hash}` |
+| `ask.answer` | API `POST /asks` | `ask.answer` | 10 | `ask:{ask_id}` |
+| `audit.run` | API `POST /audits` | `audit.run` | 20 | `audit:{audit_id}` |
 
 **Runner behaviour** (`server/app/jobs/runner.py`):
 - **Claiming:** `SELECT … WHERE status='queued' AND run_after<=now() ORDER BY priority, id FOR UPDATE SKIP LOCKED LIMIT 1`.
@@ -84,7 +87,7 @@ def handle_save_read(ctx: JobContext, payload: SaveReadPayload) -> None: ...
 4. **Validate** the output with Pydantic (`Reading` schema) and save it.
 5. **Hand over:**
    - If `is_checkable` → enqueue `save.check`. Otherwise → enqueue `save.when`.
-   - Always enqueue `save.place`.
+   - Always enqueue `save.place`, and `save.embed` (for non-private saves, so the save becomes searchable by meaning).
 6. **Emit** `read`, for example *"Read a flyer: Afreximbank internship call (Cairo)."* with evidence = the snapshot.
 
 **Output schema** (`schemas/agents.py`):
@@ -254,6 +257,48 @@ fatigue    = 15 × dismissals in this thread over the last 14 days
 - invents a deadline. Dates come from verified source text or the user.
 
 ---
+
+## Ask and Audit (on request)
+
+These aren't extra agents. They're jobs that use what the four agents have already produced (readings, snapshots, checks, threads and whens), so every source has already been understood and screened. Their work shows up in **The team** as `system` events, listing which saves each step used.
+
+### Ask
+
+`server/app/ask/answer.py`. One question gives one answer page.
+
+1. **Candidates (code):**
+   - hybrid search ([02 · Search](02-data-model.md#search)), top 40;
+   - plus every save in the top 2 matching threads;
+   - plus, for a follow-up, the previous ask's `used_save_ids`.
+
+   Deduplicated, capped at 80, private saves excluded.
+2. **Pick (model, `ask.select`):** Spark sees one compact line per candidate (`id | title | what | label | thread | saved_at | verdict`) and returns the IDs that bear on the question, with a one-line reason each.
+3. **Load:** the snapshots of the picked saves (truncated per save so the total stays ≤ 60k tokens), plus their checks and whens.
+4. **Answer (model, `ask.answer`):** points, disagreements, out-of-date items and things coming up. **Every point cites at least one save with an exact quote from that save's snapshot or reading.** If the saves don't cover something, it goes in `not_in_your_saves`. The model must not use outside knowledge.
+5. **Verify (code):**
+   - every quote is matched against the cited save's snapshot or reading ([05 · Answers and audits](05-verification.md#answers-and-audits));
+   - points with no verified citation are dropped;
+   - video citations are checked as timestamps;
+   - "out of date" items must come from a check verdict or a past `due_at`, never from the model alone.
+6. **Save** `asks.answer`, and emit `save_updated`-style SSE events (`ask_ready`).
+
+**Never:** answers from outside the user's saves; cites a private save; keeps a point it can't verify.
+
+### Audit
+
+`server/app/audit/run.py`. Scope: one thread, or the whole library.
+
+| Item | Found by | Rule |
+|---|---|---|
+| `repeat` | code | same `content_hash`, or embedding similarity ≥ 0.95 with the same platform and title |
+| `went_bad` | code | check verdict `closed`, dead link, or a past `due_at` that's still marked open |
+| `contradiction` | model (`audit.contradictions`, long context over the scope's readings and snapshots), then code | needs two quotes, one from each save, both verified. Otherwise dropped. |
+| `gap` | model (`audit.gaps`) | marked `is_suggestion = true`, and shown as "You might be missing…" |
+| `let_go` | code | not in any thread, never brought back, older than 6 months, never opened |
+
+Each item gets a suggested action (`merge` · `archive` · `recheck` · `none`). The user acts with one tap. "Archive" hides a save from Today and search; it never deletes.
+
+**Never:** deletes anything; presents a gap or let-go suggestion as fact; audits private saves' content (they're only counted).
 
 ## Orchestration at a glance
 

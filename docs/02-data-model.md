@@ -18,6 +18,10 @@ erDiagram
   saves ||--o| whens : "When?"
   saves }o--o{ threads : "thread_saves (What's it for?)"
   saves }o--o| media : file
+  saves ||--o| save_embeddings : "meaning"
+  users ||--o{ asks : "answer pages"
+  users ||--o{ audits : reports
+  audits ||--o{ audit_items : items
   users ||--o{ cards : Today
   users ||--o{ agent_events : "The team"
   users ||--o{ moments : "coming up"
@@ -343,9 +347,82 @@ Grading for the accuracy numbers.
 | note | text null | |
 | created_at | timestamptz | |
 
-## Full-text search
+### save_embeddings
 
-A generated column on `readings`:
+Meaning-based search. Requires the `vector` extension (pgvector, built into Supabase).
+
+| Column | Type | Notes |
+|---|---|---|
+| save_id | text PK FK | |
+| user_id | text FK | denormalised so searches can filter by user without a join |
+| model | text | e.g. `multilingual-e5-small` |
+| embedding | vector(384) | of the reading text, see [06](06-models.md#embeddings-local) |
+| text_hash | text | re-embed only when the reading changes |
+| created_at | timestamptz | |
+
+Index: `hnsw (embedding vector_cosine_ops)`. The query always filters `user_id = :u` first. Private saves never get a row.
+
+### asks
+
+One question, and its answer page.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | text PK | |
+| user_id | text FK | |
+| question | text | |
+| follows_ask_id | text null FK | a follow-up carries the previous question as context |
+| status | text | `queued` · `working` · `ready` · `failed` |
+| answer | jsonb null | `Answer`, see below |
+| candidate_save_ids | text[] | what hybrid search returned (kept for evals) |
+| used_save_ids | text[] | what the answer cites |
+| model, prompt_version | text | |
+| created_at, finished_at | timestamptz | |
+
+`Answer`:
+```json
+{
+  "summary": "Your saves agree on three things: …",
+  "points": [{"text": "Practise a one-minute answer to 'what are you building?'",
+              "cites": [{"save_id": "…", "quote": "…", "verified": true, "t": null}]}],
+  "disagreements": [{"text": "…", "cites": ["…", "…"]}],
+  "out_of_date": [{"save_id": "…", "why": "The W27 deadline (2 Nov) has passed."}],
+  "coming_up": [{"save_id": "…", "due_at": "…"}],
+  "not_in_your_saves": "Nothing you saved covers the application form questions."
+}
+```
+
+Only points with at least one verified citation are stored. `not_in_your_saves` is said plainly, and the gap is never filled from outside knowledge.
+
+### audits
+| Column | Type | Notes |
+|---|---|---|
+| id | text PK | |
+| user_id | text FK | |
+| scope | text | `thread` · `library` |
+| thread_id | text null FK | |
+| status | text | `queued` · `working` · `ready` · `failed` |
+| counts | jsonb | per item kind |
+| created_at, finished_at | timestamptz | |
+
+### audit_items
+| Column | Type | Notes |
+|---|---|---|
+| id | text PK | |
+| audit_id | text FK | |
+| kind | text | `repeat` · `went_bad` · `contradiction` · `gap` · `let_go` |
+| save_ids | text[] | |
+| summary | text | one plain sentence |
+| evidence | jsonb | for `contradiction`: two verified quotes, one from each save |
+| is_suggestion | bool | true for `gap` and `let_go` (model-proposed opinions) |
+| action | text null | suggested action: `merge` · `archive` · `recheck` · `none` |
+| state | text | `open` · `done` · `ignored` |
+
+## Search
+
+Two indexes, merged at query time (RRF, k = 60), in one SQL round trip. See [ADR 0003](adr/0003-search-ask-audit.md).
+
+**Words:** a generated column on `readings`:
 
 ```sql
 search_tsv tsvector GENERATED ALWAYS AS (
@@ -356,6 +433,10 @@ search_tsv tsvector GENERATED ALWAYS AS (
 ```
 
 Also `pg_trgm` on `readings.title` and `saves.label` for typo-tolerant matching. Queries use `websearch_to_tsquery('simple', :q)`. We use `'simple'` rather than `'english'` because saves mix languages and names.
+
+**Meaning:** the query is embedded with the same local model (using the `query:` prefix that e5 models expect), then ranked by `embedding <=> :qvec` on `save_embeddings` for that user.
+
+**Merged score:** `score = Σ 1 / (60 + rank_i)` over both lists. Top results are returned with highlights from the word match where one exists.
 
 ## Migrations
 

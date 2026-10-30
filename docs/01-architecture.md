@@ -50,7 +50,7 @@ flowchart LR
 | Live updates by SSE over an events table | The team feed and Today update live. Every event is also stored, so a dropped connection resumes from the last event ID. |
 | Direct-to-storage uploads | Vercel caps request bodies at about 4.5 MB, and WhatsApp exports with media can be hundreds of MB. |
 | One model gateway | Caching, budgets, retries, concurrency limits and accounting live in one place. See [ADR 0006](adr/0006-model-gateway.md). |
-| No chat box, no embeddings (for now) | Search is Postgres full-text. Agents run on triggers and schedules. See [ADR 0003](adr/0003-search-without-embeddings.md). |
+| Hybrid search, Ask and Audit, no chat thread | Search combines words (Postgres full-text) and meaning (pgvector over embeddings from a small open model run in our worker). Ask gives one verified answer page per question; Audit runs as a job. See [ADR 0003](adr/0003-search-ask-audit.md). |
 
 ## Process types
 
@@ -106,7 +106,22 @@ The save card shows each answer as soon as it exists. It never waits for all fou
 - At the user's morning (07:00 local, default) and on every tick, `user.today` keeps **at most 3 new cards per day**, picked by a code-computed priority.
 - `card.prep` builds a prep sheet when a card needs one.
 
-### 4. Daily upkeep
+### 4. Search, Ask and Audit (anytime)
+
+- **Search** (instant, in the API, no model call):
+  - full-text and vector search run in one SQL round trip;
+  - the results are merged with RRF;
+  - private saves are never indexed.
+- **Ask** (`POST /asks` → job `ask.answer`):
+  1. Hybrid search, top 40, plus the saves in matching threads.
+  2. Muse Spark picks the relevant saves.
+  3. Load their snapshots.
+  4. Spark writes points, each quoting a save.
+  5. Code verifies every quote.
+  6. The answer page fills in live over SSE.
+- **Audit** (`POST /audits` → job `audit.run`): on a thread or the whole library. Code finds repeats and things that went bad. Long-context Spark proposes contradictions and gaps, and code verifies each contradiction's two quotes. The result is a report with one-tap actions.
+
+### 5. Daily upkeep
 
 | Job | What it does |
 |---|---|
@@ -130,6 +145,9 @@ Use these names in code, the database, the API and the UI.
 | Card | Something brought back to **Today** | `card` |
 | Team event | One line in **The team** feed | `agent_event` |
 | Snapshot | Our copy of a save's content at save time | `snapshot` |
+| Embedding | Numbers capturing a save's meaning, used for search | `save_embedding` |
+| Ask / answer page | One question, and its verified answer built from saves | `ask` |
+| Audit / audit report | A check of a thread or the whole library | `audit` |
 
 The agents are named after their questions:
 
@@ -153,6 +171,9 @@ The agents are named after their questions:
 | Card `kind` | `deadline` · `prep` · `related` · `went_bad` · `answer_needed` |
 | Card `state` | `new` · `used` · `dismissed` · `later` |
 | Job `status` | `queued` · `running` · `done` · `failed` · `dead` |
+| Ask / Audit `status` | `queued` · `working` · `ready` · `failed` |
+| Audit item `kind` | `repeat` · `went_bad` · `contradiction` · `gap` · `let_go` |
+| Audit item `state` | `open` · `done` · `ignored` |
 
 ## Design principles
 

@@ -54,6 +54,8 @@ VIDEO_MODE=chapters_only
 SEARCH_PROVIDER=
 SEARCH_API_KEY=
 YOUTUBE_API_KEY=
+EMBED_MODEL=intfloat/multilingual-e5-small
+EMBED_DIM=384
 
 MODEL_DAILY_BUDGET_USD=10
 MODEL_USER_DAILY_BUDGET_USD=3
@@ -65,12 +67,15 @@ FEATURE_VOICE=true
 FEATURE_VIDEO=true
 FEATURE_RECHECK=true
 FEATURE_PREP=true
+FEATURE_ASK=true
+FEATURE_AUDIT=true
 ```
 
 ## Docker image (`server/Dockerfile`)
 
 - Base `python:3.12-slim`, plus `ffmpeg` (voice notes) and `libmagic` (type sniffing).
 - Dependencies installed with `uv` from a lock file. Runs as a non-root user.
+- The embedding model (`EMBED_MODEL`, ONNX) is downloaded **at build time** into `/models`, adding about 200 MB. Both `api` (query embeddings for search) and `worker` (save embeddings) load it once at startup.
 - **Start commands:**
   - `api`: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2`
   - `worker`: `python -m app.worker`
@@ -86,10 +91,12 @@ FEATURE_PREP=true
    - sign in as the demo user;
    - add one link;
    - watch four answers arrive in the save card;
-   - check that The team shows events.
+   - check that The team shows events;
+   - search "YC" and confirm a "Y Combinator" save comes up;
+   - ask one question and confirm the answer page has verified citations.
 
 **First-time setup:**
-- Supabase: create the project and the private `saves` bucket.
+- Supabase: create the project and the private `saves` bucket. Enable the `vector` and `pg_trgm` extensions (the first migration also runs `CREATE EXTENSION IF NOT EXISTS`).
 - Google OAuth: add the redirect URL `https://<web>/api/auth/callback/google`.
 - Railway: create two services from the repo.
 - Vercel: create the project and set the env vars.
@@ -119,6 +126,8 @@ FEATURE_PREP=true
 | Upload fails | Signed URL expired; bucket policy | Re-sign; check the bucket is private and the service key is set. |
 | Voice notes fail | ffmpeg present? Transcribe endpoint errors | Set `FEATURE_VOICE=false` for the demo; note it in the README. |
 | Demo user looks wrong | Seed version | `POST /api/v1/admin/demo/reset` |
+| Search misses obvious saves | `save_embeddings` count vs ready saves; `save.embed` failures | Re-enqueue `save.embed` for missing rows (`scripts/reembed.py`); check that `EMBED_MODEL` loaded at startup |
+| Answer pages come back nearly empty | `model_calls` dropped-citation counts for `ask.answer` | The prompt isn't quoting exactly: tighten it (new prompt version). Check that the candidates actually contain the relevant saves. |
 
 ## Backups
 

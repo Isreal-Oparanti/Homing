@@ -27,11 +27,14 @@ crowscap-hackathon/
         session.py
         migrations/
       schemas/               # api.py (request/response), agents.py (Reading, ProposedCheck…), common.py
-      api/v1/                # health, me, uploads, saves, imports, threads, today, cards, moments, team, events, search, feedback, admin
+      api/v1/                # health, me, uploads, saves, imports, threads, today, cards, moments, team, events, search, asks, audits, feedback, admin
       agents/                # what_is_it.py, is_it_true.py, whats_it_for.py, when_needed.py, base.py
+      search/                # embed.py (local ONNX model), hybrid.py (words + meaning + RRF)
+      ask/                   # answer.py (candidates → pick → answer → verify)
+      audit/                 # run.py, items.py
       ingest/                # fetch.py (SafeFetcher), urls.py, youtube.py, x.py, meta_embed.py, tiktok.py, web.py, pdf.py, image.py, audio.py, video.py
         whatsapp/            # parser.py, importer.py
-      verify/                # quotes.py, dates.py, status.py, eligibility.py, verdict.py, sources.py, secrets.py, timestamps.py, data/
+      verify/                # quotes.py, dates.py, status.py, eligibility.py, verdict.py, sources.py, secrets.py, timestamps.py, citations.py, data/
       llm/                   # gateway.py, providers.py, cache.py, budget.py, video.py, search.py, prompts/
       jobs/                  # queue.py, runner.py, scheduler.py, kinds.py
       storage/               # base.py, local.py, supabase.py
@@ -41,7 +44,7 @@ crowscap-hackathon/
 ```
 
 **Module rules:**
-- **Dependencies run one way:** `api → services/agents → verify/ingest/llm → db/repo`. `verify/` imports nothing from the app except schemas.
+- **Dependencies run one way:** `api → agents/ask/audit → search/verify/ingest/llm → db/repo`. `verify/` imports nothing from the app except schemas.
 - **Small files.** If a file passes about 400 lines, split it.
 - **One public function per job kind** in `agents/`. Helpers stay private (`_name`).
 
@@ -113,4 +116,5 @@ We reuse *approaches*, not code. This repo is new code written during the event.
 | YouTube | Data API + oEmbed metadata | **Dropped** `yt-dlp` and `youtube-transcript-api` (platform rules) |
 | Dependencies | — | **Exact pins.** No `"latest"` |
 | Code size | — | **Small modules.** No 5,800-line service files |
-| Chat | — | **No chat router.** Search plus agents instead |
+| Chat | Asking about your saves, and auditing them (the belief-audit idea) | **No chat thread or router.** Ask gives one verified answer page per question; Audit is a job that produces a report |
+| Search | Meaning-based search (Crowscap used pgvector) | Hybrid words + meaning; a local open embedding model instead of a cloud embeddings API |

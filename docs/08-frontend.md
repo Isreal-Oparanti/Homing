@@ -28,7 +28,9 @@
 | `/threads/[id]` | One thread | Saves in order, plus agent notes |
 | `/saves/[id]` | **Save card** | Full page. Also opens as a sheet over other screens |
 | `/team` | **The team** | Live feed, filterable by question |
-| `/search` | Search | Full-text, no chat |
+| `/search` | **Search and ask** | One box. Typing shows matching saves instantly (words and meaning). **Ask** creates an answer page. |
+| `/ask/[id]` | **Answer page** | One question's verified answer; "Ask a follow-up" creates a new page |
+| `/audit/[id]` | **Audit report** | Started from a thread ("Audit this thread") or from Settings ("Audit everything") |
 | `/import` | Import | WhatsApp export upload and progress |
 | `/add` | Add | Paste, upload |
 | `/settings` | Profile and settings | Eligibility profile, time zone, delete my data |
@@ -39,7 +41,7 @@
 
 ## Layout
 
-- **Mobile first.** Most first users are on Android. Bottom tab bar: **Today · Threads · Team · Search**, with a floating **+** (Add).
+- **Mobile first.** Most first users are on Android. Bottom tab bar: **Today · Threads · Ask · Team**, with a floating **+** (Add). The **Ask** tab is the search-and-ask box.
 - **Desktop:** left sidebar with the same items. The save card opens as a right-hand sheet.
 - Max content width is 720px for reading surfaces.
 
@@ -71,6 +73,9 @@ These icons are also the agents' avatars in **The team**.
 | `ImportPanel` | Drop zone → direct upload with progress → live counters from events (read, private, duplicates) → summary |
 | `AnswerQuestion` | Inline answer for `needs_your_answer` (e.g. a French level select) |
 | `MomentInput` | "What's coming up?" plus a date picker |
+| `SearchAskBox` | One input. Instant results list below (each showing *matched by words* or *by meaning*). An **Ask** button, or Enter on a question, posts `/asks` and opens the answer page. |
+| `AnswerPage` | The question; a summary; points, each with citation chips (save title, plus the timestamp for videos) that open the save card with the quote highlighted; "Where your saves disagree"; "Out of date"; "Coming up"; "Not in your saves" (said plainly); "Ask a follow-up" |
+| `AuditReport` | Counts per kind, then items grouped by kind. Contradictions show two quotes side by side. Gaps and let-go items carry a "Suggestion" tag. Each item has one-tap actions (Merge · Archive · Re-check · Ignore). |
 
 ## Data flow
 
@@ -79,6 +84,7 @@ These icons are also the agents' avatars in **The team**.
   - `agent_event` is prepended to `['team']`.
   - `save_updated` invalidates `['save', save_id]`.
   - `card_new` invalidates `['today']`.
+  - `ask_progress` and `ask_ready` update `['ask', id]`; `audit_ready` invalidates `['audit', id]`.
   - It reconnects with backoff (1s → 30s) and resumes from the last event ID.
 - **Writes:** mutations with optimistic updates for card actions. A failure rolls back and shows a toast with the API's plain `message`.
 - **Uploads:** `POST /api/backend/uploads/sign` → `PUT` the file straight to `upload_url` with progress (XHR) → `POST /saves/file` or `/imports/whatsapp`. Files never pass through Vercel.
@@ -118,6 +124,8 @@ Each one is designed and built:
 - **Say what it does,** not what it doesn't do.
 - **Never describe the user as a person.** Talk about goals and saves.
 - **Numbers only when they're real** (counts from the database).
+- **On answer pages, say plainly what isn't in the saves** ("Nothing you saved covers the application form"), and never fill the gap.
+- **Ask is not a chat.** No assistant persona, no "As an AI…", no greeting. Just the answer page.
 - **Verdict names are fixed:** Fits you · Closed · Not for you · Needs your answer · Couldn't confirm.
 
 ## Accessibility and performance

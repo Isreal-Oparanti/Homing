@@ -24,6 +24,10 @@ Every time you save something, Crowscap answers four questions about it.
 
 - **Now:** you see the four answers right after you save. You can act on it straight away, or let it go knowing it's handled.
 - **Later:** Crowscap brings the save back at that date or moment, together with the next step.
+- **Anytime:**
+  - **search** by meaning, so "YC" also finds "Y Combinator";
+  - **ask** a question ("What do I know about getting into YC?") and get one answer page, built only from your saves, with every point linked to the save it came from;
+  - **audit** a thread or everything: repeats, things that went bad, contradictions, gaps, and what to let go.
 
 Behind each question is an agent. The agents work on their own schedules, every action they take is shown with its evidence, and every decision stays with you.
 
@@ -162,7 +166,7 @@ Each agent keeps its own memory, runs on its own schedule, and logs every action
 - **Out:**
   - The **Today** screen.
   - Calendar entries for dates.
-  - Search across everything.
+  - Search by meaning and by words, Ask (answer pages) and Audit (reports).
 
 ## 6. Screens and words
 
@@ -173,14 +177,18 @@ Each agent keeps its own memory, runs on its own schedule, and logs every action
 | **Thread** | A goal your saves serve, with everything you saved for it |
 | **Today** | The home screen: at most 3 things that need you now, each with its next step and proof |
 | **The team** | A live feed of what each agent did, each entry linked to its evidence |
+| **Answer page** | The result of asking a question: points built only from your saves, each linked to its save |
+| **Audit** | A report on a thread or on everything: repeats, things that went bad, contradictions, gaps, what to let go |
 
 Screens:
 - **Today**
-- **Threads**, with search
+- **Threads**
+- **Search and ask**: one box. Typing shows matching saves instantly; pressing *Ask* builds an answer page.
 - **The team**
 - the **save card**, which opens when you save or tap a save
+- the **answer page** and the **audit report**
 
-There's no chat box. You find things with search, and saves come back on their own.
+There's no chat thread. You search, ask one question at a time, or run an audit, and saves also come back on their own.
 
 ## 7. How it fits the hackathon
 
@@ -228,7 +236,7 @@ There's no chat box. You find things with search, and saves come back on their o
 | **Grok Bot + Obsidian** | A do-it-yourself setup where bots maintain a notes vault, for power users. | Nothing to set up. It starts from WhatsApp and checks claims against official sources. |
 | **Readwise / Recall / mymind** | Libraries. Readwise resurfaces highlights on a schedule; Recall and mymind wait for you to look. | Brings a save back when it's needed (dates, goals, moments) and checks it. |
 | **ChatGPT / Perplexity / Pulse** | Answer what you ask; Pulse sends daily research cards. | Work from what you chose to save, not the open web, with a date or moment for each save. |
-| "Isn't this just RAG?" | — | There's no chat box. Agents work on schedules and triggers, and every claim is checked against its source by code. |
+| "Isn't this just RAG?" | — | The main product is proactive: agents read, check and bring saves back on schedules and triggers. When you do ask, every save has already been understood (images, voice notes and videos included), the model picks the relevant ones by meaning, and code checks every quoted point against your saves. There's no chat thread. |
 
 ## 10. Rules we must not break
 
@@ -281,8 +289,8 @@ Build the whole demo path roughly first, then make each part deep.
 | **Fri 30 Oct, evening** | Tests: can Muse Spark read a YouTube link? Does Voice Transcribe handle 5 real voice notes? Confirm model IDs. Scaffold the repo ([12-dev-workflow.md](12-dev-workflow.md)). | We know which video plan we're on |
 | **Sat 31 Oct** | Rough path end to end on 30 real saves: import → save card with four rough answers → Today, Threads and The team. **First deploy.** | One save goes all the way through on a live URL |
 | **Sun 1 Nov** | **Is it true?** in depth: official sources, quote checks, Lagos time, eligibility. Run it on real opportunity posts, including the 18-opportunity thread. | The "Now" scene works on real posts |
-| **Mon 2 Nov** | **What is it?** for every kind of save; **What's it for?** over the full pile; search. Isreal grades 40 save cards (about 1 hour) for the accuracy numbers. | The "Past" scene works on all 624 saves |
-| **Tue 3 Nov** | **When will you need it?**: triggers, next steps, prep sheet, reel. A sample pile judges can use without their own export. README. **Record in the evening.** | The "Later" scene works; video recorded |
+| **Mon 2 Nov** | **What is it?** for every kind of save; **What's it for?** over the full pile; hybrid search (words + meaning) and **Ask**. Isreal grades 40 save cards (about 1 hour) for the accuracy numbers. | The "Past" scene works on all 624 saves; "How do I prepare for YC?" gives a verified answer page |
+| **Tue 3 Nov** | **When will you need it?**: triggers, next steps, prep sheet, reel. **Audit** (repeats, went bad, contradictions). A sample pile judges can use without their own export. README. **Record in the evening.** | The "Later" scene works; video recorded |
 | **Wed 4 Nov** | Polish, final deploy, X post, submit **before 03:00 Thu, Lagos time** | Submitted |
 
 **Must work at submission:**
@@ -290,6 +298,7 @@ Build the whole demo path roughly first, then make each part deep.
 - [ ] A new save gets its save card with all four answers.
 - [ ] **Is it true?** works on at least 5 real opportunity posts, with quoted proof.
 - [ ] Threads are built over the full pile.
+- [ ] Search finds saves by meaning ("YC" finds "Y Combinator"). **Ask** gives an answer page where every point is verified against a save.
 - [ ] **Today** shows at most 3 brought-back saves, each with a next step.
 - [ ] **The team** feed links every action to its evidence.
 - [ ] A live URL with a sample pile.
@@ -298,9 +307,10 @@ Build the whole demo path roughly first, then make each part deep.
 
 **If we fall behind, cut in this order:**
 1. the reel
-2. polish on the threads view
-3. voice notes
-4. the daily re-check
+2. Audit gaps and let-go suggestions (keep repeats and things that went bad)
+3. polish on the threads view
+4. voice notes
+5. the daily re-check
 
 **Never cut:** the proof on every claim, or the save card.
 
@@ -332,6 +342,8 @@ Build the whole demo path roughly first, then make each part deep.
 | "WhatsApp Wrapped" | Close to the personality-analyser ban, and uses other people's data |
 | Glasses, the "Receipts" fact-checker, exam prep | Rejected earlier |
 | A Crowscap WhatsApp bot | Banned on the Business API |
+| A chat thread for asking questions | Looks like basic RAG and like every assistant, and invites made-up answers. We use one-question answer pages (Ask) instead. |
+| Keyword-only search, or the model reading the whole library on every question | Keywords miss "YC" vs "Y Combinator". Whole-library reads get slower and pricier with every save. We use hybrid search plus the model picking from the top results. |
 | Naming the agents "Reader" and "Librarian" | Too close to the viral Grok Bot + Obsidian post. We use the four questions instead. |
 
 ## 15. Rules to come back to
@@ -351,7 +363,7 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
 - Does Meta's API include web search? If not, which search API do we use?
 - What are the exact model IDs in the dashboard? What shape does the transcription endpoint take? Does Spark take files through a Files API or by URL?
 - Hosting: is Railway OK, or is the old Crowscap server still available? See [ADR 0007](adr/0007-hosting.md).
-- Does Meta offer an embedding model? Not needed now, see [ADR 0003](adr/0003-search-without-embeddings.md).
+- Does Meta offer an embedding model? We found none, so we run a small open model ourselves. See [ADR 0003](adr/0003-search-ask-audit.md).
 - How does the Community Vote work, and when does voting open?
 - What's the YouTube Data API key setup?
 
@@ -371,3 +383,8 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
   - Added search, a sample pile for judges, an early deploy, a grading session, a must-work checklist and a glossary.
   - The demo now runs past, now, later.
 - **30 Oct, v3:** architecture decided and written up in the developer docs (`docs/01`–`12`, `docs/adr/`). Stack: Next.js, FastAPI with a worker, Postgres job queue, Supabase, and one model gateway.
+- **30 Oct, v4:**
+  - **Asking is back,** without a chat thread: **Ask** gives one verified answer page per question, and **Audit** gives a report on a thread or everything.
+  - **Search is hybrid,** by words and by meaning, using a small open embedding model we run ourselves plus pgvector, because keyword-only search misses "YC" vs "Y Combinator".
+  - Long context is kept for the thread rebuild and audits.
+  - See [ADR 0003](adr/0003-search-ask-audit.md).

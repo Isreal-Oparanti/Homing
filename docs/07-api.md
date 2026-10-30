@@ -115,6 +115,12 @@ data: {"save_id":"…","answer":"true"}
 event: card_new
 data: {"card_id":"…"}
 
+event: ask_ready          (also ask_progress {ask_id, step})
+data: {"ask_id":"…"}
+
+event: audit_ready
+data: {"audit_id":"…"}
+
 : keep-alive   (every 15s)
 ```
 
@@ -123,10 +129,28 @@ Server behaviour:
 - Sends a keep-alive comment every 15s, and closes after 10 minutes.
 - The client reconnects with `Last-Event-ID`.
 
-### Search
+### Search (instant)
 | Method | Path | Query | Returns |
 |---|---|---|---|
-| GET | `/search` | `?q&kind&thread_id&limit` | `SaveSummary[]` with `highlight` |
+| GET | `/search` | `?q&kind&thread_id&limit` | `SaveSummary[]` with `highlight` and `matched_by: ["words" \| "meaning"]` |
+
+Hybrid search by words and meaning, merged with RRF ([02 · Search](02-data-model.md#search)). There's no model call, so it's fast enough for search as you type (debounce 250 ms).
+
+### Ask (answer pages)
+| Method | Path | Body or query | Returns |
+|---|---|---|---|
+| POST | `/asks` | `{question, follows_ask_id?, thread_id?}` | `202 Ask` (`status: queued`) |
+| GET | `/asks/{id}` | — | `Ask` with `answer` once `ready` |
+| GET | `/asks` | `?cursor` | your past questions |
+
+`Ask.answer` uses the `Answer` shape in [02](02-data-model.md#asks). Each citation includes the save's title and a link to its save card. Progress events arrive over SSE (`ask_progress`, `ask_ready`).
+
+### Audits
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| POST | `/audits` | `{scope: "thread" \| "library", thread_id?}` | `202 Audit` |
+| GET | `/audits/{id}` | — | `Audit` with `items` |
+| POST | `/audits/{id}/items/{item_id}/act` | `{action: "merge" \| "archive" \| "recheck" \| "ignore"}` | `AuditItem` |
 
 ### Feedback (evals)
 | Method | Path | Body | Returns |

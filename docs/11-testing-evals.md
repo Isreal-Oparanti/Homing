@@ -38,6 +38,8 @@ These must exist before a feature counts as done.
 | `ingest/whatsapp/parser` | Android DMY and MDY, 12h and 24h, iOS; multi-line; edited; system lines; media attached vs omitted; label within 180s; lists |
 | `ingest/urls` | YouTube Shorts, youtu.be and live normalised; tracking params stripped; X host normalised |
 | `when_needed.priority` | priority formula; the 3-a-day cap; dismissed never comes back |
+| `search.fusion` | RRF merge order; a word-only match and a meaning-only match both appear; private saves never returned |
+| `verify/citations` | quote from the wrong save is rejected; one verified citation keeps a point; a contradiction needs both quotes; "out of date" needs a check or a past date |
 
 ## API tests
 
@@ -61,6 +63,10 @@ These must exist before a feature counts as done.
   Each finding verified, verdict `needs_your_answer` (French), with a question set.
 - **Golden scenario: private.** A code-like note is never sent to the gateway, which raises if it is.
 - **Golden scenario: import.** The synthetic export gives the expected counts.
+- **Golden scenario: ask.** With a fixture library holding an image save ("YC interview tips" screenshot) and a link save ("Y Combinator: how to apply"), asking "How do I prepare for YC?":
+  - both saves are among the candidates (the real local embedding model is used in this test);
+  - every point on the answer page cites one of them with a verified quote;
+  - an unrelated save is never cited.
 
 ## Evals
 
@@ -75,6 +81,8 @@ Grading uses the in-app **feedback** buttons (Right · Wrong · Nonsense) on sav
 | **What's it for?** | all threads after rebuild | % of saves in a sensible thread | measure |
 | **When will you need it?** | 20 saves with dates | % of correct dates and zones | 100% on parsed dates, which code guarantees once the quote is right |
 | Prep sheet | the 16-video demo thread | % of points that are true at the cited second | measure |
+| Search | 15 questions written by Isreal, each with the saves he expects | % of expected saves in the top 10 (recall@10), for words-only vs hybrid | hybrid beats words-only. Report both. |
+| Ask | the same 15 questions | % of answer points graded Right; % of answers that wrongly say "not in your saves" | measure |
 
 **Reporting:**
 - `GET /feedback/summary` gives the counts. Copy them into the README "How well it works" table, with the sample size and date.
