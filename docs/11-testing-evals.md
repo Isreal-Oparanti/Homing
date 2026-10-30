@@ -9,7 +9,7 @@ Two different questions:
 ```
 server/tests/
   unit/          # pure functions: verify/*, ingest/whatsapp/parser, ingest/urls, secrets, priority
-  api/           # FastAPI TestClient against a throwaway Postgres (testcontainers or docker compose)
+  api/           # FastAPI TestClient against TEST_DATABASE_URL, a fresh schema per run (no Docker needed)
   agents/        # agent handlers with FakeModelGateway (recorded outputs) and FakeFetcher
   fixtures/
     whatsapp/    # synthetic exports: android_dmy.txt, android_mdy_12h.txt, ios.txt, with_media.zip

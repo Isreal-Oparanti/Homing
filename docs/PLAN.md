@@ -285,14 +285,14 @@ There's no chat thread. You search, ask one question at a time, or run an audit,
 
 ## 12. Build plan
 
-Build the whole demo path roughly first, then make each part deep.
+Build the whole demo path roughly first, then make each part deep. The slice-by-slice breakdown, with checks, tests and checkpoints, is in [14-build-slices.md](14-build-slices.md).
 
 | Day | Goal | Done when |
 |---|---|---|
 | **Fri 30 Oct, evening** | Tests: can Muse Spark read a YouTube link? Does Voice Transcribe handle 5 real voice notes? Confirm model IDs. Scaffold the repo ([12-dev-workflow.md](12-dev-workflow.md)). | We know which video plan we're on |
-| **Sat 31 Oct** | Rough path end to end on 30 real saves: import → save card with four rough answers → Today, Threads and The team. **First deploy.** | One save goes all the way through on a live URL |
-| **Sun 1 Nov** | **Is it true?** in depth: official sources, quote checks, Lagos time, eligibility. Run it on real opportunity posts, including the 18-opportunity thread. | The "Now" scene works on real posts |
-| **Mon 2 Nov** | **What is it?** for every kind of save; **What's it for?** over the full pile; hybrid search (words + meaning) and **Ask**. Isreal grades 40 save cards (about 1 hour) for the accuracy numbers. | The "Past" scene works on all 624 saves; "How do I prepare for YC?" gives a verified answer page |
+| **Sat 31 Oct** | Rough path end to end on real saves pasted in: save card with four rough answers → Today and The team, with sign-in. **First deploy.** (S1–S5) | One save goes all the way through on a live URL |
+| **Sun 1 Nov** | **Is it true?** in depth: official sources, quote checks, Lagos time, eligibility. Images, flyers and PDFs. Run it on real opportunity posts, including the 18-opportunity thread. (S6–S7) | The "Now" scene works on real posts |
+| **Mon 2 Nov** | **WhatsApp import** of the full pile with media; **What's it for?** over the full pile; hybrid search (words + meaning) and **Ask**. Isreal grades 40 save cards (about 1 hour) for the accuracy numbers. | The "Past" scene works on all 624 saves; "How do I prepare for YC?" gives a verified answer page |
 | **Tue 3 Nov** | **When will you need it?**: triggers, next steps, prep sheet, reel. **Audit** (repeats, went bad, contradictions). A sample pile judges can use without their own export. README. **Record in the evening.** | The "Later" scene works; video recorded |
 | **Wed 4 Nov** | Polish, final deploy, X post, submit **before 03:00 Thu, Lagos time** | Submitted |
 
@@ -393,3 +393,4 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
   - See [ADR 0003](adr/0003-search-ask-audit.md).
 - **30 Oct, v5:** named **Homing** (Crowscap stays as the company and origin). Brand, logo and colours added in [13-brand.md](13-brand.md).
 - **30 Oct, v6:** brand changed to warm glass with a red primary, a new "h" icon and a wordmark. Relic added as a close competitor.
+- **30 Oct, v7:** build slices with checkpoints added ([14-build-slices.md](14-build-slices.md)). Saturday's rough path uses pasted saves; the WhatsApp import moves to Monday.

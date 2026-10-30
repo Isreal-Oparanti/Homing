@@ -18,6 +18,7 @@ Start with [PLAN.md](PLAN.md) for what we're building and why. These docs cover 
 | 11 | [Testing and evals](11-testing-evals.md) | writing tests, or measuring accuracy |
 | 12 | [Dev workflow](12-dev-workflow.md) | setting up locally, following conventions, or committing |
 | 13 | [Brand](13-brand.md) | choosing colours, type, the logo, or wording |
+| 14 | [Build slices](14-build-slices.md) | deciding what to build next, and checking whether a piece is done |
 | — | [Decisions (ADRs)](adr/) | asking "why did we do it this way?" |
 
 ## Rules for these docs
