@@ -270,7 +270,7 @@ There's no chat box. You find things with search, and saves come back on their o
 | X posts | X oEmbed (publish.twitter.com) | Free, first post only |
 | Finding official sources | Links in the post first, then a search API | Check whether Meta's API includes web search |
 | Reel of moments | YouTube embed with start and end times | No downloading |
-| Stack | Whatever Isreal is fastest in | Decide tonight |
+| Stack | Next.js (web) + FastAPI and a Python worker (server) + Postgres and storage (Supabase). See [ADR 0001](adr/0001-stack.md) and the developer docs in [docs/README.md](README.md). | Decided |
 
 ## 12. Build plan
 
@@ -278,7 +278,7 @@ Build the whole demo path roughly first, then make each part deep.
 
 | Day | Goal | Done when |
 |---|---|---|
-| **Fri 30 Oct, evening** | Tests: can Muse Spark read a YouTube link? Does Voice Transcribe handle 5 real voice notes? Confirm model IDs. Pick the stack. | We know which video plan we're on |
+| **Fri 30 Oct, evening** | Tests: can Muse Spark read a YouTube link? Does Voice Transcribe handle 5 real voice notes? Confirm model IDs. Scaffold the repo ([12-dev-workflow.md](12-dev-workflow.md)). | We know which video plan we're on |
 | **Sat 31 Oct** | Rough path end to end on 30 real saves: import → save card with four rough answers → Today, Threads and The team. **First deploy.** | One save goes all the way through on a live URL |
 | **Sun 1 Nov** | **Is it true?** in depth: official sources, quote checks, Lagos time, eligibility. Run it on real opportunity posts, including the 18-opportunity thread. | The "Now" scene works on real posts |
 | **Mon 2 Nov** | **What is it?** for every kind of save; **What's it for?** over the full pile; search. Isreal grades 40 save cards (about 1 hour) for the accuracy numbers. | The "Past" scene works on all 624 saves |
@@ -349,8 +349,9 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
 
 - Can Muse Spark take a YouTube link? Can Muse Spark Open read video?
 - Does Meta's API include web search? If not, which search API do we use?
-- What are the exact model IDs in the dashboard?
-- Which stack?
+- What are the exact model IDs in the dashboard? What shape does the transcription endpoint take? Does Spark take files through a Files API or by URL?
+- Hosting: is Railway OK, or is the old Crowscap server still available? See [ADR 0007](adr/0007-hosting.md).
+- Does Meta offer an embedding model? Not needed now, see [ADR 0003](adr/0003-search-without-embeddings.md).
 - How does the Community Vote work, and when does voting open?
 - What's the YouTube Data API key setup?
 
@@ -369,3 +370,4 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
   - Stated the Afreximbank requirements exactly.
   - Added search, a sample pile for judges, an early deploy, a grading session, a must-work checklist and a glossary.
   - The demo now runs past, now, later.
+- **30 Oct, v3:** architecture decided and written up in the developer docs (`docs/01`–`12`, `docs/adr/`). Stack: Next.js, FastAPI with a worker, Postgres job queue, Supabase, and one model gateway.
