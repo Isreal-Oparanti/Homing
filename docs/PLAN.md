@@ -364,7 +364,7 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
 
 - Can Muse Spark take a YouTube link? Can Muse Spark Open read video?
 - Does Meta's API include web search? If not, which search API do we use?
-- What are the exact model IDs in the dashboard? What shape does the transcription endpoint take? Does Spark take files through a Files API or by URL?
+- ~~What are the exact model IDs?~~ Answered 30 Oct: `muse-spark-1.3` and `muse-voice-transcribe-1.0`, among others (see [06](06-models.md#models-on-our-key)). Still open: what shape does the transcription endpoint take? Does Spark take files through a Files API or by URL?
 - Hosting: is Railway OK, or is the old Crowscap server still available? See [ADR 0007](adr/0007-hosting.md).
 - Does Meta offer an embedding model? We found none, so we run a small open model ourselves. See [ADR 0003](adr/0003-search-ask-audit.md).
 - How does the Community Vote work, and when does voting open?

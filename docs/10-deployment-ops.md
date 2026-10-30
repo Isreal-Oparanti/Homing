@@ -33,7 +33,10 @@ HOMING_PROXY_SECRET=
 **Server (`server/.env.example`):**
 ```
 ENV=prod
-DATABASE_URL=                # postgresql+psycopg://…  (Supabase pooled, port 6543 for api; direct 5432 for migrations)
+DATABASE_URL=                # Supabase Session pooler URI, pasted as shown (postgresql://… is converted)
+TEST_DATABASE_URL=           # same project; tests create and drop their own schema
+DB_POOL_SIZE=3               # per process; the free tier has few pooled connections
+DB_MAX_OVERFLOW=2
 PROXY_SECRET=
 ADMIN_TOKEN=
 STORAGE_BACKEND=supabase     # local|supabase
@@ -43,10 +46,10 @@ STORAGE_BUCKET=saves
 RUN_WORKER_IN_API=false
 WORKER_THREADS=8
 
-META_API_BASE=
+META_API_BASE=https://api.meta.ai/v1
 META_API_KEY=
-META_SPARK_MODEL=
-META_TRANSCRIBE_MODEL=
+META_SPARK_MODEL=muse-spark-1.3
+META_TRANSCRIBE_MODEL=muse-voice-transcribe-1.0
 SPARK_OPEN_BASE=
 SPARK_OPEN_KEY=
 SPARK_OPEN_MODEL=
@@ -96,7 +99,12 @@ FEATURE_AUDIT=true
    - ask one question and confirm the answer page has verified citations.
 
 **First-time setup:**
-- Supabase: create the project and the private `saves` bucket. Enable the `vector` and `pg_trgm` extensions (the first migration also runs `CREATE EXTENSION IF NOT EXISTS`).
+- Supabase (project **Homing**, `eu-west-3`, free tier):
+  - **Connection:** use **Connect → Session pooler** for `DATABASE_URL` and `TEST_DATABASE_URL`. The direct connection is IPv6-only on the free tier and fails on many Nigerian networks. If the password has `@`, `:` or `/`, URL-encode it.
+  - **Later, for production:** the Transaction pooler (port 6543) also works, because the server turns off prepared statements.
+  - **Extensions:** the first migration enables `vector` and `pg_trgm`.
+  - **Storage:** create the private `saves` bucket (S7).
+  - **Data API:** turn it off in project settings, or at least make sure every table has RLS on. Every migration enables RLS ([02](02-data-model.md)), because we never use Supabase's REST API.
 - Google OAuth: add the redirect URL `https://<web>/api/auth/callback/google`.
 - Railway: create two services from the repo.
 - Vercel: create the project and set the env vars.

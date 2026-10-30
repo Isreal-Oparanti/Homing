@@ -40,3 +40,11 @@ def test_me_returns_the_proxied_user(client: TestClient) -> None:
     response = client.get("/api/v1/me", headers=user_headers())
     assert response.status_code == 200
     assert response.json() == {"id": "u1", "email": "u1@example.com", "name": None}
+
+
+def test_supabase_urls_are_accepted_as_pasted() -> None:
+    settings = Settings(database_url="postgresql://u:p@host:5432/postgres")
+    assert settings.database_url == "postgresql+psycopg://u:p@host:5432/postgres"
+    assert Settings(database_url="postgres://u:p@h/db").database_url.startswith(
+        "postgresql+psycopg://"
+    )

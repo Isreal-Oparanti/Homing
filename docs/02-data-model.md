@@ -6,6 +6,7 @@ Postgres 15+. SQLAlchemy 2.x models in `server/app/db/models/`, migrations with 
 - **Keys and time:** IDs are UUIDv7, stored as text and made with `uuid7()`, so they sort by time. All timestamps are `timestamptz` in UTC.
 - **Every user-owned table** has `user_id` and is queried through repository helpers that always filter by it. See [09-security-privacy.md](09-security-privacy.md#user-isolation).
 - **JSON columns are typed.** Each `jsonb` column has a Pydantic model in `server/app/schemas/` and is validated on write.
+- **Row-level security on every table.** Each migration runs `ENABLE ROW LEVEL SECURITY` with no policies. That blocks Supabase's public Data API, while the server connects as the table owner, which RLS doesn't apply to.
 - **Soft delete only where the product needs undo** (cards, threads). Saves are hard-deleted on user request, with their snapshots and media.
 
 ```mermaid

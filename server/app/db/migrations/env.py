@@ -6,7 +6,10 @@ from app.db import models  # noqa: F401  (registers tables on Base.metadata)
 from app.db.base import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+_url = get_settings().database_url
+if not _url:
+    raise RuntimeError("DATABASE_URL is not set. See server/.env.example.")
+config.set_main_option("sqlalchemy.url", _url.replace("%", "%%"))
 target_metadata = Base.metadata
 
 

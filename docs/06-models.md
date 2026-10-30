@@ -6,14 +6,25 @@ All model calls go through one gateway: `server/app/llm/gateway.py`. No other mo
 
 | Provider | Used for | Client | Config |
 |---|---|---|---|
-| **Muse Spark** (Meta Model API) | Reading text, images, PDFs and video; long-context thread rebuilds; comparing a post with its source; prep sheets | `openai` SDK, `base_url=META_API_BASE` (`https://api.meta.ai/v1` **(confirm)**) | `META_API_KEY`, `META_SPARK_MODEL` (third-party docs say `muse-spark-1.1` **(confirm in dashboard)**) |
-| **Muse Voice Transcribe** (Meta Model API) | Voice notes → text | transcription endpoint **(confirm shape: OpenAI-style `/audio/transcriptions`?)** | `META_TRANSCRIBE_MODEL` (`muse-voice-transcribe-1.0` **(confirm)**) |
+| **Muse Spark** (Meta Model API) | Reading text, images, PDFs and video; long-context thread rebuilds; comparing a post with its source; prep sheets | `openai` SDK, `base_url=META_API_BASE` (`https://api.meta.ai/v1`, Bearer key; checked 30 Oct) | `META_API_KEY`, `META_SPARK_MODEL` = `muse-spark-1.3` (default; S0 compares it with 1.2, the `-contributor` builds and `muse-wonder-1.0`) |
+| **Muse Voice Transcribe** (Meta Model API) | Voice notes → text | transcription endpoint **(confirm shape: OpenAI-style `/audio/transcriptions`?)** | `META_TRANSCRIBE_MODEL` = `muse-voice-transcribe-1.0` (listed by `/v1/models`, 30 Oct) |
 | **Muse Spark Open** (Baseten or Modal) | Eligibility on free-text rules, using profile data | OpenAI-compatible endpoint from the host **(confirm)** | `SPARK_OPEN_BASE`, `SPARK_OPEN_KEY`, `SPARK_OPEN_MODEL` (`meta-models/muse-spark-open-1026`) |
 
 **Routing rules** (enforced in the gateway, not by convention):
 - **Private saves** never reach any provider. The gateway refuses any call tagged with a `private` save ID.
 - **Profile data** only goes to `spark_open`. Any purpose that includes `profile` in its inputs can only route there.
 - **No vendor outside Meta** is used for reading or reasoning. The search API returns links only (see [Web search](#web-search)).
+
+## Models on our key
+
+`GET /v1/models` on 30 Oct listed:
+- `muse-spark-1.1`, `muse-spark-1.2` and `muse-spark-1.3`, plus `-contributor` builds of 1.2 and 1.3;
+- `muse-wonder-1.0`;
+- `muse-voice-transcribe-1.0`;
+- `muse-image-1.0`;
+- `sam-3.1`.
+
+We use Spark and Voice Transcribe. S0 checks whether `muse-wonder-1.0` is worth it for `check.compare`, the hardest call. Image generation and segmentation aren't needed.
 
 ## Purposes
 

@@ -78,6 +78,11 @@ Per user, kept in Postgres with a fixed window:
 | Model spend | `MODEL_USER_DAILY_BUDGET_USD` |
 | Demo user | half of the above, and imports disabled (it already has the sample pile) |
 
+## Supabase
+
+- **The server is the only way in.** It connects to Postgres directly, as the table owner. Supabase's REST Data API isn't used: it's switched off, and every table has RLS with no policies, so the anon key reads nothing.
+- **Keys stay server-side.** The service key and database password live only in server env vars. The web app never receives a Supabase key.
+
 ## Model data rules
 
 - **Closed model (Muse Spark):** save content, minus private saves, with phone numbers masked.

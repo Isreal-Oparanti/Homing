@@ -28,6 +28,9 @@ def upgrade() -> None:
             "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
         ),
     )
+    # Supabase exposes the public schema through its Data API. RLS with no policies blocks
+    # that route; the server connects as the table owner, which RLS doesn't apply to.
+    op.execute("ALTER TABLE users ENABLE ROW LEVEL SECURITY")
 
 
 def downgrade() -> None:
