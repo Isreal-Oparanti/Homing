@@ -8,6 +8,24 @@ Built for the Meta Global AI Developer Hackathon (Indie track) on Meta's Muse Sp
 
 > This README is a placeholder. The judges' version (what it does, how to run it, how well it works, limits) is written on Tue 3 Nov.
 
+## Run it locally
+
+```bash
+# server (needs Postgres with pgvector: docker compose up -d db, or a Supabase dev database)
+cd server
+python -m pip install uv
+cp .env.example .env
+python -m uv sync
+python -m uv run alembic upgrade head
+python -m uv run uvicorn app.main:app --reload
+
+# web
+cd web
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
 ## For developers
 
 - What we're building and why: [docs/PLAN.md](docs/PLAN.md)

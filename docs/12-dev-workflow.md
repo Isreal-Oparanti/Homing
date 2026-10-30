@@ -5,8 +5,7 @@
 ```
 crowscap-hackathon/
   README.md                  # for judges: what, how to run, Meta models, limits (written Tue)
-  Makefile                   # dev, test, lint, fmt, migrate, seed
-  docker-compose.yml         # local Postgres
+  docker-compose.yml         # optional local Postgres (pgvector)
   docs/                      # this folder
   web/                       # Next.js app
     app/                     # routes (see 08)
@@ -50,17 +49,29 @@ crowscap-hackathon/
 
 ## Local setup
 
+There's no `make` on Windows, so these are plain commands. Python tooling is `uv`, run as `python -m uv`.
+
 ```bash
 # once
-cp server/.env.example server/.env      # fill META_*, YOUTUBE_API_KEY…
-cp web/.env.example web/.env.local
-docker compose up -d db                 # Postgres 16 on :5432
-cd server && uv sync && uv run alembic upgrade head
-cd ../web && npm ci
+python -m pip install uv
+cp server/.env.example server/.env        # DATABASE_URL, PROXY_SECRET, META_*
+cp web/.env.example web/.env.local        # same PROXY_SECRET as the server
+# Postgres with pgvector: `docker compose up -d db` if you have Docker,
+# otherwise a Supabase dev project's connection string in DATABASE_URL.
 
-# every day
-make dev        # api :8000 (with in-process worker) + web :3000
-make test-unit  # fast
+# server
+cd server
+python -m uv sync
+python -m uv run alembic upgrade head
+python -m uv run uvicorn app.main:app --reload    # :8000, /docs in local
+python -m uv run pytest                           # tests
+python -m uv run ruff check . && python -m uv run ruff format --check .
+
+# web
+cd web
+npm install
+npm run dev                                       # :3000
+npm run lint && npm run typecheck
 ```
 
 ## Conventions
@@ -90,7 +101,7 @@ make test-unit  # fast
 - **Commits:** small, with conventional prefixes: `feat(agents): …`, `fix(verify): …`, `docs: …`, `test: …`, `chore: …`.
 - **Commit locally. Push only when Isreal says so.**
 - **Commit trailers:** commits are Isreal's own, so no `Co-Authored-By` lines.
-- **Before each commit:** `make lint test-unit`, and update the docs touched by the change.
+- **Before each commit:** run the server tests and lint, plus `npm run lint && npm run typecheck` for web, and update the docs touched by the change.
 
 ## Definition of done (per feature)
 

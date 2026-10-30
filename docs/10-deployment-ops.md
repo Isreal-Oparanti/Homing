@@ -4,7 +4,7 @@
 
 | Env | Web | API + worker | Database and storage | Notes |
 |---|---|---|---|---|
-| `local` | `npm run dev` on :3000 | `uvicorn` on :8000, worker inside the API (`RUN_WORKER_IN_API=true`) | Postgres in Docker; storage on the local disk (`STORAGE_BACKEND=local`) | `make dev` starts everything |
+| `local` | `npm run dev` on :3000 | `uvicorn` on :8000, worker inside the API (`RUN_WORKER_IN_API=true`) | Postgres (Docker or a Supabase dev database); storage on the local disk (`STORAGE_BACKEND=local`) | see [12-dev-workflow.md](12-dev-workflow.md#local-setup) |
 | `prod` | Vercel | One Docker image, two services: `api` and `worker` | Supabase (Postgres + Storage) | See [ADR 0007](adr/0007-hosting.md) |
 
 There's no staging environment, because there's no time. Use feature flags and the demo user instead.

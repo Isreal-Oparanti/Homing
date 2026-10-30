@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* Brand tokens. Source of truth: docs/13-brand.md */
+:root {
+  --bg: #fbf8f6;
+  --ink: #16181b;
+  --ink-2: #4b4f55;
+  --muted: #868a90;
+  --line: rgb(22 24 27 / 0.08);
+
+  --red: #d2402f;
+  --red-600: #b8311f;
+  --red-soft: #fce9e5;
+  --glow: #f2836f;
+
+  --green: #1f7a4d;
+  --green-soft: #e5f3ea;
+  --amber: #b45309;
+  --amber-soft: #fcf1e4;
+  --grey-soft: #efeeec;
+
+  --glass: rgb(255 255 255 / 0.62);
+  --glass-strong: rgb(255 255 255 / 0.78);
+  --glass-line: rgb(255 255 255 / 0.7);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-red: var(--red);
+  --color-red-600: var(--red-600);
+  --color-red-soft: var(--red-soft);
+  --color-green: var(--green);
+  --color-green-soft: var(--green-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-grey-soft: var(--grey-soft);
+  --color-glass: var(--glass);
+  --color-glass-strong: var(--glass-strong);
+
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-jakarta);
+  --font-quote: var(--font-source-serif);
+
+  --radius-card: 22px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-feature-settings: "tnum" 1;
+}
+
+/* Warm glows behind the glass. Glass needs something behind it. */
+.page-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(40% 35% at 85% 8%, rgb(242 131 111 / 0.35), transparent 70%),
+    radial-gradient(35% 30% at 10% 30%, rgb(210 64 47 / 0.16), transparent 70%),
+    radial-gradient(45% 40% at 60% 95%, rgb(255 196 170 / 0.35), transparent 70%),
+    var(--bg);
+}
+
+@utility glass {
+  background: rgb(255 255 255 / 0.92);
+  border: 1px solid var(--glass-line);
+  box-shadow:
+    0 8px 30px rgb(22 24 27 / 0.06),
+    inset 0 1px 0 rgb(255 255 255 / 0.8);
+
+  @supports (backdrop-filter: blur(1px)) {
+    background: var(--glass);
+    backdrop-filter: blur(18px) saturate(140%);
+  }
+}

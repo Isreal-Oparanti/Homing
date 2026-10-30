@@ -20,8 +20,8 @@ web/
 ```
 
 **Run:**
-- `make test` runs everything.
-- `make test-unit` takes under 5 seconds and is run constantly.
+- `python -m uv run pytest` (server) and `npm test` (web) run everything.
+- `python -m uv run pytest tests/unit` takes under 5 seconds and is run constantly.
 
 ## Unit tests
 
