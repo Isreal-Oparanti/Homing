@@ -6,63 +6,69 @@ Visual reference: [brand/brand-sheet.html](brand/brand-sheet.html). Open it in a
 
 ## Direction in one line
 
-Calm, paper-like, precise. **Colour is only used where it carries meaning.** It should feel like a well-made notebook that tells the truth, not a flashy AI app.
+**Warm glass.** Frosted, translucent surfaces over a warm white background with soft red glows. Big, confident geometric headlines. Red is the brand; everything else stays quiet.
+
+> Relic (relic-app.com) uses a similar glass look with a warm accent and is a direct competitor ("helps you remember"). We share the style family but not the details: our accent is red, not terracotta; our headline font is Plus Jakarta Sans, not Poppins; and our own pieces carry the identity (the four-question save card, verified quotes in serif).
 
 ## Logo
 
 | File | Use |
 |---|---|
-| [brand/mark.svg](brand/mark.svg) | The mark on light backgrounds |
-| [brand/mark-dark.svg](brand/mark-dark.svg) | The mark on dark backgrounds |
-| [brand/app-icon.svg](brand/app-icon.svg) | Installed-app icon, social avatar (export 192, 512 and a maskable 512 PNG) |
-| [brand/favicon.svg](brand/favicon.svg) | Browser tab. Heavier strokes so it holds at 16px. |
+| [brand/app-icon.svg](brand/app-icon.svg) | **The icon.** A white lowercase "h" on a red rounded square. The right leg stops short and lands on a dot: home. Installed-app icon, avatar, nav. |
+| [brand/icon-dark.svg](brand/icon-dark.svg) | Icon on ink, with a coral dot, for dark contexts |
+| [brand/favicon.svg](brand/favicon.svg) | Browser tab (same as the icon) |
+| Wordmark | **homing** in Plus Jakarta Sans ExtraBold (800), lowercase, letter spacing −0.045em. The dot of the "i" is a red circle (`--red`). Built in HTML/CSS: a dotless `ı` plus a positioned dot. Export an outlined SVG before any print or social use. |
 
-- **The idea:** a path goes out and comes back around to a dot. The dot is home: a save returning at the right moment.
-- **Wordmark:** the mark, then **homing**, all lowercase. Inter Semibold, letter spacing −0.035em. The mark is as tall as the letters' cap height × 1.4, with a gap of 0.3× the mark's width.
+- **Lockup:** the icon, then the wordmark. The icon is as tall as the wordmark's x-height × 1.9, with a gap of 0.3× the icon's width.
 - **Don'ts:**
-  - don't rotate the mark;
-  - don't add an arrowhead (it then reads as a "refresh" icon);
-  - don't use any dot colour other than teal;
-  - don't use gradients.
+  - don't recolour the icon tile;
+  - don't put the icon on a busy photo;
+  - don't add an outline;
+  - don't use a capital "H".
 
 ## Colour
 
-| Token | Light | Dark | Use |
-|---|---|---|---|
-| `--paper` | `#F6F5F1` | `#0F1113` | page background |
-| `--surface` | `#FFFFFF` | `#171A1D` | cards, sheets |
-| `--ink` | `#14171A` | `#ECEDEE` | text, primary buttons |
-| `--ink-2` | `#4A4F55` | `#B4B8BD` | secondary text |
-| `--muted` | `#80848A` | `#7E838A` | labels, meta |
-| `--line` | `#E5E3DE` | `#2A2E33` | borders, dividers |
-| `--teal` | `#0E6B63` | `#4FC1B2` | **brand, "verified", "Fits you"** |
-| `--teal-soft` | `#E3F1EE` | `#12302C` | verified highlight, badge background |
-| `--amber` | `#B45309` | `#F0A35E` | "Needs your answer", "Couldn't confirm" |
-| `--amber-soft` | `#FCF1E4` | `#33230F` | |
-| `--red` | `#B42318` | `#F07B70` | "Closed", "Not for you" |
-| `--red-soft` | `#FBEAE8` | `#3A1714` | |
+| Token | Value | Use |
+|---|---|---|
+| `--red` | `#D2402F` | **Brand and primary action** (main buttons, links, the "i" dot, key words in headlines) |
+| `--red-600` | `#B8311F` | hover and pressed states |
+| `--red-soft` | `#FCE9E5` | selected states, soft highlights |
+| `--glow` | `#F2836F` | background glows only (radial gradients at low opacity) |
+| `--bg` | `#FBF8F6` | page background (warm white) |
+| `--ink` | `#16181B` | text, secondary dark buttons |
+| `--ink-2` | `#4B4F55` | secondary text, question icons |
+| `--muted` | `#868A90` | labels, meta |
+| `--line` | `rgba(22,24,27,.08)` | dividers |
+| `--glass` | `rgba(255,255,255,.62)` + `backdrop-filter: blur(18px) saturate(140%)` | cards, nav, sheets |
+| `--glass-line` | `rgba(255,255,255,.7)` | glass borders, plus an inset top highlight |
+| `--green` / `--green-soft` | `#1F7A4D` / `#E5F3EA` | **verified quotes, "Fits you"** |
+| `--amber` / `--amber-soft` | `#B45309` / `#FCF1E4` | "Needs your answer", "Couldn't confirm" |
+| grey (`--ink-2` on `#EFEEEC`) | | "Closed", "Not for you" |
 
 **Rules:**
-- **Teal means "checked and good".** The brand colour and the proof colour are deliberately the same: when you see teal, something was verified. Never use teal decoratively.
-- **The four questions are monochrome.** Their icons and labels are in `--ink-2`. Colour appears only on verdicts and verified quotes.
-- **Primary buttons are ink, not teal.** That keeps teal meaning "verified".
-- **Contrast:** every text/background pair meets WCAG AA. Teal on `--teal-soft` is for badges at 12px semibold or larger.
+- **Red is the brand, not a warning.** Because the brand is red, "Closed" and "Not for you" are shown in calm **grey**. They're facts, not alarms. Never use red for errors in content.
+- **Green means verified,** and only verified. Highlighted quote text and the "Fits you" badge use it.
+- **One red action per screen.** Secondary actions are glass buttons.
+- **Glass needs something behind it.** Always pair it with the warm background glows. Glass on a flat white page just looks grey.
+- **Fallback:** where `backdrop-filter` isn't supported, use `rgba(255,255,255,.92)`.
+- **Contrast:** white on `--red` passes AA for text 14px semibold and up (buttons). Body text is never red on white below 18px.
 
 ## Type
 
 | Role | Font | Notes |
 |---|---|---|
-| UI, headings, numbers | **Inter** (400, 500, 600, 650) | `font-feature-settings: "tnum"` so dates and counts line up |
-| Quoted source text | **Source Serif 4** (400, italic) | **Only** for text quoted from a source or a save, so a quote always looks like a quote |
+| Headlines, card titles, wordmark | **Plus Jakarta Sans** (600–800) | Letter spacing −0.02 to −0.045em |
+| UI text, numbers | **Inter** (400–600) | `"tnum"` so dates and counts line up |
+| Quoted source text | **Source Serif 4** | Only for text quoted from a source or a save, so a quote always looks like a quote |
 
-**Scale (px):** 12 meta · 14 body · 15 answer · 18 card title · 24 section · 34 page title. Line height 1.5 for body. Headings use letter spacing −0.01 to −0.03em.
+**Scale (px):** 12 meta · 14 body · 15 answer · 19 card title · 28 section · 64 hero (40 on mobile).
 
-## Shape and spacing
+## Shape and depth
 
-- **Radius:** 14px for cards, 10px for controls, 999px for badges.
-- **Spacing:** a 4px scale, with 20px card padding.
-- **Shadow:** at most `0 1px 2px rgba(20,23,26,.04)`. Depth comes from borders, not shadows.
-- **Icons:** lucide, 1.8px stroke, 18px.
+- **Radius:** 22px for cards, 999px for buttons, nav and badges.
+- **Shadow:** `0 8px 30px rgba(22,24,27,.06)`, plus an inset top highlight `inset 0 1px 0 rgba(255,255,255,.8)`. The primary button gets a soft red shadow: `0 6px 20px rgba(210,64,47,.35)`.
+- **Nav:** a floating glass pill, centred, at most 760px wide.
+- **Icons:** lucide, 1.8px stroke, 18px, in `--ink-2`.
 
 ## Voice
 

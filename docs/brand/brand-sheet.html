@@ -4,107 +4,117 @@
 <meta charset="utf-8">
 <title>Homing brand sheet</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&family=Source+Serif+4:ital@0;1&display=swap" rel="stylesheet">
 <style>
   :root{
-    --paper:#F6F5F1; --surface:#FFFFFF; --ink:#14171A; --ink-2:#4A4F55; --muted:#80848A; --line:#E5E3DE;
-    --teal:#0E6B63; --teal-soft:#E3F1EE; --amber:#B45309; --amber-soft:#FCF1E4; --red:#B42318; --red-soft:#FBEAE8;
+    --bg:#FBF8F6; --ink:#16181B; --ink-2:#4B4F55; --muted:#868A90; --line:rgba(22,24,27,.08);
+    --glass:rgba(255,255,255,.62); --glass-strong:rgba(255,255,255,.78); --glass-line:rgba(255,255,255,.7);
+    --red:#D2402F; --red-600:#B8311F; --red-soft:#FCE9E5; --glow:#F2836F;
+    --green:#1F7A4D; --green-soft:#E5F3EA; --amber:#B45309; --amber-soft:#FCF1E4; --grey-soft:#EFEEEC;
+    --display:"Plus Jakarta Sans",Inter,system-ui,sans-serif; --ui:Inter,system-ui,sans-serif; --quote:"Source Serif 4",Georgia,serif;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,system-ui,sans-serif;font-feature-settings:"tnum" 1}
-  .wrap{max-width:1120px;margin:0 auto;padding:48px 32px 80px}
-  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:48px 0 16px}
-  .row{display:flex;gap:24px;flex-wrap:wrap;align-items:center}
-  .tile{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px;display:flex;align-items:center;justify-content:center}
-  .dark{background:#0F1113;border-color:#0F1113}
-  .lockup{display:flex;align-items:center;gap:12px}
-  .word{font-weight:650;font-size:40px;letter-spacing:-.035em}
-  .sw{width:160px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--surface)}
-  .sw div:first-child{height:72px}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);font-feature-settings:"tnum" 1;overflow-x:hidden}
+  .bg{position:fixed;inset:0;z-index:-1;background:
+      radial-gradient(40% 35% at 85% 8%, rgba(242,131,111,.35), transparent 70%),
+      radial-gradient(35% 30% at 10% 30%, rgba(210,64,47,.16), transparent 70%),
+      radial-gradient(45% 40% at 60% 95%, rgba(255,196,170,.35), transparent 70%), var(--bg)}
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 32px 90px}
+  .glass{background:var(--glass);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);border:1px solid var(--glass-line);box-shadow:0 8px 30px rgba(22,24,27,.06), inset 0 1px 0 rgba(255,255,255,.8)}
+  nav{display:flex;align-items:center;justify-content:space-between;border-radius:999px;padding:10px 12px 10px 20px;max-width:760px;margin:0 auto}
+  nav .links{display:flex;gap:26px;font-size:14px;color:var(--ink-2)}
+  .btn{font:600 14px var(--ui);padding:10px 18px;border-radius:999px;border:1px solid var(--line);background:var(--glass-strong);color:var(--ink);cursor:pointer}
+  .btn.primary{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 6px 20px rgba(210,64,47,.35)}
+  .btn.dark{background:var(--ink);border-color:var(--ink);color:#fff}
+  .hero{text-align:center;padding:70px 0 30px}
+  .hero h1{font:800 64px/1.04 var(--display);letter-spacing:-.04em;margin:0 auto;max-width:860px}
+  .hero h1 em{font-style:normal;color:var(--red)}
+  .hero p{font-size:18px;color:var(--ink-2);max-width:620px;margin:20px auto 28px;line-height:1.55}
+  h2{font:700 12px var(--ui);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:56px 0 16px}
+  .row{display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+  .tile{border-radius:22px;padding:26px;display:flex;flex-direction:column;align-items:center;gap:12px;min-width:170px}
+  .tile small{color:var(--muted);font-size:12px}
+  .word{font:800 34px var(--display);letter-spacing:-.045em;display:inline-flex;align-items:center}
+  .sw{width:150px;border-radius:16px;overflow:hidden}
+  .sw div:first-child{height:64px}
   .sw p{margin:0;padding:10px 12px;font-size:12px;line-height:1.5}
   .sw b{display:block;font-size:13px}
-  .type h1{font-size:34px;letter-spacing:-.03em;margin:0 0 6px;font-weight:650}
-  .type p{margin:0 0 6px;color:var(--ink-2);font-size:15px}
-  .quote{font-family:"Source Serif 4",Georgia,serif;font-size:17px;line-height:1.55}
-  /* sample save card */
-  .card{width:420px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 1px 2px rgba(20,23,26,.04)}
+  .card{width:440px;border-radius:22px;padding:22px}
   .meta{font-size:12px;color:var(--muted);margin-bottom:4px}
-  .title{font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:14px}
+  .title{font:700 19px var(--display);letter-spacing:-.02em;margin-bottom:12px}
   .ans{display:grid;grid-template-columns:22px 1fr;gap:10px;padding:12px 0;border-top:1px solid var(--line)}
-  .q{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:3px}
+  .q{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:3px}
   .a{font-size:14px;line-height:1.5}
-  .badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px}
-  .amber{background:var(--amber-soft);color:var(--amber)}
-  .tealb{background:var(--teal-soft);color:var(--teal)}
-  .redb{background:var(--red-soft);color:var(--red)}
-  .ev{margin-top:8px;border-left:2px solid var(--teal);padding:6px 10px;background:#FBFAF7;border-radius:0 8px 8px 0}
-  .ev .src{font-size:11px;color:var(--muted);font-family:Inter,system-ui,sans-serif}
-  mark{background:var(--teal-soft);color:inherit;padding:0 2px;border-radius:3px}
-  .btns{display:flex;gap:8px;margin-top:14px}
-  .btn{font:600 13px Inter,system-ui,sans-serif;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
-  .btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .badge{display:inline-block;font:600 12px var(--ui);padding:3px 9px;border-radius:999px}
+  .g{background:var(--green-soft);color:var(--green)} .am{background:var(--amber-soft);color:var(--amber)} .gr{background:var(--grey-soft);color:var(--ink-2)}
+  .ev{margin-top:8px;border-left:2px solid var(--green);padding:7px 11px;background:rgba(255,255,255,.7);border-radius:0 10px 10px 0}
+  .ev .src{font:12px var(--ui);color:var(--muted)}
+  .quote{font-family:var(--quote);font-size:15.5px;line-height:1.55}
+  mark{background:var(--green-soft);color:inherit;padding:0 2px;border-radius:3px}
   svg.i{width:18px;height:18px;stroke:var(--ink-2);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin-top:2px}
 </style>
 </head>
 <body>
+<div class="bg"></div>
 <div class="wrap">
-  <div class="lockup">
-    <svg width="44" height="44" viewBox="0 0 64 64"><path d="M44.5 17.5 A 20 20 0 1 0 51 34" fill="none" stroke="#14171A" stroke-width="6" stroke-linecap="round"/><circle cx="50.5" cy="22.5" r="6.5" fill="#0E6B63"/></svg>
-    <span class="word">homing</span>
-  </div>
-  <p style="color:var(--ink-2);margin:8px 0 0">Save anything to use now or later.</p>
 
-  <h2>Mark</h2>
+  <nav class="glass">
+    <span class="word" style="font-size:20px;gap:8px">
+      <svg width="26" height="26" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#D2402F"/><path d="M23 14v36M23 37c0-9 18-9 18 0v4" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><circle cx="41" cy="50" r="4.5" fill="#fff"/></svg>hom<span style="position:relative">ı<span style="position:absolute;left:50%;top:.06em;transform:translateX(-50%);width:.22em;height:.22em;border-radius:50%;background:#D2402F"></span></span>ng</span>
+    <span class="links"><span>How it works</span><span>FAQ</span><span>Sign in</span></span>
+    <button class="btn dark">Try the demo</button>
+  </nav>
+
+  <section class="hero">
+    <h1>Save anything.<br>It comes back <em>when you need it.</em></h1>
+    <p>Links, flyers, voice notes, videos. Homing reads every save, checks it against the source, and brings it back at the right moment.</p>
+    <button class="btn primary">Import your WhatsApp saves</button>
+  </section>
+
+  <h2>Logo · A is the icon, C is the wordmark (B dropped)</h2>
   <div class="row">
-    <div class="tile"><svg width="120" height="120" viewBox="0 0 64 64"><path d="M44.5 17.5 A 20 20 0 1 0 51 34" fill="none" stroke="#14171A" stroke-width="6" stroke-linecap="round"/><circle cx="50.5" cy="22.5" r="6.5" fill="#0E6B63"/></svg></div>
-    <div class="tile dark"><svg width="120" height="120" viewBox="0 0 64 64"><path d="M44.5 17.5 A 20 20 0 1 0 51 34" fill="none" stroke="#ECEDEE" stroke-width="6" stroke-linecap="round"/><circle cx="50.5" cy="22.5" r="6.5" fill="#4FC1B2"/></svg></div>
-    <div class="tile" style="padding:20px"><svg width="128" height="128" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#14171A"/><g transform="translate(9 9) scale(.72)"><path d="M44.5 17.5 A 20 20 0 1 0 51 34" fill="none" stroke="#F6F5F1" stroke-width="6.5" stroke-linecap="round"/><circle cx="50.5" cy="22.5" r="7" fill="#4FC1B2"/></g></svg></div>
-    <div class="tile" style="gap:18px">
-      <svg width="32" height="32" viewBox="0 0 64 64"><path d="M44.5 17.5 A 20 20 0 1 0 51 34" fill="none" stroke="#14171A" stroke-width="7" stroke-linecap="round"/><circle cx="50.5" cy="22.5" r="7.5" fill="#0E6B63"/></svg>
-      <svg width="16" height="16" viewBox="0 0 64 64"><path d="M44.5 17.5 A 20 20 0 1 0 51 34" fill="none" stroke="#14171A" stroke-width="8" stroke-linecap="round"/><circle cx="50.5" cy="22.5" r="8.5" fill="#0E6B63"/></svg>
+    <div class="tile glass">
+      <svg width="96" height="96" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#D2402F"/><path d="M23 14v36M23 37c0-9 18-9 18 0v4" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><circle cx="41" cy="50" r="4.5" fill="#fff"/></svg>
+      <small>A · the "h" whose leg lands on a dot (home)</small>
+    </div>
+    <div class="tile glass">
+      <svg width="96" height="96" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#16181B"/><path d="M14 40c6-14 16-20 30-18" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M14 40c10-4 20-2 30 6" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".55"/><circle cx="48" cy="21" r="5.5" fill="#D2402F"/></svg>
+      <small>B · a wing arcing home to a red dot</small>
+    </div>
+    <div class="tile glass">
+      <span class="word" style="font-size:44px">hom<span style="position:relative">ı<span style="position:absolute;left:50%;top:.06em;transform:translateX(-50%);width:.22em;height:.22em;border-radius:50%;background:#D2402F"></span></span>ng</span>
+      <small>C · wordmark, the "i" dot is home</small>
     </div>
   </div>
-  <p style="color:var(--ink-2);font-size:14px;max-width:640px">The path goes out and comes back around to the dot. The dot is home: a save returning at the right moment.</p>
 
   <h2>Colour</h2>
   <div class="row">
-    <div class="sw"><div style="background:#14171A"></div><p><b>Ink</b>#14171A · text, primary buttons</p></div>
-    <div class="sw"><div style="background:#F6F5F1"></div><p><b>Paper</b>#F6F5F1 · background</p></div>
-    <div class="sw"><div style="background:#FFFFFF"></div><p><b>Surface</b>#FFFFFF · cards</p></div>
-    <div class="sw"><div style="background:#0E6B63"></div><p><b>Homing teal</b>#0E6B63 · brand, verified, fits you</p></div>
-    <div class="sw"><div style="background:#B45309"></div><p><b>Amber</b>#B45309 · needs you</p></div>
-    <div class="sw"><div style="background:#B42318"></div><p><b>Red</b>#B42318 · closed, not for you</p></div>
-  </div>
-
-  <h2>Type</h2>
-  <div class="row" style="align-items:flex-start;gap:48px">
-    <div class="type"><h1>Closes Sun 2 Nov, 23:59</h1><p>Inter · UI, headings, numbers (tabular)</p></div>
-    <div class="type"><div class="quote">“Fluency in English or French and a working knowledge of the other.”</div><p style="margin-top:6px">Source Serif 4 · only for quoted source text</p></div>
+    <div class="sw glass"><div style="background:#D2402F"></div><p><b>Homing red</b>#D2402F · brand, primary action</p></div>
+    <div class="sw glass"><div style="background:#16181B"></div><p><b>Ink</b>#16181B · text</p></div>
+    <div class="sw glass"><div style="background:#FBF8F6"></div><p><b>Warm white</b>#FBF8F6 · background</p></div>
+    <div class="sw glass"><div style="background:rgba(255,255,255,.62)"></div><p><b>Glass</b>white 62% + blur</p></div>
+    <div class="sw glass"><div style="background:#1F7A4D"></div><p><b>Green</b>#1F7A4D · verified, fits you</p></div>
+    <div class="sw glass"><div style="background:#B45309"></div><p><b>Amber</b>#B45309 · needs you</p></div>
   </div>
 
   <h2>In use · save card</h2>
-  <div class="card">
+  <div class="card glass">
     <div class="meta">Saved Thu 30 Oct · WhatsApp · apply.workable.com</div>
     <div class="title">Afreximbank internship call</div>
-
     <div class="ans"><svg class="i" viewBox="0 0 24 24"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2M8 9h8M8 12h8M8 15h5"/></svg>
       <div><div class="q">What is it?</div><div class="a">Internship programme in Cairo for students aged 20–32. $1,000 a month.</div></div></div>
-
     <div class="ans"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
-      <div><div class="q">Is it true?</div><div class="a"><span class="badge amber">Needs your answer</span> The post left out 4 things.
-        <div class="ev"><div class="quote" style="font-size:15px">“Fluency in English or French <mark>and a working knowledge of the other</mark>.”</div><div class="src">apply.workable.com · verified on source</div></div></div></div></div>
-
+      <div><div class="q">Is it true?</div><div class="a"><span class="badge am">Needs your answer</span> The post left out 4 things.
+        <div class="ev"><div class="quote">“Fluency in English or French <mark>and a working knowledge of the other</mark>.”</div><div class="src">apply.workable.com · verified on source</div></div></div></div></div>
     <div class="ans"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h6a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8h6"/></svg>
       <div><div class="q">What's it for?</div><div class="a">Funding and opportunities · 26th save</div></div></div>
-
     <div class="ans"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
       <div><div class="q">When will you need it?</div><div class="a">Now. The post says it closes tomorrow. The official page shows no date.</div></div></div>
-
-    <div class="btns"><button class="btn primary">Use it</button><button class="btn">Not for me</button><button class="btn">Later</button></div>
+    <div class="row" style="gap:8px;margin-top:14px"><button class="btn primary">Use it</button><button class="btn">Not for me</button><button class="btn">Later</button></div>
   </div>
 
   <h2>Verdicts</h2>
-  <div class="row"><span class="badge tealb">Fits you</span><span class="badge amber">Needs your answer</span><span class="badge amber">Couldn't confirm</span><span class="badge redb">Closed</span><span class="badge redb">Not for you</span></div>
+  <div class="row"><span class="badge g">Fits you</span><span class="badge am">Needs your answer</span><span class="badge am">Couldn't confirm</span><span class="badge gr">Closed</span><span class="badge gr">Not for you</span></div>
 </div>
 </body>
 </html>

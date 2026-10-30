@@ -236,6 +236,7 @@ There's no chat thread. You search, ask one question at a time, or run an audit,
 |---|---|---|
 | **Meta Muse** | A personal agent: works on goals you give it, acts for you with approval, sends proactive check-ins, and can search your Instagram saved posts. US/Canada and Japan; not Nigeria. | Works on your saves from any app, including WhatsApp and YouTube, which Muse doesn't read. Checks claims against official sources, and stays inside your library. |
 | **Grok Bot + Obsidian** | A do-it-yourself setup where bots maintain a notes vault, for power users. | Nothing to set up. It starts from WhatsApp and checks claims against official sources. |
+| **Relic** (relic-app.com, beta) | "Most tools help you save. Relic helps you remember." It gathers links, PDFs, notes, YouTube, Instagram and LinkedIn posts, organises them automatically, and helps you find and use what you've learned. | Closest in spirit. Homing checks saves against their official source, and brings each save back at a date or moment with the next step. Check Relic's features properly before the pitch **(confirm)**. |
 | **Readwise / Recall / mymind** | Libraries. Readwise resurfaces highlights on a schedule; Recall and mymind wait for you to look. | Brings a save back when it's needed (dates, goals, moments) and checks it. |
 | **ChatGPT / Perplexity / Pulse** | Answer what you ask; Pulse sends daily research cards. | Work from what you chose to save, not the open web, with a date or moment for each save. |
 | "Isn't this just RAG?" | — | The main product is proactive: agents read, check and bring saves back on schedules and triggers. When you do ask, every save has already been understood (images, voice notes and videos included), the model picks the relevant ones by meaning, and code checks every quoted point against your saves. There's no chat thread. |
@@ -391,3 +392,4 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
   - Long context is kept for the thread rebuild and audits.
   - See [ADR 0003](adr/0003-search-ask-audit.md).
 - **30 Oct, v5:** named **Homing** (Crowscap stays as the company and origin). Brand, logo and colours added in [13-brand.md](13-brand.md).
+- **30 Oct, v6:** brand changed to warm glass with a red primary, a new "h" icon and a wordmark. Relic added as a close competitor.

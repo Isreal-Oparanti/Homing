@@ -14,7 +14,7 @@
 | Auth | NextAuth (Google, plus a "Try the demo" credentials provider) | Same pattern as current Crowscap |
 | Forms | react-hook-form + zod | The profile form |
 | Dates | `date-fns` + `date-fns-tz` | Show times in the user's zone |
-| Fonts | Inter (UI) + Source Serif 4 (quoted source text only), via `next/font` | See [13-brand.md](13-brand.md#type) |
+| Fonts | Plus Jakarta Sans (headlines), Inter (UI), Source Serif 4 (quoted source text only), via `next/font` | See [13-brand.md](13-brand.md#type) |
 
 **Pin exact versions at scaffold time.** No `"latest"` in `package.json`; the current Crowscap's `"latest"` pins are a lesson.
 
@@ -54,7 +54,7 @@
 | What's it for? | `Waypoints` |
 | When will you need it? | `CalendarClock` |
 
-Icons and labels are monochrome (`--ink-2`). Colour appears only on verdicts and verified quotes; see [13-brand.md](13-brand.md#colour). The same icons are the agents' avatars in **The team**.
+Icons and labels are monochrome (`--ink-2`). Red is reserved for the brand and the primary action; green marks verified quotes and "Fits you"; amber marks "needs you"; "Closed" and "Not for you" are grey; see [13-brand.md](13-brand.md#colour). The same icons are the agents' avatars in **The team**.
 
 ## Key components (`web/components/`)
 
@@ -63,7 +63,7 @@ Icons and labels are monochrome (`--ink-2`). Colour appears only on verdicts and
 | `SaveCard` | Header (title, platform, saved date, original link or media), then four `AnswerRow`s. Each row shows a skeleton while its key is in `pending`. |
 | `AnswerRow` | Question label + icon, the answer in one line, an expandable detail |
 | `EvidenceQuote` | Source favicon + domain, the quoted line with the matched text highlighted, a "Verified on source" badge, a link to the source. **Only renders verified findings.** |
-| `VerdictBadge` | `fits_you` · `closed` · `not_for_you` · `needs_your_answer` · `couldnt_confirm`, in plain words ("Fits you", "Closed", "Not for you", "Needs your answer", "Couldn't confirm") |
+| `VerdictBadge` | `fits_you` (green) · `needs_your_answer`, `couldnt_confirm` (amber) · `closed`, `not_for_you` (grey), in plain words ("Fits you", "Closed", "Not for you", "Needs your answer", "Couldn't confirm") |
 | `DeadlineText` | "Sun 2 Nov, 23:59 Lagos time", plus a muted "time zone not stated" when relevant, and an **Add to calendar** link (`/saves/{id}/calendar.ics`) |
 | `TodayCard` | `why_now` (bold), title, `next_step`, proof chips, and the actions **Use it · Not for me · Later** |
 | `PrepSheet` | 5 points, each with source chips (`Video title · 4:12`) that open the player at that second; then "They agree" / "They disagree" sections |
@@ -142,4 +142,4 @@ Each one is designed and built:
 
 ## Design tokens
 
-The tokens, type and logo come from [13-brand.md](13-brand.md). Define them as CSS variables in `app/globals.css` and map them into the Tailwind theme, so components use `bg-surface`, `text-ink`, `text-teal` and so on, never raw hex values. Dark mode uses the same token names, switched on `prefers-color-scheme`, and is built only if time allows after Day 4.
+The tokens, type and logo come from [13-brand.md](13-brand.md). Define them as CSS variables in `app/globals.css` and map them into the Tailwind theme, so components use `bg-surface`, `text-ink`, `text-teal` and so on, never raw hex values. Surfaces use the glass tokens (`--glass` + backdrop blur) over the warm background glows, with a solid fallback. Dark mode is out of scope for the hackathon.
