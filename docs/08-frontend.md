@@ -14,7 +14,7 @@
 | Auth | NextAuth (Google, plus a "Try the demo" credentials provider) | Same pattern as current Crowscap |
 | Forms | react-hook-form + zod | The profile form |
 | Dates | `date-fns` + `date-fns-tz` | Show times in the user's zone |
-| Fonts | Inter (UI) | Neutral and very readable |
+| Fonts | Inter (UI) + Source Serif 4 (quoted source text only), via `next/font` | See [13-brand.md](13-brand.md#type) |
 
 **Pin exact versions at scaffold time.** No `"latest"` in `package.json`; the current Crowscap's `"latest"` pins are a lesson.
 
@@ -47,14 +47,14 @@
 
 ## The four questions, visually
 
-| Question | Icon (lucide) | Accent |
-|---|---|---|
-| What is it? | `ScanText` | slate |
-| Is it true? | `ShieldCheck` | green (fits) · amber (needs your answer, couldn't confirm) · red (closed, not for you) |
-| What's it for? | `Waypoints` | indigo |
-| When will you need it? | `CalendarClock` | sky |
+| Question | Icon (lucide) |
+|---|---|
+| What is it? | `ScanText` |
+| Is it true? | `ShieldCheck` |
+| What's it for? | `Waypoints` |
+| When will you need it? | `CalendarClock` |
 
-These icons are also the agents' avatars in **The team**.
+Icons and labels are monochrome (`--ink-2`). Colour appears only on verdicts and verified quotes; see [13-brand.md](13-brand.md#colour). The same icons are the agents' avatars in **The team**.
 
 ## Key components (`web/components/`)
 
@@ -140,13 +140,6 @@ Each one is designed and built:
   - images go through `next/image`;
   - the feed is virtualised past 100 items.
 
-## Design tokens (Tailwind theme)
+## Design tokens
 
-```
---bg: #FAFAF9   --surface: #FFFFFF   --text: #1C1917   --muted: #78716C
---border: #E7E5E4   --brand: #111111
---fits: #15803D   --attention: #B45309   --stop: #B91C1C   --info: #0369A1   --link: #4338CA
-radius: 14px (cards), 10px (controls)   spacing scale: 4px
-```
-
-Dark mode: optional, only if time allows after Day 4.
+The tokens, type and logo come from [13-brand.md](13-brand.md). Define them as CSS variables in `app/globals.css` and map them into the Tailwind theme, so components use `bg-surface`, `text-ink`, `text-teal` and so on, never raw hex values. Dark mode uses the same token names, switched on `prefers-color-scheme`, and is built only if time allows after Day 4.

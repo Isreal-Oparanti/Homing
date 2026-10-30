@@ -26,8 +26,8 @@ NEXTAUTH_SECRET=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 DEMO_LOGIN_ENABLED=true
-CROWSCAP_API_URL=            # https://api.<domain>
-CROWSCAP_PROXY_SECRET=
+HOMING_API_URL=            # https://api.<domain>
+HOMING_PROXY_SECRET=
 ```
 
 **Server (`server/.env.example`):**
@@ -122,7 +122,7 @@ FEATURE_AUDIT=true
 | 429s from Meta | `model_calls.error` | Lower `SPARK_MAX_CONCURRENCY`. Backoff already applies. |
 | Budget exceeded | `/health/deep` spend | Raise `MODEL_DAILY_BUDGET_USD` if credits allow; otherwise imports wait until tomorrow. |
 | Checks all `couldnt_confirm` | Search provider errors; official pages 403 | Set `FEATURE_SEARCH_FOR_SOURCES=false` and rely on post links; tell the user plainly. |
-| Live feed not updating | Browser devtools EventSource; `/api/stream` status | Vercel function timeout (reconnect is automatic); check `CROWSCAP_API_URL`. |
+| Live feed not updating | Browser devtools EventSource; `/api/stream` status | Vercel function timeout (reconnect is automatic); check `HOMING_API_URL`. |
 | Upload fails | Signed URL expired; bucket policy | Re-sign; check the bucket is private and the service key is set. |
 | Voice notes fail | ffmpeg present? Transcribe endpoint errors | Set `FEATURE_VOICE=false` for the demo; note it in the README. |
 | Demo user looks wrong | Seed version | `POST /api/v1/admin/demo/reset` |

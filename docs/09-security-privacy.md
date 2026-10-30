@@ -5,7 +5,7 @@ People's saves are personal. Our own pile contains phone numbers, an account num
 ## Authentication
 
 - **Sign-in:** NextAuth with Google, plus a **demo** credentials provider that signs into the shared demo user. The demo user is flagged `is_demo` and reset nightly.
-- **The browser never calls the API.** The Next.js server adds `X-Crowscap-Proxy-Secret` and the user headers ([ADR 0005](adr/0005-auth-proxy.md)).
+- **The browser never calls the API.** The Next.js server adds `X-Homing-Proxy-Secret` and the user headers ([ADR 0005](adr/0005-auth-proxy.md)).
 - **API checks:**
   - compares the secret in constant time (`hmac.compare_digest`);
   - creates the user on first sight (upsert by ID);
@@ -50,7 +50,7 @@ People's saves are personal. Our own pile contains phone numbers, an account num
 - **Addresses:** resolve DNS, then reject private, loopback, link-local, multicast and reserved IPs (IPv4 and IPv6). This re-runs on every redirect, with at most 5 redirects, and is re-checked after connect to stop DNS rebinding.
 - **Limits:** 5 MB body cap (streamed), connect 5s, read 15s.
 - **Robots:** respects robots.txt (cached per host for 1h).
-- **Identity:** User-Agent `CrowscapBot/0.1 (+https://<site>/bot)`.
+- **Identity:** User-Agent `HomingBot/0.1 (+https://<site>/bot)`.
 - **Blocks:** no cookies, no auth headers, never posts forms.
 
 ## Uploads

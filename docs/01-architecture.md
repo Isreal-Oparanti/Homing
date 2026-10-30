@@ -2,7 +2,7 @@
 
 ## Summary
 
-Crowscap is made of three parts:
+Homing is made of three parts:
 
 - **Web app (Next.js):** the screens, sign-in, and a server-side proxy to the API.
 - **API (FastAPI):** fast endpoints that read and write state. Slow work never runs inside a request.

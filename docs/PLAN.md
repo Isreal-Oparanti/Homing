@@ -1,4 +1,6 @@
-# Crowscap: what we're building
+# Homing: what we're building
+
+_Homing is built by Crowscap. The idea comes from Crowscap's own memory product._
 
 _Meta Global AI Developer Hackathon · Indie track_
 _Due **Wed 4 Nov, 9 PM ET**, which is **Thu 5 Nov, 03:00 Lagos**_
@@ -11,9 +13,9 @@ This file is for us. The pitch (video, README, X post) is written separately and
 
 ## 1. What we're building
 
-**Crowscap: save anything to use now or later.**
+**Homing: save anything to use now or later.**
 
-Every time you save something, Crowscap answers four questions about it.
+Every time you save something, Homing answers four questions about it.
 
 | Question | What the answer looks like |
 |---|---|
@@ -23,7 +25,7 @@ Every time you save something, Crowscap answers four questions about it.
 | **When will you need it?** | A date or a moment, such as "before the deadline on 15 Nov, Lagos time" or "the next time you record a video". |
 
 - **Now:** you see the four answers right after you save. You can act on it straight away, or let it go knowing it's handled.
-- **Later:** Crowscap brings the save back at that date or moment, together with the next step.
+- **Later:** Homing brings the save back at that date or moment, together with the next step.
 - **Anytime:**
   - **search** by meaning, so "YC" also finds "Y Combinator";
   - **ask** a question ("What do I know about getting into YC?") and get one answer page, built only from your saves, with every point linked to the save it came from;
@@ -54,14 +56,14 @@ The cost is highest for people outside the default user that big products are bu
 
 ## 3. What research says about saving, and what we build because of it
 
-| What's known | Source | What Crowscap does about it |
+| What's known | Source | What Homing does about it |
 |---|---|---|
 | People keep things (open tabs, saved links) partly out of fear of losing them, and the build-up causes stress. | Chang et al., *When the Tab Comes Due*, Carnegie Mellon, CHI 2021 | Saving is one action from anywhere, with nothing to fill in. At save time we keep a copy of the content (the page text, the post text, the transcript), so a dead link or deleted post doesn't lose it. |
 | Filing things into folders doesn't help people find them later. | Whittaker et al., *Am I wasting my time organizing email?*, CHI 2011 | No folders and no tags. Agents connect saves to goals, and search finds anything. |
 | Saving frees your memory for new things only when you trust the save will be there. | Storm & Stone, *Saving-enhanced memory*, Psychological Science, 2015 | Every save gets its four answers right away. Facts come with the source line, and you can see what each agent did. |
 | An unfinished goal keeps nagging at you until you make a specific plan for it. | Masicampo & Baumeister, *Consider it done!*, Journal of Personality and Social Psychology, 2011 | Every save gets a "when". A save that comes back brings its next step with it. |
 | Read-later apps fail when "later" never comes. Pocket, the best-known one, shut down on 8 July 2025. | Mozilla announcement, 2025 (the conclusion is our reading of it) | Bringing saves back is the core of the product, not a side feature. **Today** is the home screen. |
-| Workers want AI to take over repetitive work, about 46% of tasks, but most prefer an equal partnership to full automation. | Shao et al., *Future of Work with AI Agents* (WORKBank), Stanford, 2025 | Agents do the reading, checking, connecting and timing. You make every decision: *Use it · Not for me · Later*. Crowscap doesn't act outside your library. |
+| Workers want AI to take over repetitive work, about 46% of tasks, but most prefer an equal partnership to full automation. | Shao et al., *Future of Work with AI Agents* (WORKBank), Stanford, 2025 | Agents do the reading, checking, connecting and timing. You make every decision: *Use it · Not for me · Later*. Homing doesn't act outside your library. |
 
 Together, these give the theme fit. A save you trust, with a "when", stops taking up space in your head.
 
@@ -230,7 +232,7 @@ There's no chat thread. You search, ask one question at a time, or run an audit,
 
 ## 9. How we're different (prep for questions)
 
-| Product | What it does | Where Crowscap differs |
+| Product | What it does | Where Homing differs |
 |---|---|---|
 | **Meta Muse** | A personal agent: works on goals you give it, acts for you with approval, sends proactive check-ins, and can search your Instagram saved posts. US/Canada and Japan; not Nigeria. | Works on your saves from any app, including WhatsApp and YouTube, which Muse doesn't read. Checks claims against official sources, and stays inside your library. |
 | **Grok Bot + Obsidian** | A do-it-yourself setup where bots maintain a notes vault, for power users. | Nothing to set up. It starts from WhatsApp and checks claims against official sources. |
@@ -334,21 +336,21 @@ Build the whole demo path roughly first, then make each part deep.
 |---|---|
 | A general personal agent, "does the later", goals and reminders | That's what Muse, Dots, Duet and Grok Bot do |
 | "Every save is a question you never asked" (researching what you didn't ask) | It mostly produces answers, which is chat-app territory |
-| A standalone opportunity checker | Muse could do a version if asked. Now it's the **Is it true?** question inside Crowscap. |
+| A standalone opportunity checker | Muse could do a version if asked. Now it's the **Is it true?** question inside Homing. |
 | An agent that finds free servers for startups | The agent itself is the product, and that's Muse/Dots |
 | Tracking class WhatsApp groups | No market: students won't pay |
 | Live sermon verse projection | Crowded (Pewbeam, AnchorCast, SmartVerses) |
 | Bookkeeping for traders from WhatsApp | Meta's own Business Agent is moving there |
 | "WhatsApp Wrapped" | Close to the personality-analyser ban, and uses other people's data |
 | Glasses, the "Receipts" fact-checker, exam prep | Rejected earlier |
-| A Crowscap WhatsApp bot | Banned on the Business API |
+| A WhatsApp bot | Banned on the Business API |
 | A chat thread for asking questions | Looks like basic RAG and like every assistant, and invites made-up answers. We use one-question answer pages (Ask) instead. |
 | Keyword-only search, or the model reading the whole library on every question | Keywords miss "YC" vs "Y Combinator". Whole-library reads get slower and pricier with every save. We use hybrid search plus the model picking from the top results. |
 | Naming the agents "Reader" and "Librarian" | Too close to the viral Grok Bot + Obsidian post. We use the four questions instead. |
 
 ## 15. Rules to come back to
 
-1. **Your saves are the source.** Crowscap works on what you saved, and you make the decisions.
+1. **Your saves are the source.** Homing works on what you saved, and you make the decisions.
 2. **Proof or silence.** Every claim quotes its source and is checked by code. If we can't confirm something, we say so.
 3. **Answer now, bring back later.** Every save gets its card straight away, plus a "when".
 4. **Calm by default.** At most 3 cards a day, and anything dismissed stays dismissed.
@@ -388,3 +390,4 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
   - **Search is hybrid,** by words and by meaning, using a small open embedding model we run ourselves plus pgvector, because keyword-only search misses "YC" vs "Y Combinator".
   - Long context is kept for the thread rebuild and audits.
   - See [ADR 0003](adr/0003-search-ask-audit.md).
+- **30 Oct, v5:** named **Homing** (Crowscap stays as the company and origin). Brand, logo and colours added in [13-brand.md](13-brand.md).

@@ -1,8 +1,8 @@
-# Crowscap
+# Homing
 
 **Save anything to use now or later.**
 
-Crowscap answers four questions about every save: *What is it? Is it true? What's it for? When will you need it?* Then it brings the save back when it's needed.
+Homing answers four questions about every save: *What is it? Is it true? What's it for? When will you need it?* Then it brings the save back when it's needed.
 
 Built for the Meta Global AI Developer Hackathon (Indie track) on Meta's Muse Spark, Muse Voice Transcribe and Muse Spark Open.
 
@@ -15,4 +15,4 @@ Built for the Meta Global AI Developer Hackathon (Indie track) on Meta's Muse Sp
 
 ## Origin
 
-The idea comes from Crowscap, Isreal Oparanti's personal memory product. This repository is new code written during the hackathon. No code was copied from the original Crowscap.
+Homing is built by Crowscap. The idea comes from Crowscap, Isreal Oparanti's personal memory product. This repository is new code written during the hackathon. No code was copied from the original Crowscap.

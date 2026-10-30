@@ -5,8 +5,8 @@ FastAPI. Base path `/api/v1`. The API is called only by the Next.js server ([ADR
 ## Conventions
 
 - **Auth headers** (set by the Next.js proxy):
-  - `X-Crowscap-Proxy-Secret`: must equal `PROXY_SECRET`, else 401;
-  - `X-Crowscap-User-Id`, `X-Crowscap-User-Email`, `X-Crowscap-User-Name`.
+  - `X-Homing-Proxy-Secret`: must equal `PROXY_SECRET`, else 401;
+  - `X-Homing-User-Id`, `X-Homing-User-Email`, `X-Homing-User-Name`.
 - **JSON:** request and response bodies are Pydantic models in `server/app/schemas/api.py`. Field names are `snake_case`; the web app maps them to camelCase in `web/lib/api.ts`.
 - **Slow work** returns `202 Accepted` with the created resource. Progress arrives over SSE.
 - **Pagination** is cursor-based: `?cursor=<opaque>&limit=<≤100>` → `{items, next_cursor}`.

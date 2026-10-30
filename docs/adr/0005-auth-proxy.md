@@ -7,7 +7,7 @@ This approach worked in the current Crowscap: Next.js owns the Google session, a
 
 ## Decision
 - NextAuth (Google, plus a demo credentials provider).
-- `/api/backend/[...path]` forwards requests with `X-Crowscap-Proxy-Secret` and the user headers.
+- `/api/backend/[...path]` forwards requests with `X-Homing-Proxy-Secret` and the user headers.
 - The API compares the secret in constant time and scopes every query by user ID.
 - `/api/stream` relays SSE the same way.
 
