@@ -142,4 +142,4 @@ Each one is designed and built:
 
 ## Design tokens
 
-The tokens, type and logo come from [13-brand.md](13-brand.md). Define them as CSS variables in `app/globals.css` and map them into the Tailwind theme, so components use `bg-surface`, `text-ink`, `text-teal` and so on, never raw hex values. Surfaces use the glass tokens (`--glass` + backdrop blur) over the warm background glows, with a solid fallback. Dark mode is out of scope for the hackathon.
+The tokens, type and logo come from [13-brand.md](13-brand.md). Define them as CSS variables in `app/globals.css` and map them into the Tailwind theme, so components use `bg-glass`, `text-ink`, `bg-red` and so on, never raw hex values. Surfaces use the glass tokens (`--glass` + backdrop blur) over the warm background glows, with a solid fallback. Dark mode is out of scope for the hackathon.
