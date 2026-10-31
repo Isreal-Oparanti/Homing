@@ -63,7 +63,7 @@ cp web/.env.example web/.env.local        # same PROXY_SECRET as the server
 cd server
 python -m uv sync
 python -m uv run alembic upgrade head
-python -m uv run uvicorn app.main:app --reload    # :8000, /docs in local
+python -m uv run uvicorn app.main:app --reload --timeout-graceful-shutdown 3    # :8000, /docs in local
 python -m uv run pytest                           # tests
 python -m uv run ruff check . && python -m uv run ruff format --check .
 

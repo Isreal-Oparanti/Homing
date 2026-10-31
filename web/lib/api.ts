@@ -106,3 +106,92 @@ export const teamApi = {
 export const meApi = {
   get: () => api<{ id: string; email: string; name: string | null }>("me"),
 };
+
+export type SaveSummary = {
+  id: string;
+  kind: "note" | "link" | "list" | "image" | "voice" | "video" | "pdf" | "file";
+  platform: string | null;
+  url: string | null;
+  label: string | null;
+  text: string | null;
+  savedAt: string;
+  status: "received" | "reading" | "ready" | "failed";
+  visibility: "normal" | "private";
+  error: string | null;
+};
+
+export type Reading = {
+  title: string;
+  what: string;
+  keyFacts: {
+    dates?: { text: string; role: string }[];
+    amounts?: { text: string }[];
+    requirements?: { text: string }[];
+    organisations?: string[];
+    places?: string[];
+  };
+  isCheckable: boolean;
+  isOpportunity: boolean;
+};
+
+export type Answer = "what" | "true" | "for" | "when";
+
+export type SaveCard = { save: SaveSummary; what: Reading | null; pending: Answer[] };
+
+type RawSave = {
+  id: string;
+  kind: SaveSummary["kind"];
+  platform: string | null;
+  url: string | null;
+  label: string | null;
+  text: string | null;
+  saved_at: string;
+  status: SaveSummary["status"];
+  visibility: SaveSummary["visibility"];
+  error: string | null;
+};
+
+type RawReading = {
+  title: string;
+  what: string;
+  key_facts: Reading["keyFacts"];
+  is_checkable: boolean;
+  is_opportunity: boolean;
+};
+
+function toSave(raw: RawSave): SaveSummary {
+  return {
+    id: raw.id,
+    kind: raw.kind,
+    platform: raw.platform,
+    url: raw.url,
+    label: raw.label,
+    text: raw.text,
+    savedAt: raw.saved_at,
+    status: raw.status,
+    visibility: raw.visibility,
+    error: raw.error,
+  };
+}
+
+export const savesApi = {
+  async create(text: string): Promise<SaveSummary> {
+    return toSave(await api<RawSave>("saves", { method: "POST", body: JSON.stringify({ text }) }));
+  },
+  async get(id: string): Promise<SaveCard> {
+    const raw = await api<{ save: RawSave; what: RawReading | null; pending: Answer[] }>(
+      `saves/${encodeURIComponent(id)}`,
+    );
+    return {
+      save: toSave(raw.save),
+      what: raw.what && {
+        title: raw.what.title,
+        what: raw.what.what,
+        keyFacts: raw.what.key_facts ?? {},
+        isCheckable: raw.what.is_checkable,
+        isOpportunity: raw.what.is_opportunity,
+      },
+      pending: raw.pending,
+    };
+  },
+};

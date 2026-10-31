@@ -19,7 +19,9 @@ router = APIRouter(tags=["team"])
 
 POLL_S = 0.75
 KEEPALIVE_S = 15.0
-STREAM_MAX_S = 600.0
+# Streams end after a minute and the browser reconnects, resuming from the id it last saw.
+# Long streams hold up uvicorn reloads and deploys, which wait for open connections.
+STREAM_MAX_S = 60.0
 
 
 class AgentEventOut(BaseModel):
@@ -80,7 +82,8 @@ async def stream(
         if last is None:
             last = await asyncio.to_thread(_latest, user.id)
         started = last_ping = time.monotonic()
-        yield "retry: 2000\n\n"
+        # The id sets the browser's resume point, so a reconnect after a quiet minute skips nothing.
+        yield f"id: {last}\nretry: 2000\n\n"
         while time.monotonic() - started < STREAM_MAX_S:
             if await request.is_disconnected():
                 break

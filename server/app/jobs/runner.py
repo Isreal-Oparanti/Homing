@@ -26,6 +26,8 @@ class JobContext:
     job_id: int
     kind: str
     user_id: str | None
+    attempt: int = 1
+    max_attempts: int = 5
 
 
 Handler = Callable[[JobContext, dict[str, Any]], None]
@@ -66,7 +68,10 @@ class Runner:
             if handler is None:
                 raise PermanentError(f"No handler for job kind {job.kind!r}.")
             with self._sessions() as db:
-                handler(JobContext(db, job.id, job.kind, job.user_id), job.payload)
+                handler(
+                    JobContext(db, job.id, job.kind, job.user_id, job.attempts, job.max_attempts),
+                    job.payload,
+                )
                 db.commit()
             with self._sessions() as db:
                 queue.complete(db, job.id)

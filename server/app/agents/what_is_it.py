@@ -1,0 +1,208 @@
+"""What is it? Reads every save, keeps a copy of its content, and says what it is.
+
+See docs/03-agents.md#what-is-it. Never calls a model on a private save, never invents content
+it couldn't read, and never edits what the user saved.
+"""
+
+from typing import Any
+
+from app.core.config import get_settings
+from app.db.models import Save, Snapshot
+from app.db.repo import saves as saves_repo
+from app.events.emitter import emit
+from app.ingest.fetch import SafeFetcher
+from app.ingest.gather import Gathered, gather_link
+from app.jobs import queue
+from app.jobs.errors import PermanentError, RetryableError
+from app.jobs.runner import JobContext
+from app.llm.gateway import ModelGateway
+from app.schemas.agents import Reading
+
+SNAPSHOT_CHARS_FOR_MODEL = 40_000  # about 10k tokens
+
+PRIVATE_REASONS = {
+    "looks_like_code": "it looks like a code",
+    "looks_like_one_time_code": "it looks like a one-time code",
+    "looks_like_account_number": "it looks like an account number",
+    "looks_like_card_number": "it looks like a card number",
+    "looks_like_id_number": "it looks like an ID number",
+    "looks_like_api_key": "it looks like a key",
+    "looks_like_password": "it looks like a password",
+    "looks_like_secret_token": "it looks like a secret",
+}
+
+KIND_WORDS = {
+    "youtube": "a YouTube video",
+    "x": "an X post",
+    "instagram": "an Instagram post",
+    "facebook": "a Facebook post",
+    "tiktok": "a TikTok",
+    "web": "a page",
+}
+
+# Tests swap these for fakes; agents never build clients themselves.
+gateway_factory: Any = ModelGateway
+fetcher_factory: Any = SafeFetcher
+
+
+def _gather(save: Save) -> Gathered:
+    if save.kind == "link" and save.url:
+        return gather_link(save.url, fetcher_factory(), get_settings())
+    return Gathered()  # notes and lists: the save's own text is the content
+
+
+def _model_inputs(save: Save, gathered: Gathered, snapshots: list[Snapshot]) -> dict[str, Any]:
+    content = []
+    budget = SNAPSHOT_CHARS_FOR_MODEL
+    for snap in snapshots:
+        text = snap.text[:budget]
+        budget -= len(text)
+        content.append(
+            {
+                "kind": snap.kind,
+                "source": snap.source_url,
+                "meta": _small_meta(snap.meta),
+                "text": text,
+            }
+        )
+        if budget <= 0:
+            break
+    return {
+        "save": {
+            "kind": save.kind,
+            "platform": save.platform,
+            "url": save.url,
+            "label": save.label,
+            "text": save.text if save.kind != "link" or save.label is None else save.label,
+            "saved_at": save.saved_at.isoformat() if save.saved_at else None,
+        },
+        "content": content,
+        "notes": gathered.notes,
+    }
+
+
+def _small_meta(meta: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in meta.items() if k not in ("segments",)}
+
+
+def _hand_over(ctx: JobContext, save: Save, reading: Reading) -> None:
+    """Queue the next questions. Only kinds that have a handler yet (slices land one by one)."""
+    from app.jobs.handlers import HANDLERS
+
+    nxt = ["save.check"] if reading.is_checkable else ["save.when"]
+    nxt += ["save.place", "save.embed"]
+    for kind in nxt:
+        if kind in HANDLERS:
+            prefix = kind.split(".")[1]
+            queue.enqueue(
+                ctx.db,
+                kind,
+                {"save_id": save.id},
+                user_id=save.user_id,
+                priority=queue.PRIORITY_USER,
+                dedupe_key=f"{prefix}:{save.id}",
+            )
+
+
+def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
+    if ctx.user_id is None:
+        raise PermanentError("save.read needs a user.")
+    save = saves_repo.get_save(ctx.db, ctx.user_id, str(payload.get("save_id")))
+    if save is None:
+        raise PermanentError("That save no longer exists.")
+
+    if save.visibility == "private":
+        why = PRIVATE_REASONS.get(save.private_reason or "", "it looks sensitive")
+        saves_repo.upsert_reading(
+            ctx.db,
+            save.id,
+            {
+                "title": "Kept private",
+                "what": f"Kept private because {why}. We never send these to AI.",
+                "key_facts": {},
+                "is_checkable": False,
+                "is_opportunity": False,
+                "model": "none",
+                "prompt_version": "none",
+            },
+        )
+        save.status = "ready"
+        emit(
+            ctx.db,
+            user_id=save.user_id,
+            agent="what",
+            action="kept_private",
+            summary=f"Kept a save private: {why}.",
+            save_id=save.id,
+        )
+        return
+
+    save.status = "reading"
+    ctx.db.commit()
+
+    try:
+        gathered = _gather(save)
+        snapshots = [
+            Snapshot(
+                save_id=save.id, kind=s.kind, source_url=s.source_url, text=s.text, meta=s.meta
+            )
+            for s in gathered.snapshots
+        ]
+        ctx.db.add_all(snapshots)
+        ctx.db.flush()
+        gateway = gateway_factory(ctx.db)
+        reading: Reading = gateway.run(
+            "read.text",
+            user_id=save.user_id,
+            inputs=_model_inputs(save, gathered, snapshots),
+            save_ids=[save.id],
+        )
+    except (RetryableError, PermanentError) as exc:
+        if isinstance(exc, PermanentError) or ctx.attempt >= ctx.max_attempts:
+            ctx.db.rollback()
+            failed = saves_repo.get_save(ctx.db, ctx.user_id, save.id)
+            if failed is not None:
+                failed.status = "failed"
+                failed.error = "Couldn't read this save. Try again later."
+                emit(
+                    ctx.db,
+                    user_id=failed.user_id,
+                    agent="what",
+                    action="failed",
+                    summary="Couldn't read a save.",
+                    save_id=failed.id,
+                )
+                ctx.db.commit()
+        raise
+
+    saves_repo.upsert_reading(
+        ctx.db,
+        save.id,
+        {
+            "title": reading.title,
+            "what": reading.what,
+            "key_facts": reading.key_facts.model_dump(),
+            "is_checkable": reading.is_checkable,
+            "is_opportunity": reading.is_opportunity,
+            "model": get_settings().meta_spark_model,
+            "prompt_version": "read_text.v1",
+        },
+    )
+    save.status = "ready"
+    save.error = None
+    thing = KIND_WORDS.get(
+        save.platform or "", "a note" if save.kind == "note" else "a list of links"
+    )
+    evidence = [{"label": "Our copy of the content", "snapshot_id": s.id} for s in snapshots[:2]]
+    if save.url:
+        evidence.append({"label": "Original link", "url": save.url})
+    emit(
+        ctx.db,
+        user_id=save.user_id,
+        agent="what",
+        action="read",
+        summary=f"Read {thing}: {reading.title}",
+        save_id=save.id,
+        evidence=evidence,
+    )
+    _hand_over(ctx, save, reading)

@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     meta_api_key: str = ""
     meta_spark_model: str = "muse-spark-1.3"
     meta_transcribe_model: str = "muse-voice-transcribe-1.0"
+    youtube_api_key: str = ""
+    # YouTube captions via youtube-transcript-api (Isreal's decision, docs/adr/0008).
+    feature_yt_captions: bool = True
+    # Spend guards. Prices aren't published yet, so cost is tracked only when known.
+    model_daily_budget_usd: float = 10.0
+    spark_max_concurrency: int = 6
 
     @field_validator("database_url", "test_database_url")
     @classmethod

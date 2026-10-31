@@ -42,7 +42,7 @@ We use Spark and Voice Transcribe. S0 checks whether `muse-wonder-1.0` is worth 
 
 **Decision for YouTube (Isreal, 31 Oct):** read YouTube's **captions** with `youtube-transcript-api` (timestamped text, no video download), behind `FEATURE_YT_CAPTIONS`. Spark reads the captions and cites exact seconds. Revisit after asking at office hours ([ADR 0008](adr/0008-platform-rules.md)). Tested on the saved "10 Speaking Techniques" video: 545 timestamped lines over 20 minutes.
 
-**Known risk:** YouTube often blocks caption requests from cloud-server IPs. It works from Isreal's machine; check it from the deployed worker in S5.
+**Known risk:** YouTube often blocks caption requests from cloud-server IPs. It works from Isreal's machine, but even there YouTube sometimes refuses a request (`RequestBlocked`, seen several times on 31 Oct). The worker tries 3 times with a short pause. If it's still blocked, or the video has no captions, Spark reads the title, description and chapters, and the card says which happened. Check it from the deployed worker in S5.
 
 ## Purposes
 

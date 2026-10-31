@@ -80,7 +80,7 @@ FEATURE_AUDIT=true
 - Dependencies installed with `uv` from a lock file. Runs as a non-root user.
 - The embedding model (`EMBED_MODEL`, ONNX) is downloaded **at build time** into `/models`, adding about 200 MB. Both `api` (query embeddings for search) and `worker` (save embeddings) load it once at startup.
 - **Start commands:**
-  - `api`: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2`
+  - `api`: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2 --timeout-graceful-shutdown 10`
   - `worker`: `python -m app.worker`
 - Healthcheck: `GET /health`.
 

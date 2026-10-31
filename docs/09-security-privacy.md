@@ -25,7 +25,9 @@ People's saves are personal. Our own pile contains phone numbers, an account num
 
 | Pattern | Example shape | Action |
 |---|---|---|
-| Backup or recovery codes | 4+ upper-case alphanumeric groups containing digits, e.g. `8XK2-9QPL` | private |
+| Backup or recovery codes | a note made only of 4+ upper-case alphanumeric groups containing digits, e.g. `8XK2-9QPL` | private |
+| Labelled codes | "backup codes", "recovery codes", "2FA codes" followed by 2+ code-like groups, any case, digits only allowed (Google's are digits, GitHub's lower-case) | private |
+| Seed phrases | "seed phrase", "recovery phrase", "mnemonic" followed by 12+ words | private |
 | One-time codes | "code is 123456", "OTP" near 4–8 digits | private |
 | Nigerian bank account (NUBAN) | 10 digits near a bank name or "acct", "account" | private |
 | BVN or NIN | 11 digits near "BVN" or "NIN" | private |

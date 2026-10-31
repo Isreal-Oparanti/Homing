@@ -20,12 +20,24 @@ export function useEventStream(onEvent: (event: AgentEvent) => void): StreamStat
 
   useEffect(() => {
     const source = new EventSource("/api/stream");
-    source.onopen = () => setStatus("live");
-    source.onerror = () => setStatus("reconnecting");
+    // The server ends each stream after a minute and we reconnect within seconds;
+    // only call it "reconnecting" if that takes longer.
+    let grace: ReturnType<typeof setTimeout> | undefined;
+    source.onopen = () => {
+      clearTimeout(grace);
+      setStatus("live");
+    };
+    source.onerror = () => {
+      clearTimeout(grace);
+      grace = setTimeout(() => setStatus("reconnecting"), 4000);
+    };
     source.addEventListener("agent_event", (e) => {
       handler.current(toAgentEvent(JSON.parse((e as MessageEvent<string>).data)));
     });
-    return () => source.close();
+    return () => {
+      clearTimeout(grace);
+      source.close();
+    };
   }, []);
 
   return status;

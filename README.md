@@ -17,7 +17,7 @@ python -m pip install uv
 cp .env.example .env
 python -m uv sync
 python -m uv run alembic upgrade head
-python -m uv run uvicorn app.main:app --reload
+python -m uv run uvicorn app.main:app --reload --timeout-graceful-shutdown 3
 
 # web
 cd web

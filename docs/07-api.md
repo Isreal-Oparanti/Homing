@@ -66,7 +66,7 @@ FastAPI. Base path `/api/v1`. The API is called only by the Next.js server ([ADR
 }
 ```
 
-`pending` lists the answers still being worked on, so the UI shows a skeleton for each.
+`pending` lists the answers still being worked on, so the UI shows a skeleton for each. Until S4 ships, `true`, `for` and `when` are `null` and stay in `pending`. `save.text` is `null` for private saves, and `save.error` holds a plain message when reading failed.
 
 ### Imports
 | Method | Path | Body | Returns |
@@ -125,9 +125,10 @@ data: {"audit_id":"…"}
 ```
 
 Server behaviour:
-- Polls `agent_events WHERE user_id=? AND id>?` every 1s (cheap at our scale).
-- Sends a keep-alive comment every 15s, and closes after 10 minutes.
-- The client reconnects with `Last-Event-ID`.
+- The first frame is `id: <resume point>` plus `retry: 2000`, so the browser always has an id to resume from, even after a quiet stretch.
+- Polls `agent_events WHERE user_id=? AND id>?` every 0.75s (cheap at our scale).
+- Sends a keep-alive comment every 15s, and closes after 60 seconds. Long streams held up `uvicorn --reload` and deploys, which wait for open connections (found 31 Oct). Run uvicorn with `--timeout-graceful-shutdown` as well.
+- The client reconnects with `Last-Event-ID` and gets everything after it. The web shows "Reconnecting" only if that takes more than 4s.
 
 ### Search (instant)
 | Method | Path | Query | Returns |
