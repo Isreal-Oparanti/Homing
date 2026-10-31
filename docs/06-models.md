@@ -26,6 +26,21 @@ All model calls go through one gateway: `server/app/llm/gateway.py`. No other mo
 
 We use Spark and Voice Transcribe. S0 checks whether `muse-wonder-1.0` is worth it for `check.compare`, the hardest call. Image generation and segmentation aren't needed.
 
+## What the S0 check found (30 Oct)
+
+| Input | Works? | How to send it |
+|---|---|---|
+| Text with structured output | Yes | `response_format={"type": "json_schema", ...}` (exact schema followed) |
+| Images (JPEG, PNG, GIF, WebP) | Yes | **Base64 data URL** in `image_url`. Remote URLs can fail when the host blocks Meta's downloader, so always send bytes. |
+| PDF | Yes | `{"type": "file", "file": {"filename": ..., "file_data": "data:application/pdf;base64,..."}}`. File URLs are rejected; `file_id` (upload first) also works. |
+| Video | **MP4 only** | `{"type": "video_url", "video_url": {"url": <MP4 URL>}}`. Answers carry timestamps. 5s sample took about 23s. |
+| **YouTube links** | **No** | Rejected (`text/html`, MP4 only), and Spark says it can't watch YouTube. **Decision: `VIDEO_MODE=spark_file` for videos we hold, plus `chapters_only` for YouTube.** |
+| Muse Wonder | Yes | Same API, faster on simple JSON (3.7s vs 5.9s). Compare on `check.compare` in S6. |
+
+**Latency:** Spark is a reasoning model. Most output tokens are reasoning (about 300–800 per call). Use `reasoning_effort="low"` for reading and placing (simple extraction took 2.8s instead of 5–6s), and leave the default for `check.compare`, `ask.answer` and `prep.sheet`.
+
+**What this means for the prep sheet (S12):** the 14 YouTube demo videos can only give chapters, titles and descriptions. For the strongest demo moment, Isreal screen-records the 4–5 most useful speaking videos as MP4 (his own screen, no downloading) and adds them as saves. Spark then watches those and cites exact seconds.
+
 ## Purposes
 
 Every call declares a purpose. Each purpose fixes the model, prompt file, output schema, timeout and budget class.
@@ -98,8 +113,8 @@ and expects `list[Reading]` with matching IDs. Code rejects the batch if IDs are
 
 | Mode | How | When |
 |---|---|---|
-| `spark_youtube_url` | Pass the YouTube URL to Spark | only if the Day 0 test proves Spark accepts YouTube links **(confirm)** |
-| `spark_file` | Signed URL or Files API upload of a file we hold (WhatsApp media, Instagram's own download, screen recordings) | always available for files |
+| `spark_youtube_url` | Pass the YouTube URL to Spark | **ruled out**: the S0 check showed Spark rejects YouTube links |
+| `spark_file` | MP4 by URL (signed storage URL) or Files API upload, for files we hold (WhatsApp media, Instagram's own download, screen recordings) | **default** for any video file |
 | `chapters_only` | Use YouTube chapters plus title and description. No watching. | fallback. The prep sheet says "from chapters" |
 
 The output is always `VideoPoints {save_id, duration_s, points:[{text, t_start, t_end}]}`, validated by `verify/timestamps.py`.

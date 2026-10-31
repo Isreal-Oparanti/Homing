@@ -362,7 +362,7 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
 
 ## 16. Open questions
 
-- Can Muse Spark take a YouTube link? Can Muse Spark Open read video?
+- ~~Can Muse Spark take a YouTube link?~~ No (S0, 30 Oct). We use MP4 files we hold plus YouTube chapters. Still open: can Muse Spark Open read video?
 - Does Meta's API include web search? If not, which search API do we use?
 - ~~What are the exact model IDs?~~ Answered 30 Oct: `muse-spark-1.3` and `muse-voice-transcribe-1.0`, among others (see [06](06-models.md#models-on-our-key)). Still open: what shape does the transcription endpoint take? Does Spark take files through a Files API or by URL?
 - Hosting: is Railway OK, or is the old Crowscap server still available? See [ADR 0007](adr/0007-hosting.md).
