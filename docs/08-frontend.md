@@ -65,7 +65,7 @@ Icons and labels are monochrome (`--ink-2`). Red is reserved for the brand and t
 | `EvidenceQuote` | Source favicon + domain, the quoted line with the matched text highlighted, a "Verified on source" badge, a link to the source. **Only renders verified findings.** |
 | `VerdictBadge` | `fits_you` (green) · `needs_your_answer`, `couldnt_confirm` (amber) · `closed`, `not_for_you` (grey), in plain words ("Fits you", "Closed", "Not for you", "Needs your answer", "Couldn't confirm") |
 | `DeadlineText` | "Sun 2 Nov, 23:59 Lagos time", plus a muted "time zone not stated" when relevant, and an **Add to calendar** link (`/saves/{id}/calendar.ics`) |
-| `TodayCard` | `why_now` (bold), title, `next_step`, proof chips, and the actions **Use it · Not for me · Later** |
+| `TodayCard` | `why_now` (bold), title, `next_step`, proof chips, and the actions **Use it · Not for me · Later**. The rough S4 card has no actions yet. It says when the date is from the post rather than the official page, and when the time zone wasn't stated. |
 | `PrepSheet` | 5 points, each with source chips (`Video title · 4:12`) that open the player at that second; then "They agree" / "They disagree" sections |
 | `ReelPlayer` | YouTube IFrame API playing segments in order (`start`/`end`), or a `<video>` for files. Next/previous, with the segment source shown. |
 | `TeamFeed` | Virtualised list of `AgentEvent`s: avatar, question name, summary (links to the save card), relative time, evidence chips ("Our copy of the page / post / captions" opens the card's copy; "Original link" opens the source). New events slide in live. |

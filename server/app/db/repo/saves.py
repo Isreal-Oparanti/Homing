@@ -11,6 +11,9 @@ from app.db.models import Reading, Save, Snapshot
 from app.ingest.urls import canonical_url, find_urls, platform_of
 from app.verify.secrets import screen
 
+# Several links plus at least this much text is a post that carries links, not a list.
+POST_CHARS = 80
+
 
 def content_hash(value: str) -> str:
     return hashlib.sha256(" ".join(value.split()).lower().encode()).hexdigest()
@@ -37,7 +40,10 @@ def new_save_from_text(user_id: str, text: str, *, origin: str = "paste") -> Sav
         save.label = rest if 0 < len(rest) <= 60 else None
         save.content_hash = content_hash(save.canonical_url)
     else:
-        save.kind = "list" if urls else "note"
+        words = text
+        for url in urls:
+            words = words.replace(url, "")
+        save.kind = "list" if urls and len(words.strip()) < POST_CHARS else "note"
         save.content_hash = content_hash(text)
     return save
 

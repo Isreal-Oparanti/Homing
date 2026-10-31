@@ -242,6 +242,15 @@ def gather_link(url: str, fetcher: SafeFetcher, settings: Settings) -> Gathered:
             return gather_tiktok(url, fetcher)
         if platform in ("instagram", "facebook"):
             return gather_meta_embed(platform)
+        from app.ingest.ats import is_workable, read_workable  # ats builds on this module
+
+        if is_workable(url):
+            try:
+                job = read_workable(url, fetcher)
+            except (FetchError, ValueError, KeyError):
+                job = None  # fall back to the plain page
+            if job is not None:
+                return Gathered(snapshots=[job])
         return gather_web(url, fetcher)
     except FetchError as exc:
         return Gathered(notes=[str(exc)])

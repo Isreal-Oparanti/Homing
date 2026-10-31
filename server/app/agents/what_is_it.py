@@ -15,6 +15,7 @@ from app.db.repo import saves as saves_repo
 from app.events.emitter import emit
 from app.ingest.fetch import SafeFetcher
 from app.ingest.gather import Gathered, gather_link
+from app.ingest.urls import find_urls
 from app.jobs import queue
 from app.jobs.errors import DeferredError, PermanentError
 from app.jobs.runner import JobContext
@@ -234,9 +235,10 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
     )
     save.status = "ready"
     save.error = None
-    thing = KIND_WORDS.get(
-        save.platform or "", "a note" if save.kind == "note" else "a list of links"
-    )
+    if save.kind == "note":
+        thing = "a post" if find_urls(save.text or "") else "a note"
+    else:
+        thing = KIND_WORDS.get(save.platform or "", "a list of links")
     evidence = [
         {"label": COPY_LABELS.get(s.kind, "Our copy of the content"), "snapshot_id": s.id}
         for s in snapshots[:2]

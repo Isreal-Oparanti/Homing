@@ -48,3 +48,33 @@ class Reading(BaseModel):
     def _short_what(cls, v: str) -> str:
         v = " ".join(v.split())
         return v if len(v) <= 200 else v[:199].rstrip() + "…"
+
+
+class ProposedFinding(BaseModel):
+    point: str = Field(
+        description="One plain sentence for the person, e.g. 'It's on-site in Cairo.'"
+    )
+    quote: str = Field(description="Copied word for word from SOURCE, 3 to 40 words.")
+    kind: Literal["left_out", "differs", "confirmed"]
+
+
+class ProposedCheck(BaseModel):
+    """What the model proposes for "Is it true?". Code verifies every quote before showing it."""
+
+    is_same_opportunity: bool = Field(
+        description="True if SOURCE is the opportunity or offer the SAVE is about."
+    )
+    findings: list[ProposedFinding] = Field(default_factory=list, max_length=8)
+    deadline_quote: str | None = Field(
+        default=None, description="The exact words from SOURCE giving the closing date, or null."
+    )
+
+
+class Placement(BaseModel):
+    """Where one save goes: an existing thread, a new goal, or nowhere if it's unclear."""
+
+    thread_id: str | None = Field(default=None, description="An id from THREADS, or null.")
+    new_thread_title: str | None = Field(
+        default=None, description="A new goal, 2-5 words, e.g. 'Getting into YC'. Or null."
+    )
+    reason: str = Field(description="One short line on why it serves that goal.")

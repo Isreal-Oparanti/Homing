@@ -25,13 +25,17 @@ function EvidenceChips({ event }: { event: AgentEvent }) {
               <FileText className="size-3" aria-hidden />
               {ev.label}
             </Link>
+          ) : ev.url?.startsWith("/") ? (
+            <Link href={ev.url} className={CHIP}>
+              {ev.label}
+            </Link>
           ) : ev.url ? (
-            <a href={ev.url} target="_blank" rel="noreferrer" className={CHIP}>
+            <a href={ev.url} target="_blank" rel="noreferrer" className={CHIP} title={ev.quote}>
               <ExternalLink className="size-3" aria-hidden />
               {ev.label}
             </a>
           ) : (
-            <span className={CHIP}>{ev.label}</span>
+            <span className={CHIP}>{ev.quote ? `${ev.label}: “${ev.quote}”` : ev.label}</span>
           )}
         </li>
       ))}

@@ -2,11 +2,21 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff, ExternalLink, Lock } from "lucide-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import { AGENTS } from "@/components/team/agents";
-import { type AgentEvent, type Answer, type Copy, type SaveCard, savesApi } from "@/lib/api";
+import {
+  type AgentEvent,
+  type Answer,
+  type Copy,
+  type ForAnswer,
+  type SaveCard,
+  type TrueAnswer,
+  type WhenAnswer,
+  savesApi,
+} from "@/lib/api";
 import { useEventStream } from "@/lib/events";
 
 const PLATFORM: Record<string, string> = {
@@ -23,6 +33,26 @@ const COPY_KIND: Record<string, string> = {
   post_text: "Post text",
   transcript: "Captions",
   metadata: "Title and description",
+  official_text: "Official page",
+};
+
+const FINDING_KIND: Record<string, string> = {
+  left_out: "Left out of the post",
+  differs: "Differs from the post",
+  confirmed: "Confirmed",
+  closed: "Closed",
+};
+
+function ordinal(n: number) {
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+  return `${n}${suffix}`;
+}
+
+const WORKING: Record<Exclude<Answer, "what">, string> = {
+  true: "Checking the official page…",
+  for: "Finding what it's for…",
+  when: "Working out when you'll need it…",
 };
 
 const NOT_YET: Record<Exclude<Answer, "what">, string> = {
@@ -64,6 +94,99 @@ function Working({ text }: { text: string }) {
       <span className="inline-block size-2 animate-pulse rounded-full bg-red" aria-hidden />
       {text}
     </p>
+  );
+}
+
+function Muted({ children }: { children: React.ReactNode }) {
+  return <p className="text-muted">{children}</p>;
+}
+
+/** Only findings code verified against the official page get here (docs/05). */
+function TrueAnswerView({ answer, postHasDeadline }: { answer: TrueAnswer; postHasDeadline: boolean }) {
+  if (answer.verdict === "nothing_to_check") return <Muted>Nothing to check.</Muted>;
+  const host = answer.officialUrl ? hostOf(answer.officialUrl) : null;
+  return (
+    <div className="space-y-2">
+      {answer.verdict === "closed" ? (
+        <p className="font-semibold text-amber">Closed, per the official page.</p>
+      ) : host && !answer.note ? (
+        <p>
+          Checked against{" "}
+          <a href={answer.officialUrl!} target="_blank" rel="noreferrer" className="underline">
+            {host}
+          </a>
+          .
+        </p>
+      ) : null}
+      {answer.note && <p className="text-amber">{answer.note}</p>}
+      {answer.findings.length > 0 && (
+        <ul className="space-y-2.5">
+          {answer.findings.map((f, i) => (
+            <li key={i}>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
+                {FINDING_KIND[f.kind] ?? f.kind}
+              </p>
+              <p>{f.point}</p>
+              <blockquote className="mt-1 border-l-2 border-green pl-2.5 text-sm text-ink-2">
+                “{f.quote}”
+                {host && (
+                  <span className="mt-0.5 block text-xs text-green">Found word for word on {host}</span>
+                )}
+              </blockquote>
+            </li>
+          ))}
+        </ul>
+      )}
+      {answer.deadline ? (
+        <p className="text-sm">
+          Official closing date: {answer.deadline.display}
+          {!answer.deadline.tzStated && <span className="text-muted"> · time zone not stated</span>}
+        </p>
+      ) : host && postHasDeadline && !answer.note ? (
+        <p className="text-sm text-ink-2">We didn&apos;t find a closing date on the official page.</p>
+      ) : null}
+    </div>
+  );
+}
+
+function ForAnswerView({ answer }: { answer: ForAnswer }) {
+  const thread = answer.threads[0];
+  return (
+    <div className="space-y-1">
+      {answer.duplicateOf && (
+        <p>
+          You saved this before.{" "}
+          <Link href={`/saves/${answer.duplicateOf}`} className="underline">
+            See the first one
+          </Link>
+          .
+        </p>
+      )}
+      {thread ? (
+        <p>
+          <span className="font-semibold">{thread.title}</span>
+          {thread.count > 1 ? `: your ${ordinal(thread.position)} save on this.` : ": the first save on this."}
+        </p>
+      ) : (
+        !answer.duplicateOf && <Muted>Not sure what this is for yet.</Muted>
+      )}
+    </div>
+  );
+}
+
+function WhenAnswerView({ answer }: { answer: WhenAnswer }) {
+  if (answer.kind !== "date") return <Muted>{answer.explanation}</Muted>;
+  return (
+    <div>
+      <p>{answer.explanation}</p>
+      {(!answer.tzStated || answer.sourceText) && (
+        <p className="mt-0.5 text-xs text-muted">
+          {answer.sourceText && <>From “{answer.sourceText}”</>}
+          {answer.sourceText && !answer.tzStated && " · "}
+          {!answer.tzStated && "time zone not stated"}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -228,11 +351,22 @@ function Card({ card }: { card: SaveCard }) {
         {(["true", "for", "when"] as const).map((answer) => (
           <AnswerRow key={answer} answer={answer}>
             {isPrivate ? (
-              <p className="text-muted">Not used for private saves.</p>
+              <Muted>Not used for private saves.</Muted>
             ) : pending.includes("what") ? (
-              <p className="text-muted">Waiting for the reading.</p>
+              <Muted>Waiting for the reading.</Muted>
+            ) : pending.includes(answer) ? (
+              <Working text={WORKING[answer]} />
+            ) : answer === "true" && card.true ? (
+              <TrueAnswerView
+                answer={card.true}
+                postHasDeadline={(what?.keyFacts.dates ?? []).some((d) => d.role === "deadline")}
+              />
+            ) : answer === "for" && card.for ? (
+              <ForAnswerView answer={card.for} />
+            ) : answer === "when" && card.when ? (
+              <WhenAnswerView answer={card.when} />
             ) : (
-              <p className="text-muted">{NOT_YET[answer]}</p>
+              <Muted>{NOT_YET[answer]}</Muted>
             )}
           </AnswerRow>
         ))}
@@ -251,7 +385,7 @@ export function SaveCardView() {
     // Safety net for the live feed: keep asking while the reading is on its way, but not
     // while it's paused (a budget pause lasts until tomorrow).
     refetchInterval: (q) =>
-      q.state.data?.pending.includes("what") && !q.state.data.save.error ? 3000 : false,
+      q.state.data && q.state.data.pending.length > 0 && !q.state.data.save.error ? 3000 : false,
   });
 
   const onEvent = useCallback(

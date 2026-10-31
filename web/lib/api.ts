@@ -145,7 +145,53 @@ export type Copy = {
   excerpt: string;
 };
 
-export type SaveCard = { save: SaveSummary; what: Reading | null; copies: Copy[]; pending: Answer[] };
+/** Is it true?: only findings code has verified against the official page reach the web. */
+export type TrueAnswer = {
+  verdict: "fits_you" | "closed" | "not_for_you" | "needs_your_answer" | "couldnt_confirm" | "nothing_to_check";
+  officialUrl: string | null;
+  note: string | null;
+  deadline: { at: string; display: string; tzStated: boolean; sourceText: string | null } | null;
+  findings: { point: string; quote: string; kind: "left_out" | "differs" | "confirmed" | "closed" }[];
+  question: string | null;
+};
+
+export type ForAnswer = {
+  threads: { id: string; title: string; position: number; count: number }[];
+  duplicateOf: string | null;
+};
+
+export type WhenAnswer = {
+  kind: "date" | "moment" | "none";
+  source: "check" | "reading" | "thread" | "user";
+  dueAt: string | null;
+  display: string | null;
+  bringBackAt: string | null;
+  explanation: string;
+  sourceText: string | null;
+  tzStated: boolean;
+  timeStated: boolean;
+};
+
+export type SaveCard = {
+  save: SaveSummary;
+  what: Reading | null;
+  true: TrueAnswer | null;
+  for: ForAnswer | null;
+  when: WhenAnswer | null;
+  copies: Copy[];
+  pending: Answer[];
+};
+
+export type TodayCard = {
+  saveId: string;
+  kind: string;
+  title: string;
+  whyNow: string;
+  nextStep: string;
+  dueAt: string;
+  tzStated: boolean;
+  unconfirmed: boolean;
+};
 
 /** A row in the saves list: the save plus its reading's title, when there is one. */
 export type SaveListItem = SaveSummary & { title: string | null; what: string | null };
@@ -162,6 +208,61 @@ type RawSave = {
   visibility: SaveSummary["visibility"];
   error: string | null;
 };
+
+type RawTrue = {
+  verdict: TrueAnswer["verdict"];
+  official_url?: string | null;
+  note?: string | null;
+  deadline?: { at: string; display: string; tz_stated: boolean; source_text: string | null } | null;
+  findings?: TrueAnswer["findings"];
+  question?: string | null;
+};
+
+type RawWhen = {
+  kind: WhenAnswer["kind"];
+  source: WhenAnswer["source"];
+  due_at: string | null;
+  display: string | null;
+  bring_back_at: string | null;
+  explanation: string;
+  source_text: string | null;
+  tz_stated: boolean;
+  time_stated: boolean;
+};
+
+function toTrue(raw: RawTrue | null): TrueAnswer | null {
+  if (!raw) return null;
+  return {
+    verdict: raw.verdict,
+    officialUrl: raw.official_url ?? null,
+    note: raw.note ?? null,
+    deadline: raw.deadline
+      ? {
+          at: raw.deadline.at,
+          display: raw.deadline.display,
+          tzStated: raw.deadline.tz_stated,
+          sourceText: raw.deadline.source_text,
+        }
+      : null,
+    findings: raw.findings ?? [],
+    question: raw.question ?? null,
+  };
+}
+
+function toWhen(raw: RawWhen | null): WhenAnswer | null {
+  if (!raw) return null;
+  return {
+    kind: raw.kind,
+    source: raw.source,
+    dueAt: raw.due_at,
+    display: raw.display,
+    bringBackAt: raw.bring_back_at,
+    explanation: raw.explanation,
+    sourceText: raw.source_text,
+    tzStated: raw.tz_stated,
+    timeStated: raw.time_stated,
+  };
+}
 
 type RawCopy = { id: string; kind: string; source_url: string | null; chars: number; excerpt: string };
 
@@ -209,6 +310,9 @@ export const savesApi = {
     const raw = await api<{
       save: RawSave;
       what: RawReading | null;
+      true: RawTrue | null;
+      for: { threads: ForAnswer["threads"]; duplicate_of: string | null } | null;
+      when: RawWhen | null;
       copies: RawCopy[];
       pending: Answer[];
     }>(`saves/${encodeURIComponent(id)}`);
@@ -221,6 +325,9 @@ export const savesApi = {
         isCheckable: raw.what.is_checkable,
         isOpportunity: raw.what.is_opportunity,
       },
+      true: toTrue(raw.true),
+      for: raw.for && { threads: raw.for.threads, duplicateOf: raw.for.duplicate_of },
+      when: toWhen(raw.when),
       copies: raw.copies.map((c) => ({
         id: c.id,
         kind: c.kind,
@@ -229,6 +336,37 @@ export const savesApi = {
         excerpt: c.excerpt,
       })),
       pending: raw.pending,
+    };
+  },
+};
+
+export const todayApi = {
+  async get(): Promise<{ date: string; cards: TodayCard[] }> {
+    const raw = await api<{
+      date: string;
+      cards: {
+        save_id: string;
+        kind: string;
+        title: string;
+        why_now: string;
+        next_step: string;
+        due_at: string;
+        tz_stated: boolean;
+        unconfirmed: boolean;
+      }[];
+    }>("today");
+    return {
+      date: raw.date,
+      cards: raw.cards.map((c) => ({
+        saveId: c.save_id,
+        kind: c.kind,
+        title: c.title,
+        whyNow: c.why_now,
+        nextStep: c.next_step,
+        dueAt: c.due_at,
+        tzStated: c.tz_stated,
+        unconfirmed: c.unconfirmed,
+      })),
     };
   },
 };

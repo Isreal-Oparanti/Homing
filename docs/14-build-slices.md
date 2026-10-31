@@ -150,6 +150,19 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **Done when:** all four answers fill in on a pasted opportunity post. Only verified quotes are shown. The post shows up on Today when its date is within a week.
 - **Proved by:** unit tests for `verify/quotes` (exact, fuzzy at 92 accepted and 91 rejected, short quote exact, offsets) and for the first `verify/dates` golden rows.
 - **If late:** Today waits for S11. The save card's four answers don't.
+- **As built (31 Oct):**
+  - **Agents:**
+    - `agents/is_it_true.py` finds the official link with `verify/sources.py`, reads Workable through `ingest/ats.py`, keeps an `official_text` snapshot, and drops any finding whose quote code can't find. The verdict is `closed` (a closed signal from `verify/status.py`, or a passed official deadline) or `couldnt_confirm`.
+    - `agents/whats_it_for.py` finds repeats by code. It doesn't place saves we can't see inside, and it refuses titles that describe the person.
+    - `agents/when_needed.py` gets its date from the official deadline first, otherwise from the post.
+  - **Migration 0003:** `checks`, `threads`, `thread_saves`, `whens`.
+  - **Done-when, on the real Afreximbank post with the real model:** the card filled in 44s.
+    - **Is it true?:** checked against the Workable posting, with 8 verified findings, among them Cairo, the second language, full-time study only preferred, and the $500 housing only for relocating. It also said "We didn't find a closing date on the official page."
+    - **What's it for?:** "Getting an internship".
+    - **When?:** "Closes Sat 31 Oct, 23:59 Lagos time, if the post is right".
+    - **Today:** showed it with "Read the 6 things the post left out, then decide."
+  - **Where the time goes:** `check.compare` took 17s of the 44.
+  - **Also:** a post with several links and real words is now a `note` (a post), not a `list`.
 
 ### S5 · First deploy
 - **Day:** Sat evening · **Estimate:** 2h · **Depends on:** S1–S4 and the accounts (Isreal)

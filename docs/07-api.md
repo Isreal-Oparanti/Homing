@@ -74,6 +74,15 @@ Also on the card:
 - For private saves, `save.text`, `save.url` and `save.label` are `null`. A key inside a link is one reason a save is private. The owner sees the text with `/reveal`.
 - `save.error` holds a plain message when reading failed, or "Paused until tomorrow…" when the day's model budget is used up (`status` is then `received`).
 
+As built in S4, the three answers differ slightly from the example above:
+- **`true`:**
+  - It adds `note` (plain words when there was nothing to check against), `deadline.source_text` and `checked_at`.
+  - Findings are `{point, quote, kind}` with the source in `official_url`, and only verified findings are sent.
+  - A save with nothing checkable gets `{"verdict": "nothing_to_check"}`.
+- **`for`:** each thread also has `count`, so the card can say "your 3rd save on this".
+- **`when`:** it adds `source` (`check` or `reading`), `display` ("Sat 31 Oct, 23:59 Lagos time"), `source_text`, `tz_stated` and `time_stated`.
+- **`pending`:** an answer is pending while its agent's job is queued or running. The "when" also waits on the check, because an official deadline beats a date in the post.
+
 ### Imports
 | Method | Path | Body | Returns |
 |---|---|---|---|
@@ -93,7 +102,7 @@ Also on the card:
 ### Today and cards
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| GET | `/today` | — | `{cards: Card[], date}` (≤ 3 new, plus `later` cards that are due) |
+| GET | `/today` | — | `{cards: Card[], date}` (≤ 3 new, plus `later` cards that are due). **Until S11:** dated saves due within 7 days, soonest first, as `{save_id, kind: "deadline", title, why_now, next_step, due_at, tz_stated, unconfirmed}`. `unconfirmed` means the date came from the post, not the official page. |
 | GET | `/cards/{id}` | — | `Card` (with `payload`, e.g. `PrepSheet`) |
 | POST | `/cards/{id}/act` | `{action: "use" \| "dismiss" \| "later", later_until?}` | `Card` |
 

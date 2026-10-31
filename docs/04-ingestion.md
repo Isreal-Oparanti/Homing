@@ -107,6 +107,14 @@ Each connector returns `Gathered(snapshots: list[Snapshot], media_urls: list[str
 - `trafilatura` extracts the main text and metadata. If it fails, fall back to the `<title>` and meta description.
 - If the content type is PDF, hand over to the PDF connector.
 
+### Application sites built by JavaScript (`ats.py`)
+A plain fetch of a Workable job page returns only its one-line description (tested 31 Oct on the Afreximbank internship). Workable publishes the same data as JSON, and its robots.txt allows AI input (`Content-Signal: ai-input=yes`).
+- `apply.workable.com/{account}/j/{code}` → `GET /api/v2/accounts/{account}/jobs/{code}`. The snapshot holds the title, location, workplace (`on-site`), description, requirements and benefits.
+- `/j/{code}` alone is followed to the account's own path first.
+- An account link with no job (`apply.workable.com/afreximbank/`) lists the account's jobs (`/api/v1/widget/accounts/{account}`). Code picks the only job, or the one whose title shares the most words with the save's title. If it's unclear, it gives up rather than guess.
+- If the JSON can't be read, the plain page fetch is used.
+- Greenhouse and Lever have similar public JSON; add them the same way when a real post needs it.
+
 ### PDF (`pdf.py`)
 - PyMuPDF extracts the text layer, with page numbers kept (`[p. 3]` markers).
 - If there are fewer than 200 chars of text per page on average → treat it as scanned and send the PDF to Muse Spark (`read.pdf`, with the OCR-style instruction). Store the result as `ocr_text`.

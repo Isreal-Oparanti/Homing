@@ -16,7 +16,7 @@ Code: `verify/quotes.py`
    - collapse all whitespace to single spaces;
    - remove soft hyphens and zero-width characters.
 2. **Exact substring** → `score = 100` with offsets.
-3. **Otherwise fuzzy:** slide a window of `len(quote) ± 15%` over the source and score with `rapidfuzz.fuzz.ratio`. Accept if the best score ≥ **92** and the quote is ≥ **12** characters. Shorter quotes must match exactly.
+3. **Otherwise fuzzy:** find the best-matching stretch of the source with `rapidfuzz.fuzz.partial_ratio_alignment` (windows the length of the quote). Accept if the best score ≥ **92** and the quote is ≥ **12** characters. Shorter quotes must match exactly.
 4. **Map offsets back** to the original (un-normalised) source, so the UI can highlight the exact text.
 
 **Rejected outright:**
@@ -40,7 +40,8 @@ Code: `verify/dates.py`
    - If no zone is stated, use `source_tz_hint` (country of the organiser) or else the user's zone, and mark `deadline_tz_stated = false`. The UI then says *"time zone not stated"*.
 3. **No time given** → end of day, 23:59, in that zone. Mark it `time_stated = false`.
 4. Convert to the user's zone for display: `"Thu 5 Nov, 03:00 Lagos time"`.
-5. **Mismatch guard:** if the model's proposed ISO date is more than 1 day away from the code's parse → `needs_your_answer` with *"The date is unclear: '…'. When does it close?"*
+5. **Only real dates count:** a month with a day ("31 October", "Nov 4"), a full numeric date ("31/10/2026", ISO) or a relative word ("tomorrow", "demain"). "Early December" or "aged 20–32" give no date. Labels like "Date limite :" are tried with and without the label. Offsets need `UTC`/`GMT` or the `±hh:mm` form, so a bare "+1" isn't a zone.
+6. **Mismatch guard:** if the model's proposed ISO date is more than 1 day away from the code's parse → `needs_your_answer` with *"The date is unclear: '…'. When does it close?"*
 
 **Examples (golden tests):**
 
@@ -99,7 +100,7 @@ Code: `agents/is_it_true.py`, helpers in `verify/sources.py`
 1. **Links in the post:** prefer links whose domain matches the organisation named in the reading (e.g. `afreximbank.com`, `apply.workable.com/afreximbank`), and known application hosts (`workable.com`, `greenhouse.io`, `lever.co`, `typeform.com`, `forms.gle`, `docs.google.com/forms`, `fluxx.io`, `submittable.com`).
 2. **Agent memory** for the same canonical URL or organisation name.
 3. **Search** (`SearchProvider`, see [06](06-models.md#web-search)): query `"{organisation} {programme name} {year} apply"`. Keep results whose domain matches the organisation or a known application host. Take the top 2 candidates.
-4. **Aggregator sites** (opportunity blogs, X threads) are never treated as official. They can only lead to the official page.
+4. **Aggregator sites** (opportunity blogs, X threads) are never treated as official. They can only lead to the official page. Nor are chat and social links (WhatsApp channels, Telegram, Instagram, YouTube, link shorteners). The list is in `verify/sources.py`.
 
 If nothing passes → `couldnt_confirm`, with *"We couldn't find the official page. Here's what the post says, unconfirmed."*
 

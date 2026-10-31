@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.db.models import ModelCall, Save, User
 from app.jobs.errors import DeferredError, PermanentError, RetryableError
-from app.schemas.agents import Reading
+from app.schemas.agents import Placement, ProposedCheck, Reading
 from app.verify.secrets import mask_phones
 
 T = TypeVar("T", bound=BaseModel)
@@ -41,6 +41,9 @@ class Purpose:
 
 PURPOSES: dict[str, Purpose] = {
     "read.text": Purpose("read.text", "read_text.v2.md", Reading, 90, "low"),
+    # Comparing with a source is the hardest call, so it keeps the default reasoning effort.
+    "check.compare": Purpose("check.compare", "check_compare.v1.md", ProposedCheck, 120),
+    "place.assign": Purpose("place.assign", "place_assign.v1.md", Placement, 45, "low"),
 }
 
 

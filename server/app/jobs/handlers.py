@@ -2,7 +2,10 @@
 
 from typing import Any
 
+from app.agents.is_it_true import check
 from app.agents.what_is_it import read_one
+from app.agents.whats_it_for import place
+from app.agents.when_needed import set_when
 from app.events.emitter import emit
 from app.jobs.errors import PermanentError
 from app.jobs.runner import Handler, JobContext
@@ -24,4 +27,7 @@ def system_echo(ctx: JobContext, payload: dict[str, Any]) -> None:
 HANDLERS: dict[str, Handler] = {
     "system.echo": system_echo,
     "save.read": read_one,
+    "save.check": check,
+    "save.place": place,
+    "save.when": set_when,
 }

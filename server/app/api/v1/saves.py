@@ -9,11 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import CurrentUser, require_user
 from app.core.errors import AppError
-from app.db.models import Save, Snapshot
+from app.db.models import Check, Save, Snapshot, User, When
+from app.db.repo import answers as answers_repo
 from app.db.repo import saves as saves_repo
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
 from app.jobs import queue
+from app.verify.dates import display
 
 router = APIRouter(prefix="/saves", tags=["saves"])
 
@@ -99,6 +101,49 @@ class SavePage(BaseModel):
     next_cursor: str | None
 
 
+def true_out(check: Check | None, user_tz: str) -> dict[str, Any] | None:
+    """Is it true?: only verified findings ever leave the server (docs/05)."""
+    if check is None:
+        return None
+    deadline = None
+    if check.deadline_at is not None:
+        deadline = {
+            "at": check.deadline_at,
+            "display": display(check.deadline_at, user_tz),
+            "tz_stated": check.deadline_tz_stated,
+            "source_text": check.deadline_source_text,
+        }
+    return {
+        "verdict": check.verdict,
+        "official_url": check.official_url,
+        "note": check.note,
+        "deadline": deadline,
+        "findings": [
+            {"point": f["point"], "quote": f["quote"], "kind": f["kind"]}
+            for f in check.findings
+            if f.get("verified")
+        ],
+        "question": check.question_for_user,
+        "checked_at": check.checked_at,
+    }
+
+
+def when_out(when: When | None, user_tz: str) -> dict[str, Any] | None:
+    if when is None:
+        return None
+    return {
+        "kind": when.kind,
+        "source": when.source,
+        "due_at": when.due_at,
+        "display": display(when.due_at, user_tz) if when.due_at else None,
+        "bring_back_at": when.bring_back_at,
+        "explanation": when.explanation,
+        "source_text": when.source_text,
+        "tz_stated": when.tz_stated,
+        "time_stated": when.time_stated,
+    }
+
+
 @router.post("", status_code=202, response_model=SaveOut)
 def create_save(
     body: SaveIn,
@@ -157,18 +202,42 @@ def save_card(
     if save is None:
         raise AppError("save_not_found", "That save doesn't exist.", status=404)
     reading = saves_repo.get_reading(db, save.id)
-    working = save.status in ("received", "reading")
-    pending = []
-    if reading is None and working:
-        pending.append("what")
-    if save.visibility != "private" and save.status != "failed":
-        # Is it true? / What's it for? / When will you need it? arrive in the next slices.
-        pending += ["true", "for", "when"]
+    is_private = save.visibility == "private"
+    owner = db.get(User, user.id)
+    user_tz = owner.tz if owner else "Africa/Lagos"
+
+    pending: list[str] = []
+    if reading is None and save.status in ("received", "reading"):
+        pending = ["what"] if is_private else ["what", "true", "for", "when"]
+    elif not is_private:
+        live = answers_repo.working_on(db, save.id)
+        pending = [a for a in ("true", "for", "when") if a in live]
+        if "true" in live:
+            pending.append("when")  # the "when" waits for the check's deadline
+
+    true = None if is_private else true_out(answers_repo.get_check(db, save.id), user_tz)
+    if true is None and reading is not None and not reading.is_checkable and not is_private:
+        true = {"verdict": "nothing_to_check"}
+
+    for_ = None
+    if not is_private and reading is not None and "for" not in pending:
+        threads = answers_repo.threads_of(db, save)
+        for_ = {
+            "threads": [
+                {"id": t.id, "title": t.title, "position": pos, "count": total}
+                for t, pos, total in threads
+            ],
+            "duplicate_of": save.duplicate_of,
+        }
+
     return SaveCard(
         save=SaveOut.of(save),
         what=WhatOut.model_validate(reading, from_attributes=True) if reading else None,
+        true=true,
+        for_=for_,
+        when=None if is_private else when_out(answers_repo.get_when(db, save.id), user_tz),
         copies=[CopyOut.of(snap) for snap in saves_repo.snapshots_for(db, save.id)],
-        pending=pending,
+        pending=sorted(set(pending), key=["what", "true", "for", "when"].index),
     )
 
 

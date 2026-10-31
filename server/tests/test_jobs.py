@@ -72,7 +72,8 @@ def test_retryable_failure_backs_off_then_dies(db: Session) -> None:
     row = _job(db, job_id)  # type: ignore[arg-type]
     assert row.run_after > datetime.now(UTC) and row.last_error == "timeout"
 
-    db.execute(update(Job).where(Job.id == job_id).values(run_after=datetime.now(UTC)))
+    # The database's clock, not ours: a small skew would make the job look not yet due.
+    db.execute(update(Job).where(Job.id == job_id).values(run_after=func.now()))
     job = queue.claim(db, "w1")
     assert job is not None and job.attempts == 2
     assert queue.fail(db, job, "timeout again", retryable=True) == "dead"

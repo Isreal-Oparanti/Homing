@@ -112,7 +112,7 @@ Our copy of the content at save time, so a dead link doesn't lose it.
 |---|---|---|
 | id | text PK | |
 | save_id | text FK | |
-| kind | text | `page_text` · `post_text` · `transcript` · `pdf_text` · `metadata` · `ocr_text` |
+| kind | text | `page_text` · `post_text` · `transcript` · `pdf_text` · `metadata` · `ocr_text` · `official_text` (the official page **Is it true?** checked against) |
 | source_url | text null | where it came from (may differ from the save URL) |
 | text | text | normalized text, max 200k chars |
 | meta | jsonb | e.g. YouTube `{title, channel, duration_s, chapters:[{t,title}]}` |
@@ -157,6 +157,7 @@ Our copy of the content at save time, so a dead link doesn't lose it.
 | findings | jsonb | `[Finding]` |
 | eligibility | jsonb | `[EligibilityRule]` with results |
 | question_for_user | text null | when the verdict is `needs_your_answer` |
+| note | text null | plain words when we couldn't check, e.g. "We couldn't find the official page…" |
 | checked_at | timestamptz | |
 | next_check_at | timestamptz null | daily while open |
 | model | text | |
@@ -219,7 +220,9 @@ Our copy of the content at save time, so a dead link doesn't lose it.
 | bring_back_at | timestamptz null | when to surface it, before due_at (see [03](03-agents.md#when-will-you-need-it)) |
 | moment_id | text null FK | for `moment` |
 | source | text | `reading` · `check` · `thread` · `user` |
-| explanation | text | "Before the deadline on 15 Nov" |
+| source_text | text null | the exact date words the date came from |
+| tz_stated, time_stated | bool | false → the UI says "time zone not stated"; no time means 23:59 |
+| explanation | text | "Closes Sat 31 Oct, 23:59 Lagos time, if the post is right." |
 | updated_at | timestamptz | |
 
 Partial index: `(bring_back_at) where kind = 'date'`.
