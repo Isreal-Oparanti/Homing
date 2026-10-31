@@ -32,6 +32,7 @@ class Video:
     author: str | None = None
     duration_s: float | None = None
     save_id: str | None = None
+    thread: str | None = None  # the goal it was saved under, e.g. "Speaking better"
     points: list[CheckedPoint] = field(default_factory=list)
     dropped: int = 0
 
@@ -85,6 +86,7 @@ def build_sheet(
                 {
                     "video": v.id,
                     "title": v.title,
+                    "thread": v.thread,
                     "points": [{"t": p.t_start, "point": p.point} for p in v.points],
                 }
                 for v in with_points

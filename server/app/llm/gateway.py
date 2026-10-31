@@ -45,7 +45,7 @@ PURPOSES: dict[str, Purpose] = {
     "check.compare": Purpose("check.compare", "check_compare.v1.md", ProposedCheck, 120),
     "place.assign": Purpose("place.assign", "place_assign.v1.md", Placement, 45, "low"),
     "video.points": Purpose("video.points", "video_points.v1.md", VideoPoints, 120, "low"),
-    "prep.sheet": Purpose("prep.sheet", "prep_sheet.v1.md", PrepSheet, 120),
+    "prep.sheet": Purpose("prep.sheet", "prep_sheet.v2.md", PrepSheet, 120),
 }
 
 
