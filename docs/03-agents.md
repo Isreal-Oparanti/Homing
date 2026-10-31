@@ -48,13 +48,14 @@ def handle_save_read(ctx: JobContext, payload: SaveReadPayload) -> None: ...
 | `user.recheck_open` | daily 06:00 user time | `is_it_true.recheck_open` | 60 | `recheck:{user_id}:{date}` |
 | `user.today` | daily 07:00 user time; after each tick | `when_needed.compose_today` | 40 | `today:{user_id}:{date}:{hour}` |
 | `tick.when` | scheduler every 10 min | `when_needed.tick` | 40 | `tick:{yyyymmddhhmm}` |
+| `system.echo` | `POST /dev/echo` (local only), tests | `jobs.handlers.system_echo` | 10 | none |
 | `save.embed` | after read (non-private only) | `search.embed.embed_save` | 30 | `embed:{save_id}:{text_hash}` |
 | `ask.answer` | API `POST /asks` | `ask.answer` | 10 | `ask:{ask_id}` |
 | `audit.run` | API `POST /audits` | `audit.run` | 20 | `audit:{audit_id}` |
 
 **Runner behaviour** (`server/app/jobs/runner.py`):
 - **Claiming:** `SELECT … WHERE status='queued' AND run_after<=now() ORDER BY priority, id FOR UPDATE SKIP LOCKED LIMIT 1`.
-- **Threads:** `WORKER_THREADS` (default 8).
+- **Threads:** `WORKER_THREADS` (default 3). Each thread holds a database connection while it works, and Supabase's free tier allows only a few, so keep it below `DB_POOL_SIZE`. Idle threads check for work every 0.5s.
 - **Backoff:** `run_after = now() + min(2^attempts × 10s, 30 min)`. After `max_attempts`, the job is marked `dead` and a system event is emitted.
 - **Stuck jobs:** a job in `running` longer than 15 minutes goes back to `queued` (the worker probably crashed).
 - **Scheduler** (`server/app/jobs/scheduler.py`): one loop, wakes every 60s, and enqueues timed jobs using dedupe keys, so running two schedulers is harmless.

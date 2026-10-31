@@ -41,6 +41,12 @@ These must exist before a feature counts as done.
 | `search.fusion` | RRF merge order; a word-only match and a meaning-only match both appear; private saves never returned |
 | `verify/citations` | quote from the wrong save is rejected; one verified citation keeps a point; a contradiction needs both quotes; "out of date" needs a check or a past date |
 
+## The test database
+
+- **Schema per run:** integration tests (`@pytest.mark.integration`) create a schema `test_<random>` in `TEST_DATABASE_URL`, migrate it, and drop it at the end.
+- **Version record:** Alembic keeps its version record inside that schema (`version_table_schema`). Without that, it finds the real `public.alembic_version` through the search path and marks the real database as migrated. That happened once on 31 Oct and was fixed.
+- **Leak guard:** after migrating, the fixture checks that `users`, `jobs`, `saves` and `alembic_version` exist **in the test schema**, and fails otherwise.
+
 ## API tests
 
 - Auth: a missing or wrong proxy secret gets 401.

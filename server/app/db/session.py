@@ -25,10 +25,10 @@ def get_engine() -> Engine:
 
 
 @lru_cache
-def _session_factory() -> sessionmaker[Session]:
+def session_factory() -> sessionmaker[Session]:
     return sessionmaker(bind=get_engine(), expire_on_commit=False)
 
 
 def get_db() -> Iterator[Session]:
-    with _session_factory()() as db:
+    with session_factory()() as db:
         yield db

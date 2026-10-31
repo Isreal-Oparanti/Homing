@@ -35,7 +35,7 @@ HOMING_PROXY_SECRET=
 ENV=prod
 DATABASE_URL=                # Supabase Session pooler URI, pasted as shown (postgresql://… is converted)
 TEST_DATABASE_URL=           # same project; tests create and drop their own schema
-DB_POOL_SIZE=3               # per process; the free tier has few pooled connections
+DB_POOL_SIZE=5               # per process; the free tier has few pooled connections
 DB_MAX_OVERFLOW=2
 PROXY_SECRET=
 ADMIN_TOKEN=
@@ -44,7 +44,7 @@ SUPABASE_URL=
 SUPABASE_SERVICE_KEY=
 STORAGE_BUCKET=saves
 RUN_WORKER_IN_API=false
-WORKER_THREADS=8
+WORKER_THREADS=3             # each thread holds a DB connection, so keep below DB_POOL_SIZE
 
 META_API_BASE=https://api.meta.ai/v1
 META_API_KEY=

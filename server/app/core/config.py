@@ -21,8 +21,11 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://homing:homing@127.0.0.1:5432/homing"
     test_database_url: str = ""
     # Supabase's free tier allows few pooled connections: keep each process's pool small.
-    db_pool_size: int = 3
+    db_pool_size: int = 5
     db_max_overflow: int = 2
+    # Job runner threads per process. Each holds a DB connection while it works, so this
+    # stays below db_pool_size.
+    worker_threads: int = 3
     proxy_secret: str = ""
     admin_token: str = ""
     run_worker_in_api: bool = True

@@ -158,6 +158,11 @@ Hybrid search by words and meaning, merged with RRF ([02 · Search](02-data-mode
 | POST | `/feedback` | `{target, target_id, verdict, note?}` | `201` |
 | GET | `/feedback/summary` | — | counts per target and verdict (used for the README numbers) |
 
+### Dev (local only)
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| POST | `/dev/echo` | `{message?}` | `202 {job_id}`. Queues `system.echo`, whose event reaches `/events/stream` in about 1.3s (measured 31 Oct). Returns 404 unless `ENV=local`. |
+
 ### Demo (admin)
 | Method | Path | Returns |
 |---|---|---|
