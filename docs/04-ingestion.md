@@ -34,18 +34,34 @@ How things come in, and how **What is it?** gets content to read. Code lives in 
 1. **Several URLs in one message** → one `list` save, with `items` filled in later by the reader.
 2. **One URL** → a `link` save. Any other text in the message becomes the save `text`.
 3. **A label for the previous link:** a text-only message ≤ 60 chars, sent within 180s after a link save, becomes that save's `label`. This rule is from our pile analysis: only 13% of links have labels, and they arrive this way.
-4. **Other text-only messages** → a `note` save.
-5. **Media** → a `media` row (stored by sha256) plus a save of kind `image` / `voice` / `video` / `pdf` / `file`, by MIME type.
+4. **Other text-only messages** → a `note` save. Empty or punctuation-only messages ("..") are skipped.
+5. **Media** → a `media` row (stored once per sha256) plus a save of kind `image` / `voice` / `video` / `pdf` / `file`. **The type comes from the file's first bytes, not its name**: WhatsApp exports can drop extensions (Isreal's export has 3 Word docs and a PDF named `DOC-…WA0037.`). See the storage rules below.
 6. **`<Media omitted>`** → no save. It's counted as `skipped` in `imports.counts`, and the import summary says how many were left out and how to re-export with media.
 7. **Secret screen** ([09](09-security-privacy.md#secret-screen)) runs on every text. A match sets `visibility = private`.
 8. **Dedupe:** compute `content_hash`. Duplicates are kept as saves and get linked by **What's it for?**, because re-saving is a signal.
 
 **Import summary** (`imports.counts`): `{messages, saves, media, private, duplicates, skipped}`, shown to the user when the import finishes.
 
+### Storage rules (approved by Isreal, 31 Oct)
+
+The database holds **text only**: saves, readings, snapshots, captions and transcripts. That's a few MB for the whole pile. Files go to object storage (Supabase free tier: 1 GB). Isreal's export is about 200 MB, 93% of it 31 videos. These rules bring it to about 40–60 MB without losing anything useful.
+
+| File | Rule |
+|---|---|
+| **Videos** (MP4, MOV) | Spark reads the **original** once. Keep the reading, its timestamped points and a thumbnail (JPEG, 480px wide). Store a **480p H.264 copy** (CRF 28, AAC 64k) instead of the original; the original isn't uploaded. Compression runs in the worker with ffmpeg (in the Docker image). If ffmpeg isn't available (local Windows dev), keep the original and log it. |
+| **Photos** (JPEG, PNG, WebP not a sticker) | Store as is. |
+| **Voice notes** (Opus) | Store as is; the transcript is the snapshot. |
+| **PDFs, Word docs** | Store as is; the extracted text is the snapshot. |
+| **Stickers** (`STK-*.webp`) | **Skip.** They're reactions, not saves. Counted as `skipped`. |
+| **Contact cards** (`.vcf`) | **Skip.** They hold someone else's personal details. Counted as `skipped`. |
+| **Archives inside the export** (`.zip`, `.rar`) | **Don't open or store them.** The save says "zip not imported". |
+| **The same file twice** (same sha256) | Store once; both saves point to it. |
+
 **Zip safety:**
 - reject paths with `..` or absolute paths (zip slip);
 - cap total uncompressed size at 2 GB and the file count at 20k;
-- only extract `.txt` and known media extensions.
+- only extract the chat `.txt` and known media types (checked by first bytes, not by name);
+- never extract nested archives.
 
 ## Connectors (one per platform or kind)
 

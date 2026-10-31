@@ -62,6 +62,7 @@ People's saves are personal. Our own pile contains phone numbers, an account num
   - allowed types: `txt`, `zip`, images, audio (`opus`, `ogg`, `m4a`, `mp3`, `wav`), video (`mp4`, `mov`, `webm`), `pdf`.
 - **Zip:** zip-slip protection, 2 GB uncompressed cap, 20k files cap, allowed extensions only ([04](04-ingestion.md#whatsapp-message-yourself-export)).
 - Files are never executed. PDFs are parsed with PyMuPDF only.
+- **WhatsApp imports skip contact cards** (`.vcf`, someone else's details) **and never open nested archives** ([04](04-ingestion.md#storage-rules-approved-by-isreal-31-oct)).
 
 ## Rate limits
 

@@ -395,3 +395,4 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
 - **30 Oct, v5:** named **Homing** (Crowscap stays as the company and origin). Brand, logo and colours added in [13-brand.md](13-brand.md).
 - **30 Oct, v6:** brand changed to warm glass with a red primary, a new "h" icon and a wordmark. Relic added as a close competitor.
 - **30 Oct, v7:** build slices with checkpoints added ([14-build-slices.md](14-build-slices.md)). Saturday's rough path uses pasted saves; the WhatsApp import moves to Monday.
+- **31 Oct, v8:** YouTube read through captions behind a flag (Isreal's decision, option 2; revisit after office hours). Voice Transcribe confirmed on real voice notes. Storage rules approved: text-only database; videos kept as 480p copies plus thumbnails; stickers, contact cards and nested zips skipped ([04](04-ingestion.md#storage-rules-approved-by-isreal-31-oct)).

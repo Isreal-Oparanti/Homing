@@ -93,11 +93,14 @@ Used only by **Is it true?** for eligibility. Sent only to Muse Spark Open.
 |---|---|---|
 | id | text PK | |
 | user_id | text FK | |
-| storage_key | text | object storage path `u/{user_id}/{sha256}.{ext}` |
+| storage_key | text | object storage path `u/{user_id}/{sha256}.{ext}`. For videos, this is the 480p copy. |
 | mime | text | |
 | bytes | bigint | |
 | sha256 | text | |
 | duration_s | numeric null | audio and video |
+| original_bytes | bigint null | size before compression (videos), for the import summary |
+| thumb_key | text null | thumbnail path for videos |
+| compressed | bool | true when `storage_key` holds the 480p copy rather than the original |
 | original_filename | text null | |
 | created_at | timestamptz | |
 
