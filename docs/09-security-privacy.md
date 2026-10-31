@@ -37,6 +37,8 @@ People's saves are personal. Our own pile contains phone numbers, an account num
 | Passwords | "password", "pwd", "pass:" followed by a value, or "my password is …" | private |
 | Phone numbers | `+234…`, `0[789]0…` (11 digits) | **not private**, but **masked** before any model call and in the demo UI |
 
+**Images and scanned PDFs:** code can't read a picture before the model does, so a screenshot is sent to Muse Spark to be read. The words it returns are screened at once. If they look like a code, account number or key, the save becomes private, the words aren't stored, and nothing else is sent. A note typed with the upload is screened first, as usual, and a private note keeps the file from ever being sent. Say this plainly in the README.
+
 **Private saves:**
 - stored and shown blurred to the owner only. The text, link and label are left out of every API response; the owner taps **Show**, which calls `GET /saves/{id}/reveal` (`no-store`, owner only);
 - never sent to any model (the gateway refuses, see [06](06-models.md#providers));

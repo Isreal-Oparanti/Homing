@@ -11,6 +11,7 @@ import { AGENTS } from "@/components/team/agents";
 import {
   type AgentEvent,
   type Answer,
+  type CheckedItem,
   type Copy,
   type ForAnswer,
   type SaveCard,
@@ -35,6 +36,8 @@ const COPY_KIND: Record<string, string> = {
   transcript: "Captions",
   metadata: "Title and description",
   official_text: "Official page",
+  ocr_text: "Words on it",
+  pdf_text: "The PDF's text",
 };
 
 const FINDING_KIND: Record<string, string> = {
@@ -111,11 +114,100 @@ const VERDICT: Record<string, { label: string; tone: string }> = {
   couldnt_confirm: { label: "Couldn't confirm", tone: "bg-grey-soft text-ink-2" },
 };
 
+const FIRST_QUESTIONS = 3; // more than this on one card is too much at once
+
 const RESULT: Record<string, { mark: string; tone: string; words: string }> = {
   meets: { mark: "✓", tone: "text-green", words: "You meet this" },
   fails: { mark: "✗", tone: "text-red", words: "You don't meet this" },
   unknown: { mark: "?", tone: "text-amber", words: "Not known yet" },
 };
+
+/** The flyer, screenshots or PDF itself, so you can see what you saved. */
+function Files({ saveId, kind, count }: { saveId: string; kind: string; count: number }) {
+  const src = (i: number) => `/api/backend/saves/${saveId}/files/${i}`;
+  if (kind === "pdf") {
+    return (
+      <a href={src(0)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm text-ink-2 underline">
+        <ExternalLink className="size-3.5" aria-hidden />
+        Open the PDF
+      </a>
+    );
+  }
+  return (
+    <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+      {Array.from({ length: count }, (_, i) => (
+        <a key={i} href={src(i)} target="_blank" rel="noreferrer" className="shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element -- private, owner-only file */}
+          <img src={src(i)} alt={`Saved image ${i + 1}`} className="h-36 w-auto rounded-xl border border-line object-cover" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+const ITEM_VERDICT: Record<string, string> = {
+  fits_you: "Fits you",
+  not_for_you: "Not for you",
+  needs_your_answer: "Needs your answer",
+  closed: "Closed",
+  couldnt_confirm: "Couldn't confirm",
+  checked: "Checked",
+};
+
+/** A save that lists several opportunities: each one checked on its own page, side by side. */
+function ItemsView({ items }: { items: CheckedItem[] }) {
+  const done = items.filter((i) => i.status === "done");
+  const counts = new Map<string, number>();
+  for (const i of done) counts.set(i.verdict ?? "couldnt_confirm", (counts.get(i.verdict ?? "couldnt_confirm") ?? 0) + 1);
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
+        {items.length} items, each checked on its own page
+      </p>
+      <p className="mt-0.5 text-sm text-ink-2">
+        {[...counts.entries()].map(([v, n]) => `${n} ${(ITEM_VERDICT[v] ?? v).toLowerCase()}`).join(" · ")}
+        {done.length < items.length && `${done.length ? " · " : ""}${items.length - done.length} still checking`}
+      </p>
+      <ul className="mt-2 divide-y divide-line">
+        {items.map((item, i) => {
+          const verdict = item.verdict ? VERDICT[item.verdict] : null;
+          const failing = item.rules.filter((r) => r.strength === "required" && r.result === "fails");
+          const reason =
+            item.status !== "done"
+              ? null
+              : item.note ??
+                (failing.length ? `You don't meet: ${failing.map((r) => r.plain).join("; ")}` : null) ??
+                item.findings[0]?.point ??
+                null;
+          return (
+            <li key={i} className="py-2">
+              <div className="flex items-center gap-2">
+                <p className="min-w-0 flex-1 truncate font-semibold">
+                  {item.url ? (
+                    <a href={item.url} target="_blank" rel="noreferrer" className="hover:underline">
+                      {item.name}
+                    </a>
+                  ) : (
+                    item.name
+                  )}
+                </p>
+                {item.status !== "done" ? (
+                  <Working text="Checking…" />
+                ) : (
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${verdict?.tone ?? "bg-grey-soft text-ink-2"}`}>
+                    {ITEM_VERDICT[item.verdict ?? ""] ?? "Checked"}
+                  </span>
+                )}
+              </div>
+              {reason && <p className="mt-0.5 text-sm text-ink-2">{reason}</p>}
+              {item.deadline && <p className="text-xs text-muted">Closes {item.deadline.display}</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 /** Only findings and rules code verified against the official page get here (docs/05). */
 function TrueAnswerView({
@@ -129,6 +221,7 @@ function TrueAnswerView({
 }) {
   const queryClient = useQueryClient();
   const [summary, setSummary] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const reply = useMutation({
     // Wait for the card's own refresh, so the message and the verdict change together.
     mutationFn: async ({ id, value }: { id: string; value: string | number | boolean }) => {
@@ -145,6 +238,12 @@ function TrueAnswerView({
   });
 
   if (answer.verdict === "nothing_to_check") return <Muted>Nothing to check.</Muted>;
+  // Questions Homing remembers for every opportunity (age, languages, country) come first;
+  // the ones only this opportunity needs come after.
+  const questions = [
+    ...answer.questions.filter((q) => !q.id.startsWith("rule:")),
+    ...answer.questions.filter((q) => q.id.startsWith("rule:")),
+  ];
   const host = answer.officialUrl ? hostOf(answer.officialUrl) : null;
   const verdict = VERDICT[answer.verdict];
   const failing = answer.rules.filter((r) => r.strength === "required" && r.result === "fails");
@@ -164,7 +263,11 @@ function TrueAnswerView({
           </span>
         )}
       </div>
-      {answer.verdict === "closed" && <p className="font-semibold">Closed, per the official page.</p>}
+      {answer.verdict === "closed" && (
+        <p className="font-semibold">
+          {answer.fromPost || !answer.officialUrl ? "Closed, going by the date in the post." : "Closed, per the official page."}
+        </p>
+      )}
       {answer.verdict === "not_for_you" && failing.length > 0 && (
         <p>
           You don&apos;t meet: {failing.map((r) => r.plain).join("; ")}.{" "}
@@ -174,15 +277,22 @@ function TrueAnswerView({
         </p>
       )}
       {answer.verdict === "fits_you" && <p>Nothing on the official page rules you out.</p>}
+      {answer.fromPost &&
+        answer.verdict === "couldnt_confirm" &&
+        answer.rules.length > 0 &&
+        answer.rules.every((r) => r.strength !== "required" || r.result === "meets") && (
+          <p>Going by the post, nothing rules you out.</p>
+        )}
       {answer.note && <p className="text-amber">{answer.note}</p>}
 
-      {answer.questions.length > 0 && (
+      {questions.length > 0 && (
         <div className="space-y-3 rounded-xl bg-amber-soft/60 p-3">
           <p className="text-sm text-ink-2">
-            Answer {answer.questions.length === 1 ? "this" : "these"} to see if it fits you. Homing
-            remembers, so other opportunities won&apos;t ask again.
+            Answer {questions.length === 1 ? "this" : "these"} to see if it fits you.
+            {questions.some((q) => !q.id.startsWith("rule:")) &&
+              " Homing remembers, so other opportunities won't ask again."}
           </p>
-          {answer.questions.map((q) => (
+          {questions.slice(0, showAll ? undefined : FIRST_QUESTIONS).map((q) => (
             <QuestionView
               key={q.id}
               question={q}
@@ -190,6 +300,12 @@ function TrueAnswerView({
               onAnswer={(value) => reply.mutate({ id: q.id, value })}
             />
           ))}
+          {!showAll && questions.length > FIRST_QUESTIONS && (
+            <button type="button" onClick={() => setShowAll(true)} className="text-sm text-ink-2 underline">
+              Show {questions.length - FIRST_QUESTIONS} more{" "}
+              {questions.length - FIRST_QUESTIONS === 1 ? "question" : "questions"}
+            </button>
+          )}
         </div>
       )}
       {summary && <p className="text-sm font-semibold text-green">{summary}</p>}
@@ -212,7 +328,9 @@ function TrueAnswerView({
                       {r.strength === "preferred" && <span className="text-muted"> · preferred, not required</span>}
                     </p>
                     <p className="text-xs text-ink-2">
-                      “{r.quote}”{host && <span className="text-green"> · on {host}</span>}
+                      “{r.quote}”
+                      {host && <span className="text-green"> · on {host}</span>}
+                      {answer.fromPost && <span className="text-muted"> · in the post, not confirmed</span>}
                     </p>
                   </div>
                 </li>
@@ -221,6 +339,8 @@ function TrueAnswerView({
           </ul>
         </div>
       )}
+
+      {answer.items.length > 0 && <ItemsView items={answer.items} />}
 
       {answer.findings.length > 0 && (
         <ul className="space-y-2.5">
@@ -417,6 +537,7 @@ function Card({ card }: { card: SaveCard }) {
           <span className="truncate">{save.url}</span>
         </a>
       )}
+      {save.files > 0 && !isPrivate && <Files saveId={save.id} kind={save.kind} count={save.files} />}
 
       <div className="mt-4">
         <AnswerRow answer="what">

@@ -59,7 +59,9 @@ def official_candidates(urls: list[str], organisations: list[str]) -> list[str]:
     ranked: list[tuple[int, int, str]] = []
     for i, url in enumerate(dict.fromkeys(urls)):
         host = _host(url)
-        if not host or _matches(host, NEVER_OFFICIAL):
+        # A LinkedIn job page is the posting itself; LinkedIn posts and profiles are not.
+        is_job_page = host.endswith("linkedin.com") and "/jobs/" in urlsplit(url).path
+        if not host or (_matches(host, NEVER_OFFICIAL) and not is_job_page):
             continue
         names_org = any(w in host or w in urlsplit(url).path.lower() for w in words)
         if _matches(host, APPLICATION_HOSTS):

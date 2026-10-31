@@ -11,6 +11,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from sqlalchemy import select
+from sqlalchemy.orm import object_session
 
 from app.core.config import get_settings
 from app.db.models import Check, Profile, Reading, Save, Snapshot, User
@@ -58,7 +59,7 @@ def _fetch_source(url: str, hint: str, fetcher: SafeFetcher) -> SnapshotIn | Non
 
 def _candidates(save: Save, reading: Reading) -> list[str]:
     facts = reading.key_facts or {}
-    urls = find_urls(save.text or "") + ([save.url] if save.url else []) + facts.get("links", [])
+    urls = find_urls(words_of(save)) + ([save.url] if save.url else []) + facts.get("links", [])
     return official_candidates(urls, facts.get("organisations", []))[:TRIES]
 
 
@@ -68,6 +69,39 @@ def _find_official(save: Save, reading: Reading) -> tuple[str, SnapshotIn] | Non
         if (page := _fetch_source(url, reading.title, fetcher)) is not None:
             return url, page
     return None
+
+
+MIN_POST_CHARS = 80  # shorter than this, a post has no rules worth reading
+
+
+def words_of(save: Save) -> str:
+    """What the save says: the person's own text, or the words read off their file."""
+    if save.kind in ("image", "pdf"):
+        db = object_session(save)
+        copy = None
+        if db is not None:
+            copy = db.scalar(
+                select(Snapshot.text)
+                .where(Snapshot.save_id == save.id, Snapshot.kind.in_(("ocr_text", "pdf_text")))
+                .limit(1)
+            )
+        return "\n\n".join(t for t in (save.text, copy) if t)
+    return save.text or ""
+
+
+def _rules_from_post(ctx: JobContext, save: Save, reading: Reading) -> list[dict[str, Any]]:
+    """Who-can-apply rules quoted from the post itself, when there's no official page."""
+    text = words_of(save)
+    proposed: ProposedCheck = gateway_factory(ctx.db).run(
+        "check.compare",
+        user_id=save.user_id,
+        inputs={
+            "save": {"text": text, "what": reading.what, "key_facts": reading.key_facts},
+            "source": {"url": None, "text": text},
+        },
+        save_ids=[save.id],
+    )
+    return [r for p in proposed.rules if (r := accept_rule(p.model_dump(), text))]
 
 
 def _host(url: str) -> str:
@@ -108,6 +142,7 @@ def _save_check(ctx: JobContext, save: Save, **values: Any) -> Check:
         "model": get_settings().meta_spark_model,
         "prompt_version": PURPOSES["check.compare"].prompt.removesuffix(".md"),
         "answers": {},
+        "items": [],
         **values,
         "checked_at": datetime.now(UTC),
     }.items():
@@ -134,6 +169,19 @@ def facts_for(db: Any, user_id: str, check: Check | None) -> Facts:
     )
 
 
+def _post_deadline(save: Save | None, reading: Reading, user_tz: str) -> datetime | None:
+    """The latest closing date the post itself states, parsed by code. Event dates don't count."""
+    if save is None:
+        return None
+    found = [
+        d.at
+        for fact in (reading.key_facts or {}).get("dates", [])
+        if fact.get("role") == "deadline"
+        and (d := parse_deadline(fact.get("text", ""), base=save.saved_at, user_tz=user_tz))
+    ]
+    return max(found) if found else None
+
+
 def judge_check(db: Any, check: Check, user_id: str) -> list[dict[str, Any]]:
     """Re-judge a check's rules and verdict by code. Returns the questions still open."""
     now = datetime.now(UTC)
@@ -141,10 +189,19 @@ def judge_check(db: Any, check: Check, user_id: str) -> list[dict[str, Any]]:
     found = assess(check.eligibility or [], facts_for(db, user_id, check), ref_year=ref_year)
     check.eligibility = found.rules
     reading = db.get(Reading, check.save_id)
+    source_opened = bool(check.official_url) and not check.note
+    past = check.deadline_at is not None and check.deadline_at < now
+    if check.deadline_at is None and not source_opened and reading is not None:
+        # No official page to go by: a closing date the post itself gives that has passed
+        # still means it's over. An opened official page always wins over the post.
+        save = db.get(Save, check.save_id)
+        user = db.get(User, user_id)
+        closes = _post_deadline(save, reading, user.tz if user else "Africa/Lagos")
+        past = closes is not None and closes < now
     check.verdict = decide(
         closed=any(f.get("kind") == "closed" for f in check.findings or []),
-        past_deadline=check.deadline_at is not None and check.deadline_at < now,
-        source_opened=bool(check.official_url) and not check.note,
+        past_deadline=past,
+        source_opened=source_opened,
         rules=found.rules,
         is_opportunity=reading.is_opportunity if reading else True,
     )
@@ -157,6 +214,8 @@ VERDICT_WORDS = {
     "not_for_you": "it's not for you",
     "closed": "it's closed",
     "couldnt_confirm": "couldn't confirm it",
+    "needs_your_answer": "it needs your answer",
+    "checked": "here's what the page says",
 }
 
 
@@ -189,6 +248,9 @@ def check(ctx: JobContext, payload: dict[str, Any]) -> None:
     reading = saves_repo.get_reading(ctx.db, save.id)
     if save.visibility == "private" or reading is None:
         return
+    if len(reading.items or []) >= 2:
+        _start_items(ctx, save, reading)
+        return
     user = ctx.db.get(User, save.user_id)
     user_tz = user.tz if user else "Africa/Lagos"
 
@@ -203,7 +265,23 @@ def check(ctx: JobContext, payload: dict[str, Any]) -> None:
             else:
                 note = "We couldn't find the official page, so what the post says is unconfirmed."
                 summary = f"Couldn't find the official page for: {reading.title}"
-            _save_check(ctx, save, verdict="couldnt_confirm", note=note)
+            rules = []
+            if reading.is_opportunity and len(words_of(save)) >= MIN_POST_CHARS:
+                # No official page: still say who it's for, going by the post's own words.
+                rules = _rules_from_post(ctx, save, reading)
+                if rules:
+                    note += " Who can apply below is going by the post's own words."
+                    summary += f". Judged from the post's own words ({len(rules)} rules)"
+            check = _save_check(
+                ctx,
+                save,
+                verdict="couldnt_confirm",
+                note=note,
+                official_found_by="post_only" if rules else None,
+                eligibility=rules,
+            )
+            if rules:
+                judge_check(ctx.db, check, save.user_id)
             emit(
                 ctx.db,
                 user_id=save.user_id,
@@ -229,7 +307,11 @@ def check(ctx: JobContext, payload: dict[str, Any]) -> None:
             "check.compare",
             user_id=save.user_id,
             inputs={
-                "save": {"text": save.text, "what": reading.what, "key_facts": reading.key_facts},
+                "save": {
+                    "text": words_of(save),
+                    "what": reading.what,
+                    "key_facts": reading.key_facts,
+                },
                 "source": {"url": page.source_url, "text": page.text[:SOURCE_CHARS_FOR_MODEL]},
             },
             save_ids=[save.id],
@@ -249,14 +331,24 @@ def check(ctx: JobContext, payload: dict[str, Any]) -> None:
     official = page.source_url or url
     host = _host(official)
     if not proposed.is_same_opportunity:
-        _save_check(
+        note = f"The post's link goes to a different page on {host}, so it's unconfirmed."
+        rules = []
+        if reading.is_opportunity and len(words_of(save)) >= MIN_POST_CHARS:
+            # Still say who it's for, going by the post's (or flyer's) own words.
+            rules = _rules_from_post(ctx, save, reading)
+            if rules:
+                note += " Who can apply below is going by the post's own words."
+        check = _save_check(
             ctx,
             save,
             verdict="couldnt_confirm",
-            official_url=official,
-            official_found_by="post_link",
-            note=f"The post's link goes to a different page on {host}, so it's unconfirmed.",
+            official_url=None if rules else official,
+            official_found_by="post_only" if rules else "post_link",
+            note=note,
+            eligibility=rules,
         )
+        if rules:
+            judge_check(ctx.db, check, save.user_id)
         emit(
             ctx.db,
             user_id=save.user_id,
@@ -378,6 +470,16 @@ def rejudge_all(db: Any, user_id: str) -> list[tuple[Check, str, str]]:
     ).all()
     changed = []
     for check in checks:
+        if check.items:
+            reading = db.get(Reading, check.save_id)
+            is_opportunity = bool(reading and reading.is_opportunity)
+            items = [dict(i) for i in check.items]
+            for item in items:
+                before = item.get("verdict")
+                judge_item(db, user_id, item, is_opportunity=is_opportunity)
+                if before and item.get("verdict") != before:
+                    changed.append((check, before, item["verdict"]))
+            check.items = items
         if not check.eligibility:
             continue
         before = check.verdict
@@ -466,3 +568,134 @@ def update_profile(db: Any, user_id: str, qid: str, value: Any) -> None:
             action="rechecked",
             summary=f"Re-judged {len(changed)} saved {things} after you changed your details.",
         )
+
+
+# Lists: one save, many opportunities ----------------------------------------------------------
+
+MAX_ITEMS = 20
+
+
+def _start_items(ctx: JobContext, save: Save, reading: Reading) -> None:
+    """Fan out: one job per item, so the items are checked side by side."""
+    items = [
+        {"name": i.get("name"), "url": i.get("url"), "note": i.get("note"), "status": "queued"}
+        for i in (reading.items or [])[:MAX_ITEMS]
+    ]
+    _save_check(ctx, save, verdict="checked", items=items)
+    for index in range(len(items)):
+        queue.enqueue(
+            ctx.db,
+            "save.check_item",
+            {"save_id": save.id, "index": index},
+            user_id=save.user_id,
+            priority=queue.PRIORITY_USER,
+            dedupe_key=f"checkitem:{save.id}:{index}",
+        )
+    emit(
+        ctx.db,
+        user_id=save.user_id,
+        agent="true",
+        action="checking_list",
+        summary=f"Checking the {len(items)} items in this save, one by one.",
+        save_id=save.id,
+    )
+    _then_when(ctx, save)
+
+
+def judge_item(db: Any, user_id: str, item: dict[str, Any], *, is_opportunity: bool) -> None:
+    """An item's rules and verdict, by code. Items use the profile only (no one-off answers)."""
+    if item.get("status") != "done" or not item.get("official_url"):
+        return
+    now = datetime.now(UTC)
+    deadline = datetime.fromisoformat(item["deadline_at"]) if item.get("deadline_at") else None
+    found = assess(item.get("rules") or [], facts_for(db, user_id, None), ref_year=now.year)
+    item["rules"] = found.rules
+    item["questions"] = [q for q in found.questions if not q["id"].startswith("rule:")]
+    item["verdict"] = decide(
+        closed=bool(item.get("closed")),
+        past_deadline=deadline is not None and deadline < now,
+        source_opened=True,
+        rules=found.rules,
+        is_opportunity=is_opportunity,
+    )
+
+
+def check_item(ctx: JobContext, payload: dict[str, Any]) -> None:
+    if ctx.user_id is None:
+        raise PermanentError("save.check_item needs a user.")
+    save = saves_repo.get_save(ctx.db, ctx.user_id, str(payload.get("save_id")))
+    reading = saves_repo.get_reading(ctx.db, save.id) if save else None
+    check = ctx.db.get(Check, save.id) if save else None
+    index = int(payload.get("index", -1))
+    if save is None or reading is None or check is None or not 0 <= index < len(check.items):
+        return
+    item = dict(check.items[index])
+    name = item.get("name") or "This item"
+    url = item.get("url")
+    user = ctx.db.get(User, save.user_id)
+    user_tz = user.tz if user else "Africa/Lagos"
+    result: dict[str, Any] = {"status": "done"}
+
+    source = _fetch_source(url, name, fetcher_factory()) if url else None
+    if not url:
+        result.update(verdict="couldnt_confirm", note="No link in the save to check.")
+    elif source is None:
+        result.update(verdict="couldnt_confirm", note=f"We couldn't open {_host(url)}.")
+    else:
+        page = Snapshot(
+            save_id=save.id,
+            kind="official_text",
+            source_url=source.source_url or url,
+            text=source.text,
+            meta={**source.meta, "for": "item", "index": index},
+        )
+        ctx.db.add(page)
+        ctx.db.flush()
+        proposed: ProposedCheck = gateway_factory(ctx.db).run(
+            "check.compare",
+            user_id=save.user_id,
+            inputs={
+                "save": {"text": f"{name}: {item.get('note') or ''}".strip(": ")},
+                "source": {"url": page.source_url, "text": page.text[:SOURCE_CHARS_FOR_MODEL]},
+            },
+            save_ids=[save.id],
+        )
+        now = datetime.now(UTC)
+        deadline = None
+        if proposed.deadline_quote and (m := match_quote(proposed.deadline_quote, page.text)):
+            deadline = parse_deadline(page.text[m.start : m.end], base=now, user_tz=user_tz)
+        closed = is_closed(page.text)
+        result.update(
+            official_url=page.source_url,
+            snapshot_id=page.id,
+            findings=_verify(proposed, page)[:5],
+            rules=[r for p in proposed.rules if (r := accept_rule(p.model_dump(), page.text))],
+            deadline_at=deadline.at.isoformat() if deadline else None,
+            deadline_source_text=deadline.source_text if deadline else None,
+            closed=closed.quote if closed else None,
+        )
+        result = {**item, **result}
+        judge_item(ctx.db, save.user_id, result, is_opportunity=reading.is_opportunity)
+
+    # Several item jobs write to the same check: take the row lock to merge safely.
+    locked = ctx.db.scalar(
+        select(Check)
+        .where(Check.save_id == save.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    items = list(locked.items)
+    items[index] = {**items[index], **result}
+    locked.items = items
+    done = items[index]
+    words = VERDICT_WORDS.get(done.get("verdict", ""), "it needs your answer")
+    where = f" on {_host(done['official_url'])}" if done.get("official_url") else ""
+    emit(
+        ctx.db,
+        user_id=save.user_id,
+        agent="true",
+        action="checked_item",
+        summary=f"Checked {name}{where}: {words}.",
+        save_id=save.id,
+        evidence=[{"label": name, "url": url}] if url else [],
+    )

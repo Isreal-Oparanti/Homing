@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from app.agents.is_it_true import check
+from app.agents.is_it_true import check, check_item
 from app.agents.what_is_it import read_one
 from app.agents.whats_it_for import place
 from app.agents.when_needed import set_when
@@ -28,6 +28,7 @@ HANDLERS: dict[str, Handler] = {
     "system.echo": system_echo,
     "save.read": read_one,
     "save.check": check,
+    "save.check_item": check_item,
     "save.place": place,
     "save.when": set_when,
 }

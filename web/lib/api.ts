@@ -118,6 +118,8 @@ export type SaveSummary = {
   status: "received" | "reading" | "ready" | "failed";
   visibility: "normal" | "private";
   error: string | null;
+  /** Images or a PDF on the save, shown from /api/backend/saves/{id}/files/{n}. */
+  files: number;
 };
 
 export type Reading = {
@@ -158,12 +160,29 @@ export type TrueAnswer = {
   officialUrl: string | null;
   /** The save is just a link to the official page itself. */
   samePage: boolean;
+  /** No official page: the rules quote the post itself and aren't confirmed. */
+  fromPost: boolean;
   note: string | null;
   deadline: { at: string; display: string; tzStated: boolean; sourceText: string | null } | null;
   findings: { point: string; quote: string; kind: "left_out" | "differs" | "confirmed" | "closed" }[];
   rules: EligibilityRule[];
   questions: Question[];
+  /** For a save that lists several opportunities: each one, checked on its own page. */
+  items: CheckedItem[];
   question: string | null;
+};
+
+export type CheckedItem = {
+  name: string;
+  url: string | null;
+  status: "queued" | "done";
+  verdict: TrueAnswer["verdict"] | null;
+  note: string | null;
+  officialUrl: string | null;
+  findings: TrueAnswer["findings"];
+  rules: EligibilityRule[];
+  deadline: { at: string; display: string } | null;
+  closed: string | null;
 };
 
 export type EligibilityRule = {
@@ -245,17 +264,31 @@ type RawSave = {
   status: SaveSummary["status"];
   visibility: SaveSummary["visibility"];
   error: string | null;
+  files?: number;
 };
 
 type RawTrue = {
   verdict: TrueAnswer["verdict"];
   official_url?: string | null;
   same_page?: boolean;
+  from_post?: boolean;
   note?: string | null;
   deadline?: { at: string; display: string; tz_stated: boolean; source_text: string | null } | null;
   findings?: TrueAnswer["findings"];
   rules?: EligibilityRule[];
   questions?: Question[];
+  items?: {
+    name: string;
+    url: string | null;
+    status: CheckedItem["status"];
+    verdict: CheckedItem["verdict"];
+    note: string | null;
+    official_url: string | null;
+    findings: TrueAnswer["findings"];
+    rules: EligibilityRule[];
+    deadline: { at: string; display: string } | null;
+    closed: string | null;
+  }[];
   question?: string | null;
 };
 
@@ -277,6 +310,7 @@ function toTrue(raw: RawTrue | null): TrueAnswer | null {
     verdict: raw.verdict,
     officialUrl: raw.official_url ?? null,
     samePage: raw.same_page ?? false,
+    fromPost: raw.from_post ?? false,
     note: raw.note ?? null,
     deadline: raw.deadline
       ? {
@@ -289,6 +323,18 @@ function toTrue(raw: RawTrue | null): TrueAnswer | null {
     findings: raw.findings ?? [],
     rules: raw.rules ?? [],
     questions: raw.questions ?? [],
+    items: (raw.items ?? []).map((i) => ({
+      name: i.name,
+      url: i.url,
+      status: i.status,
+      verdict: i.verdict,
+      note: i.note,
+      officialUrl: i.official_url,
+      findings: i.findings ?? [],
+      rules: i.rules ?? [],
+      deadline: i.deadline,
+      closed: i.closed,
+    })),
     question: raw.question ?? null,
   };
 }
@@ -330,6 +376,7 @@ function toSave(raw: RawSave): SaveSummary {
     status: raw.status,
     visibility: raw.visibility,
     error: raw.error,
+    files: raw.files ?? 0,
   };
 }
 
@@ -342,6 +389,23 @@ export const savesApi = {
       "saves?limit=50",
     );
     return page.items.map((raw) => ({ ...toSave(raw), title: raw.title, what: raw.what }));
+  },
+  /** Screenshots, a flyer or a PDF (several images become one save). */
+  async upload(files: File[], note: string): Promise<SaveSummary> {
+    const form = new FormData();
+    for (const f of files) form.append("files", f);
+    if (note.trim()) form.append("note", note.trim());
+    // No JSON content type here: the browser sets the multipart boundary itself.
+    const res = await fetch("/api/backend/saves/file", { method: "POST", body: form });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new HomingApiError(
+        res.status,
+        body?.error?.code ?? "error",
+        body?.error?.message ?? "Couldn't save that file. Try again.",
+      );
+    }
+    return toSave(await res.json());
   },
   /** Answer one question; every saved opportunity is re-judged. Returns what changed. */
   async answer(id: string, questionId: string, value: string | number | boolean): Promise<string> {

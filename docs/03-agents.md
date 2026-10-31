@@ -140,6 +140,8 @@ class Reading(BaseModel):
    - Each answer is remembered on the profile (or on the check, for one-off rules). Every saved opportunity is then re-judged by code, with no model call, and The team gets one line: "Used your answer on 2 saved opportunities: 2 aren't for you."
    - Saves that aren't opportunities get `checked`, never a fit verdict.
    - Opportunities are always checked, even when saved as a bare link.
+   - **No official page, or the link goes to a different page:** the rules are taken from the post's own words (quotes checked against the post), and the card says so. With no official page, a closing date the post itself gives that has passed makes it `closed`. An opened official page always wins over the post.
+   - **Lists (S7):** a save whose reading has 2+ `items` fans out to one `save.check_item` job per item (up to 20). Each item's page is fetched and compared, and its rules and verdict are judged by code. Several items write to the same check under a row lock. The team gets one line per item ("Checked TripleFunds on triple-funds.com: it fits you.").
 6. **Verdict by code** (never by a model):
    1. if the page says closed, or `deadline_at < now` → `closed`;
    2. else if any `required` rule `fails` → `not_for_you`;

@@ -62,6 +62,10 @@ EMBED_DIM=384
 
 MODEL_DAILY_TOKEN_BUDGET=5000000
 MODEL_USER_DAILY_TOKEN_BUDGET=1500000
+STORAGE_DIR=data/storage        # local backend only
+SUPABASE_URL=                    # supabase backend: project URL
+SUPABASE_SERVICE_KEY=            # supabase backend: service role key (server only)
+STORAGE_BUCKET=saves             # private bucket
 
 # Feature flags (kill switches)
 FEATURE_CHECKS=true

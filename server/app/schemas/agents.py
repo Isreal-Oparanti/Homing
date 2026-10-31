@@ -23,6 +23,14 @@ class KeyFacts(BaseModel):
     places: list[str] = Field(default_factory=list)
 
 
+class ListItem(BaseModel):
+    """One entry in a save that lists several things, e.g. one of 18 funding opportunities."""
+
+    name: str = Field(description="The item's name as written, e.g. 'TripleFunds'.")
+    url: str | None = Field(default=None, description="Its link if the save shows one, else null.")
+    note: str | None = Field(default=None, description="What the save says about it, if anything.")
+
+
 class Reading(BaseModel):
     """The answer to "What is it?"."""
 
@@ -35,6 +43,11 @@ class Reading(BaseModel):
     )
     is_opportunity: bool = Field(
         description="True for grants, programmes, jobs, competitions, scholarships, hackathons."
+    )
+    items: list[ListItem] = Field(
+        default_factory=list,
+        max_length=25,
+        description="Only when the save lists several separate things; else empty.",
     )
 
     @field_validator("title")
@@ -157,3 +170,9 @@ class PrepSheet(BaseModel):
     agree: list[SheetItem] = Field(default_factory=list, max_length=6)
     disagree: list[Disagreement] = Field(default_factory=list, max_length=3)
     checklist: list[SheetItem] = Field(default_factory=list, max_length=5)
+
+
+class FileReading(Reading):
+    """A reading of an image or scanned PDF, with every word on it as our copy of the content."""
+
+    text: str = Field(description="All readable text, word for word, in reading order.")

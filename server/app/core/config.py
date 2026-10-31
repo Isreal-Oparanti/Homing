@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     model_user_daily_token_budget: int = 1_500_000
     spark_max_concurrency: int = 6
 
+    # Files: the local disk in development, a private Supabase bucket in production.
+    storage_backend: str = "local"  # local · supabase
+    storage_dir: str = "data/storage"
+    supabase_url: str = ""
+    supabase_service_key: str = ""
+    storage_bucket: str = "saves"
+
     @field_validator("database_url", "test_database_url")
     @classmethod
     def _use_psycopg(cls, value: str) -> str:

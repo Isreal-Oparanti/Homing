@@ -221,6 +221,13 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **Done when:** uploading screenshots of the **"18 opportunities" thread** gives a list save with its items read. Each item gets a verdict, and the card shows counts (fits you, closed, not for you, needs your answer, couldn't confirm). A flyer image gets a full save card.
 - **Proved by:** a unit test for scanned-PDF detection, and an agent test for list items using recorded output.
 - **If late:** check the first 10 list items only.
+- **As built (31 Oct):**
+  - **Uploads:** `POST /saves/file` is multipart through the proxy, not signed uploads (fine up to Vercel's ~4.5 MB; signed uploads come with the WhatsApp import). Storage is `app/storage.py`, local or Supabase. `ingest/files.py` handles type sniffing, PDF text and image shrinking. `read.file` reads images and scanned PDFs. Migration 0005 adds `saves.media_ids` and `checks.items`.
+  - **Web:** the Add sheet takes files by button, drag-and-drop or pasting a screenshot. The card shows the images (or "Open the PDF") and, for lists, each item with its verdict and a running count.
+  - **On real files from Isreal's pile:**
+    - The Startup Abuja flyer (JPG) was read word for word: dates, prizes, "Age 14 - 45 years", "Nigerians/Other Africans". Its link now goes to a generic page, so who can apply is taken from the flyer's own words. It's `closed` by its own 20 July 2025 deadline.
+    - The 5-link funding-directories message gave 5 side-by-side checks: 2 checked against their pages, 3 sites refused us (said so).
+  - **Still needed for the done-when:** screenshots of the real 18-opportunity thread (Isreal), and a web search key so items without links can find their official pages.
 
 ### S8 · WhatsApp import
 - **Day:** Mon morning · **Estimate:** 4h · **Depends on:** S3, S7 · **Scene:** Past

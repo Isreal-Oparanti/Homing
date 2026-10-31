@@ -5,6 +5,7 @@ The gateway refuses private saves, masks phone numbers, caches by input hash, as
 JSON, validates it with one repair attempt, and records every call in model_calls.
 """
 
+import base64
 import hashlib
 import json
 import threading
@@ -23,11 +24,33 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.db.models import ModelCall, Save, User
 from app.jobs.errors import DeferredError, PermanentError, RetryableError
-from app.schemas.agents import Placement, PrepSheet, ProposedCheck, Reading, VideoPoints
+from app.schemas.agents import (
+    FileReading,
+    Placement,
+    PrepSheet,
+    ProposedCheck,
+    Reading,
+    VideoPoints,
+)
 from app.verify.secrets import mask_phones
 
 T = TypeVar("T", bound=BaseModel)
 PROMPTS = Path(__file__).parent / "prompts"
+
+
+@dataclass(frozen=True)
+class Attachment:
+    """A file sent with the call: an image inline, or a PDF as file data (docs/06, S0)."""
+
+    data: bytes
+    mime: str
+    name: str = "file"
+
+    def part(self) -> dict[str, Any]:
+        url = f"data:{self.mime};base64,{base64.b64encode(self.data).decode()}"
+        if self.mime == "application/pdf":
+            return {"type": "file", "file": {"filename": self.name, "file_data": url}}
+        return {"type": "image_url", "image_url": {"url": url}}
 
 
 @dataclass(frozen=True)
@@ -40,7 +63,8 @@ class Purpose:
 
 
 PURPOSES: dict[str, Purpose] = {
-    "read.text": Purpose("read.text", "read_text.v2.md", Reading, 90, "low"),
+    "read.text": Purpose("read.text", "read_text.v3.md", Reading, 90, "low"),
+    "read.file": Purpose("read.file", "read_file.v1.md", FileReading, 120, "low"),
     # Comparing with a source is the hardest call, so it keeps the default reasoning effort.
     "check.compare": Purpose("check.compare", "check_compare.v2.md", ProposedCheck, 120),
     "place.assign": Purpose("place.assign", "place_assign.v1.md", Placement, 45, "low"),
@@ -138,7 +162,13 @@ class ModelGateway:
             )
 
     def run(
-        self, purpose: str, *, user_id: str | None, inputs: dict[str, Any], save_ids: list[str]
+        self,
+        purpose: str,
+        *,
+        user_id: str | None,
+        inputs: dict[str, Any],
+        save_ids: list[str],
+        attachments: list[Attachment] | None = None,
     ) -> Any:
         p = PURPOSES[purpose]
         self._refuse_private(save_ids)
@@ -146,7 +176,9 @@ class ModelGateway:
         instructions = (PROMPTS / p.prompt).read_text(encoding="utf-8")
         version = p.prompt.removesuffix(".md")
         user_text = render_blocks(inputs)
-        input_hash = hashlib.sha256(f"{model}\n{version}\n{user_text}".encode()).hexdigest()
+        files = "".join(hashlib.sha256(a.data).hexdigest() for a in attachments or [])
+        key = f"{model}\n{version}\n{user_text}\n{files}"
+        input_hash = hashlib.sha256(key.encode()).hexdigest()
 
         cached = self._db.scalar(
             select(ModelCall.output)
@@ -156,13 +188,18 @@ class ModelGateway:
         if cached is not None:
             return p.output.model_validate(cached)
 
-        # Characters / 4 is a rough token count; good enough for a daily guard.
-        self._check_budget(user_id, (len(instructions) + len(user_text)) // 4)
+        # Characters / 4 is a rough token count; good enough for a daily guard. Files are counted
+        # as one token per 3 bytes, capped per file (images cost far less than that).
+        file_tokens = sum(min(len(a.data) // 3, 20_000) for a in attachments or [])
+        self._check_budget(user_id, (len(instructions) + len(user_text)) // 4 + file_tokens)
 
         schema = inline_schema(p.output)
+        content: Any = user_text
+        if attachments:
+            content = [{"type": "text", "text": user_text}, *(a.part() for a in attachments)]
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": instructions},
-            {"role": "user", "content": user_text},
+            {"role": "user", "content": content},
         ]
         started = time.perf_counter()
         usage: dict[str, int] = {"in": 0, "out": 0}

@@ -107,6 +107,15 @@ Each connector returns `Gathered(snapshots: list[Snapshot], media_urls: list[str
 - `trafilatura` extracts the main text and metadata. If it fails, fall back to the `<title>` and meta description.
 - If the content type is PDF, hand over to the PDF connector.
 
+### Files (`files.py`), as built in S7
+- **Upload:** `POST /saves/file` through the web proxy: 1–6 images, or one PDF, 10 MB each. Vercel limits a request to about 4.5 MB, so bigger files will need the signed-upload route (`/uploads/sign`) before launch.
+- **Types** are sniffed from the bytes (PNG, JPEG, WebP, GIF, PDF), never from the name.
+- **Storage:** `STORAGE_BACKEND=local` in development (git-ignored `server/data/`), `supabase` in production (private bucket `saves`). Keys are `u/{user_id}/{sha256}.{ext}`, so the same file is stored once.
+- **Reading:**
+  - a PDF with a text layer (at least 200 characters a page on average) is read as text (`pdf_text` snapshot, then `read.text`);
+  - images and scanned or damaged PDFs go to Muse Spark (`read.file`), which returns every word on them as our copy (`ocr_text`) plus the reading. Images are shrunk to at most 1600 px first.
+- **Lists:** when a save lists several things (screenshots of an "18 opportunities" thread, a numbered list of links), the reading has `items`. **Is it true?** then checks each item on its own page (`save.check_item`, up to 20, side by side).
+
 ### Application sites built by JavaScript (`ats.py`)
 A plain fetch of a Workable job page returns only its one-line description (tested 31 Oct on the Afreximbank internship). Workable publishes the same data as JSON, and its robots.txt allows AI input (`Content-Signal: ai-input=yes`).
 - `apply.workable.com/{account}/j/{code}` → `GET /api/v2/accounts/{account}/jobs/{code}`. The snapshot holds the title, location, workplace (`on-site`), description, requirements and benefits.

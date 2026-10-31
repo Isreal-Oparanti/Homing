@@ -45,6 +45,8 @@ FastAPI. Base path `/api/v1`. The API is called only by the Next.js server ([ADR
 |---|---|---|---|
 | POST | `/saves` | `{text}` (may contain links) | `202 Save` |
 | POST | `/saves/file` | `{storage_key, note?}` | `202 Save` |
+| | | **As built (S7):** multipart `files` (1–6 images, or one PDF, 10 MB each) plus an optional `note` | `202 Save`. The type is sniffed from the bytes (415 otherwise). Several images become one save read in order (screenshots of one thread). The same file twice is stored once (`media.sha256`). |
+| GET | `/saves/{id}/files/{n}` | — | the owner's file `n` (image or PDF) for the card; 404 for anyone else |
 | GET | `/saves` | `?thread_id&status&cursor&limit` | `{items: SaveSummary[], next_cursor}`. Each item also carries the reading's `title` and `what` when there is one. |
 | GET | `/saves/{id}` | — | `SaveCard` |
 | GET | `/saves/{id}/reveal` | — | `{text}`: the owner's own text, for a private save they tap to show. `Cache-Control: no-store`. Another user gets 404. |
@@ -80,6 +82,11 @@ As built in S4, the three answers differ slightly from the example above:
   - Findings are `{point, quote, kind}` with the source in `official_url`, and only verified findings are sent.
   - A save with nothing checkable gets `{"verdict": "nothing_to_check"}`.
 - **`true` (S6):** it adds `rules` (`{rule, plain, quote, strength, result}`, verified only), `questions` (`{id, text, kind, options?}`, with `kind` one of `choice`, `yesno`, `year` or `country`) and `same_page` (the save is just a link to the official page).
+- **`true` (S6 follow-ups, S7):**
+  - `from_post`: no official page (or the link went to a different page), so `rules` quote the post itself and are marked "in the post, not confirmed".
+  - `items`: for a save that lists several things, one entry per item: `{name, url, status, verdict, note, official_url, findings, rules, deadline, closed}`. Each item is checked on its own page, side by side.
+  - `questions` on a list save are the profile questions its items need, asked once.
+- **`save.files`:** how many images or PDFs the save has.
 - **`for`:** each thread also has `count`, so the card can say "your 3rd save on this".
 - **`when`:** it adds `source` (`check` or `reading`), `display` ("Sat 31 Oct, 23:59 Lagos time"), `source_text`, `tz_stated` and `time_stated`.
 - **`pending`:** an answer is pending while its agent's job is queued or running. The "when" also waits on the check, because an official deadline beats a date in the post.

@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Numeric, Text
 from sqlalchemy import text as sql
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, utc_now
@@ -59,6 +59,7 @@ class Save(Base):
     text: Mapped[str | None] = mapped_column(Text)
     label: Mapped[str | None] = mapped_column(Text)
     media_id: Mapped[str | None] = mapped_column(ForeignKey("media.id", ondelete="SET NULL"))
+    media_ids: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)  # all files, in order
     content_hash: Mapped[str] = mapped_column(Text)
     saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     status: Mapped[str] = mapped_column(Text, default="received")

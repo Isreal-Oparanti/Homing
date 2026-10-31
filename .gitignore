@@ -16,3 +16,6 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Files people upload in local development (STORAGE_DIR)
+server/data/

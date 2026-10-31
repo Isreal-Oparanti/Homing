@@ -1,24 +1,29 @@
 """Saves: add one, list them, and read a save card (docs/07-api.md#saves)."""
 
+import hashlib
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agents import is_it_true
 from app.core.auth import CurrentUser, require_user
 from app.core.errors import AppError
-from app.db.models import Check, Save, Snapshot, User, When
+from app.db.models import Check, Media, Save, Snapshot, User, When
 from app.db.repo import answers as answers_repo
 from app.db.repo import saves as saves_repo
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
+from app.ingest.files import EXTENSIONS, MAX_FILE_BYTES, UnsupportedFile, sniff
 from app.ingest.urls import canonical_url
 from app.jobs import queue
+from app.storage import Storage, get_storage
 from app.verify.dates import display
 from app.verify.eligibility import assess
+from app.verify.secrets import screen
 
 router = APIRouter(prefix="/saves", tags=["saves"])
 
@@ -41,10 +46,12 @@ class SaveOut(BaseModel):
     status: str
     visibility: str
     error: str | None
+    files: int = 0  # images or a PDF, fetched with GET /saves/{id}/files/{n}
 
     @classmethod
     def of(cls, save: Save) -> "SaveOut":
         out = cls.model_validate(save, from_attributes=True)
+        out.files = len(save.media_ids or [])
         if save.visibility == "private":
             # Never echoed back; the owner taps Show (GET /saves/{id}/reveal). The link and
             # label go too, since a key inside a URL is one reason a save is private.
@@ -104,6 +111,41 @@ class SavePage(BaseModel):
     next_cursor: str | None
 
 
+def _item_out(item: dict[str, Any], user_tz: str) -> dict[str, Any]:
+    """One item of a list save, as checked. Only verified findings and rules leave the server."""
+    deadline = None
+    if item.get("deadline_at"):
+        at = datetime.fromisoformat(item["deadline_at"])
+        deadline = {"at": at, "display": display(at, user_tz)}
+    return {
+        "name": item.get("name"),
+        "url": item.get("url"),
+        "status": item.get("status", "queued"),
+        "verdict": item.get("verdict"),
+        "note": item.get("note"),
+        "official_url": item.get("official_url"),
+        "findings": [
+            {"point": f["point"], "quote": f["quote"], "kind": f["kind"]}
+            for f in item.get("findings") or []
+            if f.get("verified")
+        ],
+        "rules": [
+            {
+                "rule": r.get("rule"),
+                "plain": r.get("plain"),
+                "quote": r.get("quote"),
+                "strength": r.get("strength"),
+                "result": r.get("result", "unknown"),
+            }
+            for r in item.get("rules") or []
+            if r.get("verified")
+        ],
+        "questions": item.get("questions") or [],
+        "deadline": deadline,
+        "closed": item.get("closed"),
+    }
+
+
 def true_out(
     check: Check | None,
     user_tz: str,
@@ -128,6 +170,8 @@ def true_out(
         "same_page": bool(save_url and check.official_url)
         and canonical_url(save_url or "") == canonical_url(check.official_url or ""),
         "note": check.note,
+        # No official page: the rules below quote the post itself, unconfirmed.
+        "from_post": check.official_found_by == "post_only",
         "deadline": deadline,
         "findings": [
             {"point": f["point"], "quote": f["quote"], "kind": f["kind"]}
@@ -146,6 +190,7 @@ def true_out(
             if r.get("verified")
         ],
         "questions": questions or [],
+        "items": [_item_out(i, user_tz) for i in check.items or []],
         "question": check.question_for_user,
         "checked_at": check.checked_at,
     }
@@ -165,6 +210,81 @@ def when_out(when: When | None, user_tz: str) -> dict[str, Any] | None:
         "tz_stated": when.tz_stated,
         "time_stated": when.time_stated,
     }
+
+
+MAX_FILES = 6  # screenshots of one thread, say
+
+
+def _store_file(db: Session, storage: Storage, user_id: str, upload: UploadFile) -> Media:
+    data = upload.file.read(MAX_FILE_BYTES + 1)
+    if len(data) > MAX_FILE_BYTES:
+        raise AppError("too_big", "Files must be 10 MB or smaller.", status=413)
+    try:
+        mime = sniff(data)
+    except UnsupportedFile as exc:
+        raise AppError("unsupported_file", str(exc), status=415) from exc
+    sha = hashlib.sha256(data).hexdigest()
+    existing = db.scalar(
+        select(Media).where(Media.user_id == user_id, Media.sha256 == sha).limit(1)
+    )
+    if existing is not None:
+        return existing  # the same file saved again: kept once
+    key = f"u/{user_id}/{sha}.{EXTENSIONS[mime]}"
+    storage.put(key, data, mime)
+    media = Media(
+        user_id=user_id,
+        storage_key=key,
+        mime=mime,
+        bytes=len(data),
+        sha256=sha,
+        original_filename=(upload.filename or "")[:200] or None,
+    )
+    db.add(media)
+    db.flush()
+    return media
+
+
+@router.post("/file", status_code=202, response_model=SaveOut)
+def create_file_save(
+    files: list[UploadFile] = File(...),
+    note: str | None = Form(default=None, max_length=MAX_TEXT),
+    user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db),
+    storage: Storage = Depends(get_storage),
+) -> SaveOut:
+    """A screenshot, flyer or PDF (several images become one save, read in order)."""
+    if not files or len(files) > MAX_FILES:
+        raise AppError("bad_files", f"Add 1 to {MAX_FILES} files at a time.", status=422)
+    ensure_user(db, user)
+    media = [_store_file(db, storage, user.id, f) for f in files]
+    if any(m.mime == "application/pdf" for m in media) and len(media) > 1:
+        raise AppError("bad_files", "Add a PDF on its own.", status=422)
+    text = (note or "").strip() or None
+    result = screen(text)
+    save = Save(
+        user_id=user.id,
+        origin="upload",
+        kind="pdf" if media[0].mime == "application/pdf" else "image",
+        text=text,
+        label=text if text and len(text) <= 60 else None,
+        media_id=media[0].id,
+        media_ids=[m.id for m in media],
+        content_hash=hashlib.sha256("".join(m.sha256 for m in media).encode()).hexdigest(),
+        visibility="private" if result.private else "normal",
+        private_reason=result.reason,
+    )
+    db.add(save)
+    db.flush()
+    queue.enqueue(
+        db,
+        "save.read",
+        {"save_id": save.id},
+        user_id=user.id,
+        priority=queue.PRIORITY_USER,
+        dedupe_key=f"read:{save.id}",
+    )
+    db.commit()
+    return SaveOut.of(save)
 
 
 @router.post("", status_code=202, response_model=SaveOut)
@@ -244,6 +364,13 @@ def save_card(
         facts = is_it_true.facts_for(db, user.id, check)
         ref_year = (check.deadline_at or datetime.now(UTC)).year
         questions = assess(check.eligibility or [], facts, ref_year=ref_year).questions
+    if check is not None and check.items:
+        # A list: the profile questions its items need, asked once for all of them.
+        seen: dict[str, dict[str, Any]] = {}
+        for item in check.items:
+            for q in item.get("questions") or []:
+                seen.setdefault(q["id"], q)
+        questions = list(seen.values())
     true = true_out(check, user_tz, questions, save.url)
     if true is None and reading is not None and not reading.is_checkable and not is_private:
         true = {"verdict": "nothing_to_check"}
@@ -295,6 +422,27 @@ def answer(
         raise AppError("bad_answer", str(exc) or "That answer doesn't fit.", status=422) from exc
     db.commit()
     return AnswerOut(summary=summary)
+
+
+@router.get("/{save_id}/files/{index}")
+def file(
+    save_id: str,
+    index: int,
+    user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db),
+    storage: Storage = Depends(get_storage),
+) -> Response:
+    """One of the owner's files on a save, e.g. the flyer, to show on its card."""
+    save = saves_repo.get_save(db, user.id, save_id)
+    ids = save.media_ids if save else []
+    media = db.get(Media, ids[index]) if 0 <= index < len(ids) else None
+    if save is None or media is None or media.user_id != user.id:
+        raise AppError("file_not_found", "That file doesn't exist.", status=404)
+    return Response(
+        content=storage.get(media.storage_key),
+        media_type=media.mime,
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.get("/{save_id}/reveal", response_model=PrivateText)

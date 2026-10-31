@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import text, update
+from sqlalchemy import func, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -58,7 +58,9 @@ def enqueue(
             user_id=user_id,
             priority=priority,
             dedupe_key=dedupe_key,
-            run_after=run_after or datetime.now(UTC),
+            # The database's clock, not ours: a fast local clock would make a new job look
+            # like it's not due yet.
+            run_after=run_after or func.now(),
             max_attempts=max_attempts,
         )
         .on_conflict_do_nothing(
@@ -108,7 +110,7 @@ def fail(db: Session, job: ClaimedJob, error: str, *, retryable: bool) -> str:
         status, run_after = "dead", None
     else:
         status = "queued"
-        run_after = datetime.now(UTC) + timedelta(seconds=backoff_seconds(job.attempts))
+        run_after = func.now() + timedelta(seconds=backoff_seconds(job.attempts))
     values: dict[str, Any] = {
         "status": status,
         "locked_by": None,

@@ -11,9 +11,11 @@ dependencies = [
     "httpx>=0.28.1",
     "openai>=3.41.0",
     "pgvector>=0.5.1",
+    "pillow>=13.0.0",
     "psycopg[binary]>=3.3.6",
     "pydantic>=2.14.2",
     "pydantic-settings>=2.16.2",
+    "pypdf>=6.21.4",
     "python-multipart>=0.0.32",
     "rapidfuzz>=3.14.6",
     "sqlalchemy>=2",
@@ -42,7 +44,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Query"]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Query", "fastapi.File", "fastapi.Form"]
 
 [tool.ruff.lint.per-file-ignores]
 "app/scripts/*" = ["E501"]

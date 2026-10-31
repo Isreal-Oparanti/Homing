@@ -51,7 +51,8 @@ Every call declares a purpose. Each purpose fixes the model, prompt file, output
 | Purpose | Model | Prompt | Output schema | Timeout |
 |---|---|---|---|---|
 | `read.batch_links` | Spark | `prompts/read_batch_links.v1.md` | `list[Reading]` | 60s |
-| `read.text` | Spark | `read_text.v2.md` (v2 since 31 Oct: only facts someone could act on, a narrower `is_checkable`) | `Reading` | 90s |
+| `read.text` | Spark | `read_text.v3.md` (v2 since 31 Oct: only facts someone could act on, a narrower `is_checkable`; v3 adds `items` for saves that list several things) | `Reading` | 90s |
+| `read.file` | Spark | `read_file.v1.md`, with the images or the PDF attached | `FileReading` (`Reading` plus every word on the file as `text`) | 120s |
 | `read.image` | Spark | `read_image.v1.md` | `Reading` | 45s |
 | `read.pdf` | Spark | `read_pdf.v1.md` | `Reading` | 90s |
 | `read.video` | Spark | `read_video.v1.md` | `Reading` | 120s |

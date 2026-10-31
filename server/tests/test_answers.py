@@ -252,6 +252,14 @@ def test_thread_titles_are_goals_never_labels_about_the_person() -> None:
     assert clean_title("🔥🔥") is None
 
 
+def test_a_linkedin_job_page_counts_but_a_linkedin_post_does_not() -> None:
+    urls = [
+        "https://www.linkedin.com/posts/someone_hiring-activity-123",
+        "https://www.linkedin.com/jobs/view/4012345678/",
+    ]
+    assert official_candidates(urls, []) == ["https://www.linkedin.com/jobs/view/4012345678/"]
+
+
 def test_official_candidates_prefer_application_sites_and_skip_chat_links() -> None:
     urls = [
         "https://whatsapp.com/channel/0029VbDa9OiLY6dCMm0lpA2G/205",
@@ -343,3 +351,60 @@ def test_a_bad_answer_is_refused(client: TestClient, sessions: sessionmaker[Sess
         headers=HEADERS,
     )
     assert res.status_code == 422
+
+
+@pytest.mark.integration
+def test_without_an_official_page_rules_come_from_the_post(
+    client: TestClient, sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(is_it_true, "_find_official", lambda save, reading: None)
+    FakeModels.rules = [
+        ProposedRule(
+            rule="age",
+            strength="required",
+            quote="Requirements: aged 20–32",
+            plain="Aged 20-32",
+            min_age=20,
+            max_age=32,
+        ),
+        # Not in the post: code must drop it.
+        ProposedRule(
+            rule="other",
+            strength="required",
+            quote="Must hold a Swahili certificate",
+            plain="Swahili certificate",
+            question="Do you hold a Swahili certificate?",
+        ),
+    ]
+    save_id = _save_and_run(client, sessions, POST)
+    true = client.get(f"/api/v1/saves/{save_id}", headers=HEADERS).json()["true"]
+    assert true["from_post"] is True and true["official_url"] is None
+    assert [r["plain"] for r in true["rules"]] == ["Aged 20-32"]
+    assert true["verdict"] == "needs_your_answer"
+    assert "post's own words" in true["note"]
+
+
+@pytest.mark.integration
+def test_without_an_official_page_a_passed_post_deadline_means_closed(
+    client: TestClient, sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(is_it_true, "_find_official", lambda save, reading: None)
+    FakeModels.dates = [
+        DateFact(text="Applications close 20 July 2025", role="deadline"),
+        DateFact(text="Pitch day 30 July 2025", role="event"),
+    ]
+    FakeModels.rules = [
+        ProposedRule(
+            rule="age",
+            strength="required",
+            quote="Requirements: aged 20–32",
+            plain="Aged 20-32",
+            min_age=20,
+            max_age=32,
+        )
+    ]
+    save_id = _save_and_run(client, sessions, POST)
+    card = client.get(f"/api/v1/saves/{save_id}", headers=HEADERS).json()
+    assert card["true"]["verdict"] == "closed" and card["true"]["questions"] == []
+    # Over: "When" names the closing date, not the later pitch day.
+    assert card["when"]["explanation"].startswith("Closed on Sun 20 Jul")

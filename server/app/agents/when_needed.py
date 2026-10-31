@@ -33,7 +33,7 @@ def _from_check(check: Check | None, user_tz: str) -> Dated | None:
 
 
 def _from_reading(save: Save, reading: Reading, user_tz: str, now: datetime) -> Dated | None:
-    """The soonest coming deadline, else the soonest coming event, else the latest past one."""
+    """The soonest coming deadline, else the soonest coming event, else the latest past deadline."""
     found: list[Dated] = []
     for fact in (reading.key_facts or {}).get("dates", []):
         role = fact.get("role")
@@ -45,7 +45,9 @@ def _from_reading(save: Save, reading: Reading, user_tz: str, now: datetime) -> 
         coming = [x for x in found if x.role == role and x.deadline.at > now]
         if coming:
             return min(coming, key=lambda x: x.deadline.at)
-    return max(found, key=lambda x: x.deadline.at) if found else None
+    # All past: the closing date says most ("Closed on 20 Jul"), so prefer it over events.
+    past = [x for x in found if x.role == "deadline"] or found
+    return max(past, key=lambda x: x.deadline.at) if past else None
 
 
 def _explain(dated: Dated, user_tz: str, now: datetime) -> str:
