@@ -55,7 +55,7 @@ Used only by **Is it true?** for eligibility. Sent only to Muse Spark Open.
 | residence_country | text null | ISO alpha-2 |
 | student_status | text null | `full_time` · `part_time` · `not_student` |
 | education_level | text null | `secondary` · `undergraduate` · `postgraduate` · `graduate` |
-| languages | jsonb | `[{"code":"en","level":"fluent"},{"code":"fr","level":"basic"}]` |
+| languages | jsonb | `{"en": "fluent", "fr": "basic"}`, levels `fluent` · `working` · `basic` · `none` |
 | company_stage | text null | `idea` · `pre_seed` · `seed` · `later` · `none` |
 | company_registered | bool null | |
 | updated_at | timestamptz | |
@@ -156,7 +156,8 @@ Our copy of the content at save time, so a dead link doesn't lose it.
 | deadline_tz_stated | bool | |
 | findings | jsonb | `[Finding]` |
 | eligibility | jsonb | `[EligibilityRule]` with results |
-| question_for_user | text null | when the verdict is `needs_your_answer` |
+| question_for_user | text null | when the verdict is `needs_your_answer` (the first open question; the card shows all) |
+| answers | jsonb | answers that only make sense for this opportunity, e.g. `{"rule:7": false}` for "Are you a child of Afreximbank staff?" |
 | note | text null | plain words when we couldn't check, e.g. "We couldn't find the official page…" |
 | checked_at | timestamptz | |
 | next_check_at | timestamptz null | daily while open |

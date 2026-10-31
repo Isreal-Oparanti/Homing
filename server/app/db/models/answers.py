@@ -31,6 +31,7 @@ class Check(Base):
     findings: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     eligibility: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     question_for_user: Mapped[str | None] = mapped_column(Text)
+    answers: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # this one only
     note: Mapped[str | None] = mapped_column(Text)  # plain words when we couldn't check
     checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     next_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

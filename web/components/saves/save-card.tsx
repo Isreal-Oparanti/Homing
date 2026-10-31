@@ -1,11 +1,12 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff, ExternalLink, Lock } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
+import { QuestionView } from "@/components/saves/question";
 import { AGENTS } from "@/components/team/agents";
 import {
   type AgentEvent,
@@ -102,36 +103,136 @@ function Muted({ children }: { children: React.ReactNode }) {
 }
 
 /** Only findings code verified against the official page get here (docs/05). */
-function TrueAnswerView({ answer, postHasDeadline }: { answer: TrueAnswer; postHasDeadline: boolean }) {
+const VERDICT: Record<string, { label: string; tone: string }> = {
+  fits_you: { label: "Fits you", tone: "bg-green-soft text-green" },
+  not_for_you: { label: "Not for you", tone: "bg-grey-soft text-ink-2" },
+  needs_your_answer: { label: "Needs your answer", tone: "bg-amber-soft text-amber" },
+  closed: { label: "Closed", tone: "bg-grey-soft text-ink-2" },
+  couldnt_confirm: { label: "Couldn't confirm", tone: "bg-grey-soft text-ink-2" },
+};
+
+const RESULT: Record<string, { mark: string; tone: string; words: string }> = {
+  meets: { mark: "✓", tone: "text-green", words: "You meet this" },
+  fails: { mark: "✗", tone: "text-red", words: "You don't meet this" },
+  unknown: { mark: "?", tone: "text-amber", words: "Not known yet" },
+};
+
+/** Only findings and rules code verified against the official page get here (docs/05). */
+function TrueAnswerView({
+  saveId,
+  answer,
+  postHasDeadline,
+}: {
+  saveId: string;
+  answer: TrueAnswer;
+  postHasDeadline: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [summary, setSummary] = useState<string | null>(null);
+  const reply = useMutation({
+    // Wait for the card's own refresh, so the message and the verdict change together.
+    mutationFn: async ({ id, value }: { id: string; value: string | number | boolean }) => {
+      const text = await savesApi.answer(saveId, id, value);
+      await queryClient.refetchQueries({ queryKey: ["save", saveId] });
+      return text;
+    },
+    onSuccess: (text) => {
+      setSummary(text);
+      for (const key of [["save"], ["today"], ["saves"], ["profile"]]) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+
   if (answer.verdict === "nothing_to_check") return <Muted>Nothing to check.</Muted>;
   const host = answer.officialUrl ? hostOf(answer.officialUrl) : null;
+  const verdict = VERDICT[answer.verdict];
+  const failing = answer.rules.filter((r) => r.strength === "required" && r.result === "fails");
+
   return (
-    <div className="space-y-2">
-      {answer.verdict === "closed" ? (
-        <p className="font-semibold text-amber">Closed, per the official page.</p>
-      ) : host && !answer.note ? (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {verdict && (
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${verdict.tone}`}>{verdict.label}</span>
+        )}
+        {host && !answer.note && (
+          <span className="text-sm text-ink-2">
+            Checked against{" "}
+            <a href={answer.officialUrl!} target="_blank" rel="noreferrer" className="underline">
+              {host}
+            </a>
+          </span>
+        )}
+      </div>
+      {answer.verdict === "closed" && <p className="font-semibold">Closed, per the official page.</p>}
+      {answer.verdict === "not_for_you" && failing.length > 0 && (
         <p>
-          Checked against{" "}
-          <a href={answer.officialUrl!} target="_blank" rel="noreferrer" className="underline">
-            {host}
-          </a>
-          .
+          You don&apos;t meet: {failing.map((r) => r.plain).join("; ")}.{" "}
+          <Link href="/profile" className="text-sm text-ink-2 underline">
+            Change your answers
+          </Link>
         </p>
-      ) : null}
+      )}
+      {answer.verdict === "fits_you" && <p>Nothing on the official page rules you out.</p>}
       {answer.note && <p className="text-amber">{answer.note}</p>}
+
+      {answer.questions.length > 0 && (
+        <div className="space-y-3 rounded-xl bg-amber-soft/60 p-3">
+          <p className="text-sm text-ink-2">
+            Answer {answer.questions.length === 1 ? "this" : "these"} to see if it fits you. Homing
+            remembers, so other opportunities won&apos;t ask again.
+          </p>
+          {answer.questions.map((q) => (
+            <QuestionView
+              key={q.id}
+              question={q}
+              busy={reply.isPending}
+              onAnswer={(value) => reply.mutate({ id: q.id, value })}
+            />
+          ))}
+        </div>
+      )}
+      {summary && <p className="text-sm font-semibold text-green">{summary}</p>}
+      {reply.isError && <p className="text-sm text-amber">{reply.error.message}</p>}
+
+      {answer.rules.length > 0 && (
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">Who can apply</p>
+          <ul className="mt-1 space-y-2">
+            {answer.rules.map((r, i) => {
+              const result = RESULT[r.result] ?? RESULT.unknown;
+              return (
+                <li key={i} className="grid grid-cols-[18px_1fr] gap-1.5">
+                  <span className={`font-bold ${result.tone}`} title={result.words} aria-label={result.words}>
+                    {result.mark}
+                  </span>
+                  <div>
+                    <p>
+                      {r.plain.replace(/\s*\(preferred\)\s*$/i, "")}
+                      {r.strength === "preferred" && <span className="text-muted"> · preferred, not required</span>}
+                    </p>
+                    <p className="text-xs text-ink-2">
+                      “{r.quote}”{host && <span className="text-green"> · on {host}</span>}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {answer.findings.length > 0 && (
         <ul className="space-y-2.5">
           {answer.findings.map((f, i) => (
             <li key={i}>
               <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
-                {FINDING_KIND[f.kind] ?? f.kind}
+                {answer.samePage && f.kind === "left_out" ? "On the official page" : (FINDING_KIND[f.kind] ?? f.kind)}
               </p>
               <p>{f.point}</p>
               <blockquote className="mt-1 border-l-2 border-green pl-2.5 text-sm text-ink-2">
                 “{f.quote}”
-                {host && (
-                  <span className="mt-0.5 block text-xs text-green">Found word for word on {host}</span>
-                )}
+                {host && <span className="mt-0.5 block text-xs text-green">Found word for word on {host}</span>}
               </blockquote>
             </li>
           ))}
@@ -358,6 +459,7 @@ function Card({ card }: { card: SaveCard }) {
               <Working text={WORKING[answer]} />
             ) : answer === "true" && card.true ? (
               <TrueAnswerView
+                saveId={save.id}
                 answer={card.true}
                 postHasDeadline={(what?.keyFacts.dates ?? []).some((d) => d.role === "deadline")}
               />

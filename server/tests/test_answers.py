@@ -20,9 +20,11 @@ from app.main import create_app
 from app.schemas.agents import (
     DateFact,
     KeyFacts,
+    LanguageNeed,
     Placement,
     ProposedCheck,
     ProposedFinding,
+    ProposedRule,
     Reading,
 )
 from app.verify.sources import official_candidates
@@ -48,8 +50,23 @@ POST = (
 )
 OFFICIAL = (
     "Internship Opportunities\nLocation: Cairo, Cairo Governorate, Egypt\nWorkplace: on-site\n"
-    "Candidates must be fluent in English or French, with a working knowledge of the other.\n"
+    "Candidates must be aged between 20 and 32 in the year in which they apply.\n"
+    "Fluency in English or French and a working knowledge of the other.\n"
     f"Applications close on {_day(3)}."
+)
+LANGUAGE_RULE = ProposedRule(
+    rule="language",
+    strength="required",
+    quote="Fluency in English or French and a working knowledge of the other.",
+    plain="English or French, plus a working knowledge of the other",
+    languages_any=[
+        LanguageNeed(code="en", level="fluent"),
+        LanguageNeed(code="fr", level="fluent"),
+    ],
+    languages_all=[
+        LanguageNeed(code="en", level="working"),
+        LanguageNeed(code="fr", level="working"),
+    ],
 )
 
 
@@ -60,6 +77,7 @@ class FakeModels:
     dates: list[DateFact] = []
     checkable = True
     deadline_quote: str | None = None
+    rules: list[ProposedRule] = []
 
     def __init__(self, db: Session):
         pass
@@ -91,6 +109,7 @@ class FakeModels:
                     ),
                 ],
                 deadline_quote=FakeModels.deadline_quote,
+                rules=FakeModels.rules,
             )
         if purpose == "place.assign":
             threads = kwargs["inputs"]["threads"]
@@ -118,6 +137,7 @@ def fakes(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeModels.dates = [DateFact(text=f"Deadline: {_day(5)}.", role="deadline")]
     FakeModels.checkable = True
     FakeModels.deadline_quote = f"Applications close on {_day(3)}."
+    FakeModels.rules = []
     for agent in (what_is_it, is_it_true, whats_it_for):
         monkeypatch.setattr(agent, "gateway_factory", FakeModels)
     monkeypatch.setattr(what_is_it, "_gather", lambda save: Gathered())
@@ -143,7 +163,7 @@ def test_all_four_answers_fill_in(client: TestClient, sessions: sessionmaker[Ses
 
     assert card["pending"] == []
     true = card["true"]
-    assert true["verdict"] == "couldnt_confirm"  # no eligibility check until S6
+    assert true["verdict"] == "fits_you"  # the page opened and no rule excludes you
     assert true["official_url"] == OFFICIAL_URL
     assert [f["point"] for f in true["findings"]] == ["It's on-site in Cairo."]  # Swahili dropped
     assert true["deadline"]["source_text"] == f"Applications close on {_day(3)}."
@@ -161,7 +181,7 @@ def test_all_four_answers_fill_in(client: TestClient, sessions: sessionmaker[Ses
 
     today = client.get("/api/v1/today", headers=HEADERS).json()
     assert [c["save_id"] for c in today["cards"]] == [save_id]
-    assert today["cards"][0]["next_step"] == "Read the 1 thing the post left out, then decide."
+    assert today["cards"][0]["next_step"] == "It fits you. Apply before it closes."
     assert today["cards"][0]["unconfirmed"] is False
 
 
@@ -267,3 +287,59 @@ def test_workable_links_and_picking_the_job() -> None:
     assert picked is not None and picked["shortcode"] == "A424364E0D"
     assert _pick_job(jobs, None) is None
     assert _pick_job(jobs, "Scholarship for engineers") is None
+
+
+@pytest.mark.integration
+def test_one_answer_rejudges_every_opportunity(
+    client: TestClient, sessions: sessionmaker[Session]
+) -> None:
+    FakeModels.rules = [LANGUAGE_RULE]
+    first = _save_and_run(client, sessions, POST)
+    second = _save_and_run(client, sessions, POST.replace("Internship", "Fellowship"))
+
+    card = client.get(f"/api/v1/saves/{first}", headers=HEADERS).json()
+    assert card["true"]["verdict"] == "needs_your_answer"
+    assert [q["id"] for q in card["true"]["questions"]] == ["language:en", "language:fr"]
+    assert card["true"]["rules"][0]["quote"] == LANGUAGE_RULE.quote
+    today = client.get("/api/v1/today", headers=HEADERS).json()["cards"]
+    assert today[0]["next_step"] == "Answer 2 questions to see if it fits you."
+
+    def answer(qid: str, value: str) -> str:
+        res = client.post(
+            f"/api/v1/saves/{first}/answer",
+            json={"question_id": qid, "value": value},
+            headers=HEADERS,
+        )
+        assert res.status_code == 200
+        return res.json()["summary"]
+
+    assert answer("language:en", "fluent") == "Saved your answer."  # still waiting on French
+    summary = answer("language:fr", "basic")
+    assert summary == "Used your answer on 2 saved opportunities: 2 aren't for you."
+    for save_id in (first, second):
+        card = client.get(f"/api/v1/saves/{save_id}", headers=HEADERS).json()
+        assert card["true"]["verdict"] == "not_for_you"
+        assert card["true"]["rules"][0]["result"] == "fails"
+    assert client.get("/api/v1/today", headers=HEADERS).json()["cards"] == []
+
+    profile = client.get("/api/v1/me/profile", headers=HEADERS).json()
+    assert profile["languages"] == {"en": "fluent", "fr": "basic"}
+    res = client.put(
+        "/api/v1/me/profile",
+        json={"question_id": "language:fr", "value": "working"},
+        headers=HEADERS,
+    )
+    assert res.status_code == 200
+    card = client.get(f"/api/v1/saves/{first}", headers=HEADERS).json()
+    assert card["true"]["verdict"] == "fits_you"
+
+
+@pytest.mark.integration
+def test_a_bad_answer_is_refused(client: TestClient, sessions: sessionmaker[Session]) -> None:
+    save_id = _save_and_run(client, sessions, POST)
+    res = client.post(
+        f"/api/v1/saves/{save_id}/answer",
+        json={"question_id": "birth_year", "value": 1850},
+        headers=HEADERS,
+    )
+    assert res.status_code == 422

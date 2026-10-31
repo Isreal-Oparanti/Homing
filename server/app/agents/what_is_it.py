@@ -124,7 +124,8 @@ def _hand_over(ctx: JobContext, save: Save, reading: Reading) -> None:
     """Queue the next questions. Only kinds that have a handler yet (slices land one by one)."""
     from app.jobs.handlers import HANDLERS
 
-    nxt = ["save.check"] if reading.is_checkable else ["save.when"]
+    # Opportunities are always checked: even a bare link is the page whose rules and date matter.
+    nxt = ["save.check"] if reading.is_checkable or reading.is_opportunity else ["save.when"]
     nxt += ["save.place", "save.embed"]
     for kind in nxt:
         if kind in HANDLERS:

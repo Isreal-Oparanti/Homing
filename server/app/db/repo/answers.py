@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Check, Job, Reading, Save, Thread, ThreadSave, When
@@ -69,6 +69,8 @@ def due_soon(
             When.kind == "date",
             When.due_at > now,
             When.due_at <= now + within,
+            # Never bring back what's closed or not for you.
+            or_(Check.verdict.is_(None), Check.verdict.notin_(("not_for_you", "closed"))),
         )
         .order_by(When.due_at)
         .limit(limit)

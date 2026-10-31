@@ -1,12 +1,13 @@
 """Saves: add one, list them, and read a save card (docs/07-api.md#saves)."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.agents import is_it_true
 from app.core.auth import CurrentUser, require_user
 from app.core.errors import AppError
 from app.db.models import Check, Save, Snapshot, User, When
@@ -14,8 +15,10 @@ from app.db.repo import answers as answers_repo
 from app.db.repo import saves as saves_repo
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
+from app.ingest.urls import canonical_url
 from app.jobs import queue
 from app.verify.dates import display
+from app.verify.eligibility import assess
 
 router = APIRouter(prefix="/saves", tags=["saves"])
 
@@ -101,7 +104,12 @@ class SavePage(BaseModel):
     next_cursor: str | None
 
 
-def true_out(check: Check | None, user_tz: str) -> dict[str, Any] | None:
+def true_out(
+    check: Check | None,
+    user_tz: str,
+    questions: list[dict[str, Any]] | None = None,
+    save_url: str | None = None,
+) -> dict[str, Any] | None:
     """Is it true?: only verified findings ever leave the server (docs/05)."""
     if check is None:
         return None
@@ -116,6 +124,9 @@ def true_out(check: Check | None, user_tz: str) -> dict[str, Any] | None:
     return {
         "verdict": check.verdict,
         "official_url": check.official_url,
+        # The save is just a link to the official page, so nothing was "left out of the post".
+        "same_page": bool(save_url and check.official_url)
+        and canonical_url(save_url or "") == canonical_url(check.official_url or ""),
         "note": check.note,
         "deadline": deadline,
         "findings": [
@@ -123,6 +134,18 @@ def true_out(check: Check | None, user_tz: str) -> dict[str, Any] | None:
             for f in check.findings
             if f.get("verified")
         ],
+        "rules": [
+            {
+                "rule": r.get("rule"),
+                "plain": r.get("plain"),
+                "quote": r.get("quote"),
+                "strength": r.get("strength"),
+                "result": r.get("result", "unknown"),
+            }
+            for r in check.eligibility or []
+            if r.get("verified")
+        ],
+        "questions": questions or [],
         "question": check.question_for_user,
         "checked_at": check.checked_at,
     }
@@ -215,7 +238,13 @@ def save_card(
         if "true" in live:
             pending.append("when")  # the "when" waits for the check's deadline
 
-    true = None if is_private else true_out(answers_repo.get_check(db, save.id), user_tz)
+    check = None if is_private else answers_repo.get_check(db, save.id)
+    questions = []
+    if check is not None and check.verdict == "needs_your_answer":
+        facts = is_it_true.facts_for(db, user.id, check)
+        ref_year = (check.deadline_at or datetime.now(UTC)).year
+        questions = assess(check.eligibility or [], facts, ref_year=ref_year).questions
+    true = true_out(check, user_tz, questions, save.url)
     if true is None and reading is not None and not reading.is_checkable and not is_private:
         true = {"verdict": "nothing_to_check"}
 
@@ -239,6 +268,33 @@ def save_card(
         copies=[CopyOut.of(snap) for snap in saves_repo.snapshots_for(db, save.id)],
         pending=sorted(set(pending), key=["what", "true", "for", "when"].index),
     )
+
+
+class AnswerIn(BaseModel):
+    question_id: str = Field(min_length=1, max_length=40)
+    value: str | int | bool
+
+
+class AnswerOut(BaseModel):
+    summary: str
+
+
+@router.post("/{save_id}/answer", response_model=AnswerOut)
+def answer(
+    save_id: str,
+    body: AnswerIn,
+    user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AnswerOut:
+    """One answer, remembered, and every saved opportunity re-judged by code (no model call)."""
+    if saves_repo.get_save(db, user.id, save_id) is None:
+        raise AppError("save_not_found", "That save doesn't exist.", status=404)
+    try:
+        summary = is_it_true.answer(db, user.id, save_id, body.question_id, body.value)
+    except (is_it_true.BadAnswer, ValueError) as exc:
+        raise AppError("bad_answer", str(exc) or "That answer doesn't fit.", status=422) from exc
+    db.commit()
+    return AnswerOut(summary=summary)
 
 
 @router.get("/{save_id}/reveal", response_model=PrivateText)

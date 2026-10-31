@@ -11,12 +11,14 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.agents import is_it_true
 from app.core.auth import CurrentUser, require_user
 from app.db.models import Check, Reading, User, When
 from app.db.repo import answers as answers_repo
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
 from app.verify.dates import display
+from app.verify.eligibility import assess
 
 router = APIRouter(tags=["today"])
 
@@ -40,8 +42,13 @@ class TodayOut(BaseModel):
     cards: list[TodayCard]
 
 
-def next_step(reading: Reading, check: Check | None) -> str:
+def next_step(reading: Reading, check: Check | None, questions: int = 0) -> str:
     """What to do now, decided by code from what the agents found."""
+    if check is not None and check.verdict == "needs_your_answer" and questions:
+        asks = "question" if questions == 1 else f"{questions} questions"
+        return f"Answer {'a ' if questions == 1 else ''}{asks} to see if it fits you."
+    if check is not None and check.verdict == "fits_you":
+        return "It fits you. Apply before it closes."
     findings = check.findings if check else []
     gaps = [f for f in findings if f.get("kind") in ("left_out", "differs")]
     if gaps:
@@ -56,6 +63,14 @@ def _why_now(when: When, user_tz: str) -> str:
     assert when.due_at is not None
     verb = "Closes" if when.source == "check" or "Closes" in when.explanation else "On"
     return f"{verb} {display(when.due_at, user_tz)}"
+
+
+def _open_questions(db: Session, user_id: str, check: Check | None) -> int:
+    if check is None or check.verdict != "needs_your_answer":
+        return 0
+    facts = is_it_true.facts_for(db, user_id, check)
+    ref_year = (check.deadline_at or datetime.now(UTC)).year
+    return len(assess(check.eligibility or [], facts, ref_year=ref_year).questions)
 
 
 @router.get("/today", response_model=TodayOut)
@@ -74,7 +89,7 @@ def today(
             kind="deadline",
             title=reading.title,
             why_now=_why_now(when, user_tz),
-            next_step=next_step(reading, check),
+            next_step=next_step(reading, check, _open_questions(db, user.id, check)),
             due_at=when.due_at,  # type: ignore[arg-type]
             tz_stated=when.tz_stated,
             unconfirmed=when.source != "check",

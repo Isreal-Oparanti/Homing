@@ -166,7 +166,7 @@ The agents are named after their questions:
 | Save `visibility` | `normal` · `private` (secret-screened; never sent to a model) |
 | Save `kind` | `note` · `link` · `image` · `pdf` · `voice` · `video` · `file` · `list` |
 | Link `platform` | `youtube` · `x` · `instagram` · `facebook` · `tiktok` · `web` |
-| Check `verdict` | `fits_you` · `closed` · `not_for_you` · `needs_your_answer` · `couldnt_confirm` · `nothing_to_check` |
+| Check `verdict` | `fits_you` · `closed` · `not_for_you` · `needs_your_answer` · `couldnt_confirm` · `nothing_to_check` · `checked` (not an opportunity: compared with its source, no fit verdict) |
 | When `kind` | `date` · `moment` · `none` |
 | Card `kind` | `deadline` · `prep` · `related` · `went_bad` · `answer_needed` |
 | Card `state` | `new` · `used` · `dismissed` · `later` |

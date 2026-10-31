@@ -147,12 +147,50 @@ export type Copy = {
 
 /** Is it true?: only findings code has verified against the official page reach the web. */
 export type TrueAnswer = {
-  verdict: "fits_you" | "closed" | "not_for_you" | "needs_your_answer" | "couldnt_confirm" | "nothing_to_check";
+  verdict:
+    | "fits_you"
+    | "closed"
+    | "not_for_you"
+    | "needs_your_answer"
+    | "couldnt_confirm"
+    | "nothing_to_check"
+    | "checked";
   officialUrl: string | null;
+  /** The save is just a link to the official page itself. */
+  samePage: boolean;
   note: string | null;
   deadline: { at: string; display: string; tzStated: boolean; sourceText: string | null } | null;
   findings: { point: string; quote: string; kind: "left_out" | "differs" | "confirmed" | "closed" }[];
+  rules: EligibilityRule[];
+  questions: Question[];
   question: string | null;
+};
+
+export type EligibilityRule = {
+  rule: string;
+  plain: string;
+  quote: string;
+  strength: "required" | "preferred";
+  result: "meets" | "fails" | "unknown";
+};
+
+/** One thing Homing needs to know to judge an opportunity. Asked on the card, remembered. */
+export type Question = {
+  id: string;
+  text: string;
+  kind: "choice" | "yesno" | "year" | "country";
+  options?: { value: string; label: string }[];
+};
+
+/** What Homing remembers from your answers. */
+export type Profile = {
+  birthYear: number | null;
+  nationality: string[];
+  residenceCountry: string | null;
+  studentStatus: string | null;
+  educationLevel: string | null;
+  languages: Record<string, string>;
+  companyRegistered: boolean | null;
 };
 
 export type ForAnswer = {
@@ -212,9 +250,12 @@ type RawSave = {
 type RawTrue = {
   verdict: TrueAnswer["verdict"];
   official_url?: string | null;
+  same_page?: boolean;
   note?: string | null;
   deadline?: { at: string; display: string; tz_stated: boolean; source_text: string | null } | null;
   findings?: TrueAnswer["findings"];
+  rules?: EligibilityRule[];
+  questions?: Question[];
   question?: string | null;
 };
 
@@ -235,6 +276,7 @@ function toTrue(raw: RawTrue | null): TrueAnswer | null {
   return {
     verdict: raw.verdict,
     officialUrl: raw.official_url ?? null,
+    samePage: raw.same_page ?? false,
     note: raw.note ?? null,
     deadline: raw.deadline
       ? {
@@ -245,6 +287,8 @@ function toTrue(raw: RawTrue | null): TrueAnswer | null {
         }
       : null,
     findings: raw.findings ?? [],
+    rules: raw.rules ?? [],
+    questions: raw.questions ?? [],
     question: raw.question ?? null,
   };
 }
@@ -298,6 +342,14 @@ export const savesApi = {
       "saves?limit=50",
     );
     return page.items.map((raw) => ({ ...toSave(raw), title: raw.title, what: raw.what }));
+  },
+  /** Answer one question; every saved opportunity is re-judged. Returns what changed. */
+  async answer(id: string, questionId: string, value: string | number | boolean): Promise<string> {
+    const raw = await api<{ summary: string }>(`saves/${encodeURIComponent(id)}/answer`, {
+      method: "POST",
+      body: JSON.stringify({ question_id: questionId, value }),
+    });
+    return raw.summary;
   },
   /** The owner's own text of a private save, fetched only when they tap Show. */
   async reveal(id: string): Promise<string> {
@@ -368,5 +420,42 @@ export const todayApi = {
         unconfirmed: c.unconfirmed,
       })),
     };
+  },
+};
+
+type RawProfile = {
+  birth_year: number | null;
+  nationality: string[];
+  residence_country: string | null;
+  student_status: string | null;
+  education_level: string | null;
+  languages: Record<string, string>;
+  company_registered: boolean | null;
+};
+
+function toProfile(raw: RawProfile): Profile {
+  return {
+    birthYear: raw.birth_year,
+    nationality: raw.nationality,
+    residenceCountry: raw.residence_country,
+    studentStatus: raw.student_status,
+    educationLevel: raw.education_level,
+    languages: raw.languages,
+    companyRegistered: raw.company_registered,
+  };
+}
+
+export const profileApi = {
+  async get(): Promise<Profile> {
+    return toProfile(await api<RawProfile>("me/profile"));
+  },
+  /** Change one remembered answer, or forget it with null. */
+  async set(questionId: string, value: string | number | boolean | null): Promise<Profile> {
+    return toProfile(
+      await api<RawProfile>("me/profile", {
+        method: "PUT",
+        body: JSON.stringify({ question_id: questionId, value }),
+      }),
+    );
   },
 };

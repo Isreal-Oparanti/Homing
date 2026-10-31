@@ -42,7 +42,7 @@ class Purpose:
 PURPOSES: dict[str, Purpose] = {
     "read.text": Purpose("read.text", "read_text.v2.md", Reading, 90, "low"),
     # Comparing with a source is the hardest call, so it keeps the default reasoning effort.
-    "check.compare": Purpose("check.compare", "check_compare.v1.md", ProposedCheck, 120),
+    "check.compare": Purpose("check.compare", "check_compare.v2.md", ProposedCheck, 120),
     "place.assign": Purpose("place.assign", "place_assign.v1.md", Placement, 45, "low"),
     "video.points": Purpose("video.points", "video_points.v1.md", VideoPoints, 120, "low"),
     "prep.sheet": Purpose("prep.sheet", "prep_sheet.v2.md", PrepSheet, 120),

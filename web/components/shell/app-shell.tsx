@@ -1,6 +1,15 @@
 "use client";
 
-import { LogOut, Plus, Search, Sun, Users, Waypoints, type LucideIcon } from "lucide-react";
+import {
+  LogOut,
+  Plus,
+  Search,
+  Sun,
+  UserRound,
+  Users,
+  Waypoints,
+  type LucideIcon,
+} from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -50,6 +59,15 @@ export function AppShell({ name, children }: { name: string; children: React.Rea
         </nav>
         <div className="mt-auto">
           <p className="truncate px-4 text-sm text-muted">{name}</p>
+          <Link
+            href="/profile"
+            className={`mt-1 flex items-center gap-3 rounded-full px-4 py-2 text-sm font-semibold ${
+              isActive("/profile") ? "bg-ink text-white" : "text-ink-2 hover:bg-glass-strong"
+            }`}
+          >
+            <UserRound className="size-[18px]" strokeWidth={1.8} aria-hidden />
+            What Homing knows
+          </Link>
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: "/" })}
@@ -64,14 +82,19 @@ export function AppShell({ name, children }: { name: string; children: React.Rea
       {/* Mobile: top bar with sign-out */}
       <header className="flex items-center justify-between px-5 pt-5 md:hidden">
         <Logo size={24} />
-        <button
-          type="button"
-          onClick={() => signOut({ callbackUrl: "/" })}
-          aria-label="Sign out"
-          className="glass rounded-full p-2"
-        >
-          <LogOut className="size-[18px] text-ink-2" strokeWidth={1.8} />
-        </button>
+        <div className="flex gap-2">
+          <Link href="/profile" aria-label="What Homing knows about you" className="glass rounded-full p-2">
+            <UserRound className="size-[18px] text-ink-2" strokeWidth={1.8} />
+          </Link>
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/" })}
+            aria-label="Sign out"
+            className="glass rounded-full p-2"
+          >
+            <LogOut className="size-[18px] text-ink-2" strokeWidth={1.8} />
+          </button>
+        </div>
       </header>
 
       <main className="mx-auto w-full max-w-[720px] px-5 pb-28 pt-6 md:pb-10 md:pt-10">

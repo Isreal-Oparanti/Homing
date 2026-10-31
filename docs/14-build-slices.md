@@ -184,7 +184,7 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **Builds:**
   - **`verify/`, complete** ([05](05-verification.md)): `dates` (all golden rows, time zones, the mismatch guard), `status` (closed signals), `eligibility` (every rule type, including "English or French plus the other"), `verdict`, `sources`.
   - **Finding the official source:** links in the post, then agent memory, then the search provider (`llm/search.py`).
-  - **Profile:** `GET/PUT /me/profile` and the **Settings** page (eligibility profile form).
+  - **Profile:** `GET/PUT /me/profile` and the **Settings** page (eligibility profile form). *As built:* no form up front. Questions are asked on the card when a rule needs them, and `/profile` ("What Homing knows about you") lists every remembered answer to change or forget.
   - `check.eligibility_open` on **Muse Spark Open**, for free-text rules only.
   - `POST /saves/{id}/answer`, for the "needs your answer" question.
   - **Save card:** `VerdictBadge`, `EvidenceQuote` (serif quote, highlighted words, "verified on source"), `DeadlineText`, `AnswerQuestion`.
@@ -195,6 +195,18 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **Proved by:**
   - unit tests for every row in [05](05-verification.md) and every verdict branch;
   - the golden Afreximbank agent test, using a recorded official page fixture.
+- **As built (31 Oct):**
+  - **Rules and verdict:** `verify/eligibility.py` (rule checks against the quote, judging, questions) and `verify/verdict.py`. Migration 0004 adds `profiles` and `checks.answers`.
+  - **On the real Afreximbank posting, with the real model:** 8 rules, each quoted. Age, the English/French rule and "not a child of staff" are required. Full-time study, field of study and Arabic/Portuguese are only preferred. Nationality counts as open to everyone.
+    - The verdict starts at **Needs your answer**, with 4 questions.
+    - Answering French "Basic" turns it **Not for you**: "You don't meet: Fluent in English or French, with working knowledge of the other".
+    - Changing French to "Working knowledge" on `/profile` turns it **Fits you**, and Today follows.
+  - **Five other real posts from the pile** got honest verdicts:
+    - Startup Abuja: the page no longer matches the post;
+    - DoraHacks and ATF Challenge: couldn't open the official page, which only renders in a full browser;
+    - a scholarship WhatsApp-groups page: `checked`, not an opportunity;
+    - an application-helper tool: not an opportunity.
+  - **Known gap:** official pages built by JavaScript (DoraHacks, Notion, Typeform) can't be read without a headless browser. Pick demo posts whose official pages open.
 - **If late:**
   - Muse Spark Open waits; free-text rules show as "needs your answer";
   - search waits; post links only.

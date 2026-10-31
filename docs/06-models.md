@@ -57,7 +57,7 @@ Every call declares a purpose. Each purpose fixes the model, prompt file, output
 | `read.video` | Spark | `read_video.v1.md` | `Reading` | 120s |
 | `read.list` | Spark | `read_list.v1.md` | `Reading` with `items` | 60s |
 | `transcribe.voice` | Transcribe | — | `Transcript` | 120s |
-| `check.compare` | Spark | `check_compare.v1.md` (default reasoning effort) | `ProposedCheck` | 120s. Measured 31 Oct on the real Afreximbank post: 17.1s, 1.6k tokens in, 4.8k out (mostly reasoning). Try `low` effort or Muse Wonder in S6. |
+| `check.compare` | Spark | `check_compare.v2.md` (v2 adds eligibility `rules`, each with a quote; default reasoning effort) | `ProposedCheck` | 120s. Measured 31 Oct on the real Afreximbank post: 17.1s, 1.6k tokens in, 4.8k out (mostly reasoning). Try `low` effort or Muse Wonder in S6. |
 | `check.eligibility_open` | Spark Open | `check_eligibility_open.v1.md` | `list[RuleJudgement]` | 60s |
 | `place.assign` | Spark | `place_assign.v1.md` (`low` effort) | `Placement` | 45s. Measured 2.9s. |
 | `place.rebuild` | Spark (long context) | `place_rebuild.v1.md` | `ThreadPlan` | 180s |

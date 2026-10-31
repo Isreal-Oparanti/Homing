@@ -31,8 +31,8 @@ FastAPI. Base path `/api/v1`. The API is called only by the Next.js server ([ADR
 |---|---|---|---|
 | GET | `/me` | — | `{id, email, name, tz, is_demo}` |
 | PATCH | `/me` | `{tz?}` | user |
-| GET | `/me/profile` | — | `Profile` |
-| PUT | `/me/profile` | `Profile` | `Profile` |
+| GET | `/me/profile` | — | `Profile`: what Homing remembers from your answers |
+| PUT | `/me/profile` | `{question_id, value}` (`value: null` forgets it) | `Profile`; every saved opportunity is re-judged |
 | DELETE | `/me` | — | `204`, deletes all user data |
 
 ### Uploads
@@ -50,7 +50,7 @@ FastAPI. Base path `/api/v1`. The API is called only by the Next.js server ([ADR
 | GET | `/saves/{id}/reveal` | — | `{text}`: the owner's own text, for a private save they tap to show. `Cache-Control: no-store`. Another user gets 404. |
 | DELETE | `/saves/{id}` | — | `204` (also deletes snapshots and media) |
 | PUT | `/saves/{id}/when` | `{kind: "date", at} \| {kind: "moment", moment_id} \| {kind: "none"}` | `When` (user override, `source=user`) |
-| POST | `/saves/{id}/answer` | `{answer}` | `202`, re-runs the verdict with the answer stored on the profile or check |
+| POST | `/saves/{id}/answer` | `{question_id, value}` | `{summary}`. The answer is stored on the profile (or on the check for `rule:N` questions), then every saved opportunity is re-judged by code. 422 if the answer doesn't fit the question. |
 | GET | `/saves/{id}/calendar.ics` | — | `text/calendar`: one event at `due_at`, with an alarm at `bring_back_at`. Description: title, next step, link back to the save card. |
 
 `SaveCard`, the main read model behind the four answers:
@@ -79,6 +79,7 @@ As built in S4, the three answers differ slightly from the example above:
   - It adds `note` (plain words when there was nothing to check against), `deadline.source_text` and `checked_at`.
   - Findings are `{point, quote, kind}` with the source in `official_url`, and only verified findings are sent.
   - A save with nothing checkable gets `{"verdict": "nothing_to_check"}`.
+- **`true` (S6):** it adds `rules` (`{rule, plain, quote, strength, result}`, verified only), `questions` (`{id, text, kind, options?}`, with `kind` one of `choice`, `yesno`, `year` or `country`) and `same_page` (the save is just a link to the official page).
 - **`for`:** each thread also has `count`, so the card can say "your 3rd save on this".
 - **`when`:** it adds `source` (`check` or `reading`), `display` ("Sat 31 Oct, 23:59 Lagos time"), `source_text`, `tz_stated` and `time_stated`.
 - **`pending`:** an answer is pending while its agent's job is queued or running. The "when" also waits on the check, because an official deadline beats a date in the post.

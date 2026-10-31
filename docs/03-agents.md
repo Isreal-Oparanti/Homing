@@ -133,6 +133,13 @@ class Reading(BaseModel):
    - the deadline is parsed from the quoted source text;
    - "closed" signals are detected.
 5. **Eligibility:** structured rules are compared with `profiles` by code. Only free-text rules that code can't judge (e.g. "relevant discipline") go to **Muse Spark Open** (`check.eligibility_open`), which answers `meets` / `fails` / `unknown` with a reason. `unknown` becomes a question for the user.
+
+   **As built (S6):**
+   - Spark Open isn't on our key, so a free-text rule becomes a yes/no question the model phrases (`question`, `yes_meets`), answered on the card.
+   - Questions are asked only for required rules that are still unknown, one per missing fact (birth year, a language's level, …).
+   - Each answer is remembered on the profile (or on the check, for one-off rules). Every saved opportunity is then re-judged by code, with no model call, and The team gets one line: "Used your answer on 2 saved opportunities: 2 aren't for you."
+   - Saves that aren't opportunities get `checked`, never a fit verdict.
+   - Opportunities are always checked, even when saved as a bare link.
 6. **Verdict by code** (never by a model):
    1. if the page says closed, or `deadline_at < now` → `closed`;
    2. else if any `required` rule `fails` → `not_for_you`;

@@ -58,6 +58,44 @@ class ProposedFinding(BaseModel):
     kind: Literal["left_out", "differs", "confirmed"]
 
 
+class LanguageNeed(BaseModel):
+    code: str = Field(description="ISO 639-1 language code, e.g. 'en' or 'fr'.")
+    level: Literal["basic", "working", "fluent"]
+
+
+class ProposedRule(BaseModel):
+    """One eligibility rule from the official page. Code checks the quote and judges it."""
+
+    rule: Literal[
+        "age", "nationality", "residence", "student", "education", "language", "company", "other"
+    ]
+    strength: Literal["required", "preferred"]
+    quote: str = Field(description="The rule's words, copied exactly from SOURCE.")
+    plain: str = Field(
+        description="The rule in plain words, e.g. 'Aged 20-32 in the year you apply'."
+    )
+    min_age: int | None = None
+    max_age: int | None = None
+    countries: list[str] = Field(
+        default_factory=list, description="ISO alpha-2 codes, or ['ANY'] when open to everyone."
+    )
+    student_status: Literal["full_time", "any_student"] | None = None
+    education_levels: list[Literal["secondary", "undergraduate", "postgraduate", "graduate"]] = (
+        Field(default_factory=list)
+    )
+    languages_any: list[LanguageNeed] = Field(
+        default_factory=list, description="At least one of these is needed."
+    )
+    languages_all: list[LanguageNeed] = Field(
+        default_factory=list, description="All of these are needed."
+    )
+    company_registered: bool | None = None
+    question: str | None = Field(
+        default=None, description="For 'other' only: a yes/no question for the person."
+    )
+    yes_meets: bool = Field(default=True, description="For 'other': does 'yes' mean they meet it?")
+
+
 class ProposedCheck(BaseModel):
     """What the model proposes for "Is it true?". Code verifies every quote before showing it."""
 
@@ -68,6 +106,7 @@ class ProposedCheck(BaseModel):
     deadline_quote: str | None = Field(
         default=None, description="The exact words from SOURCE giving the closing date, or null."
     )
+    rules: list[ProposedRule] = Field(default_factory=list, max_length=10)
 
 
 class Placement(BaseModel):
