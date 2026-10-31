@@ -18,7 +18,9 @@ from openai import OpenAI
 
 from app.core.config import get_settings
 
-YOUTUBE = "https://www.youtube.com/watch?v=5azEvwamu2Y"  # "debate preambles" Short, a saved demo video
+YOUTUBE = (
+    "https://www.youtube.com/watch?v=5azEvwamu2Y"  # "debate preambles" Short, a saved demo video
+)
 IMAGE = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_big.jpg/640px-Fronalpstock_big.jpg"
 PDF = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
 
@@ -34,7 +36,9 @@ def ask(label: str, model: str, content: object, **extra: object) -> None:
         )
         text = (r.choices[0].message.content or "").strip().replace("\n", " ")
         usage = r.usage.model_dump() if r.usage else {}
-        print(f"OK   {label} [{model}] {time.perf_counter() - started:.1f}s {usage}\n     {text[:300]}")
+        print(
+            f"OK   {label} [{model}] {time.perf_counter() - started:.1f}s {usage}\n     {text[:300]}"
+        )
     except Exception as exc:  # report and move on: this script maps what works
         print(f"FAIL {label} [{model}] {type(exc).__name__}: {str(exc)[:300]}")
 
@@ -55,12 +59,20 @@ def main() -> None:
     }
     post = "Afreximbank Internship Programme closes TOMORROW! Deadline: 31 October 2026."
     ask("text + json_schema", m, f"Extract title and deadline: {post}", response_format=schema)
-    ask("text + json_object", m, f"Return JSON with title and deadline: {post}",
-        response_format={"type": "json_object"})
-    ask("image_url", m, [
-        {"type": "text", "text": "Describe this image in one sentence."},
-        {"type": "image_url", "image_url": {"url": IMAGE}},
-    ])
+    ask(
+        "text + json_object",
+        m,
+        f"Return JSON with title and deadline: {post}",
+        response_format={"type": "json_object"},
+    )
+    ask(
+        "image_url",
+        m,
+        [
+            {"type": "text", "text": "Describe this image in one sentence."},
+            {"type": "image_url", "image_url": {"url": IMAGE}},
+        ],
+    )
     for label, part in [
         ("pdf as file url", {"type": "file", "file": {"file_url": PDF}}),
         ("pdf as image_url", {"type": "image_url", "image_url": {"url": PDF}}),
@@ -71,10 +83,17 @@ def main() -> None:
         ("youtube as file url", {"type": "file", "file": {"file_url": YOUTUBE}}),
         ("youtube in text", {"type": "text", "text": f"Video: {YOUTUBE}"}),
     ]:
-        ask(label, m, [
-            {"type": "text", "text": "Watch this video. Give 2 points it makes, each with a timestamp."},
-            part,
-        ])
+        ask(
+            label,
+            m,
+            [
+                {
+                    "type": "text",
+                    "text": "Watch this video. Give 2 points it makes, each with a timestamp.",
+                },
+                part,
+            ],
+        )
     ask("text, muse-wonder", "muse-wonder-1.0", f"Extract title and deadline as JSON: {post}")
     print(json.dumps({"spark_model": m}))
 
