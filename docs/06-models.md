@@ -7,7 +7,7 @@ All model calls go through one gateway: `server/app/llm/gateway.py`. No other mo
 | Provider | Used for | Client | Config |
 |---|---|---|---|
 | **Muse Spark** (Meta Model API) | Reading text, images, PDFs and video; long-context thread rebuilds; comparing a post with its source; prep sheets | `openai` SDK, `base_url=META_API_BASE` (`https://api.meta.ai/v1`, Bearer key; checked 30 Oct) | `META_API_KEY`, `META_SPARK_MODEL` = `muse-spark-1.3` (default; S0 compares it with 1.2, the `-contributor` builds and `muse-wonder-1.0`) |
-| **Muse Voice Transcribe** (Meta Model API) | Voice notes → text | transcription endpoint **(confirm shape: OpenAI-style `/audio/transcriptions`?)** | `META_TRANSCRIBE_MODEL` = `muse-voice-transcribe-1.0` (listed by `/v1/models`, 30 Oct) |
+| **Muse Voice Transcribe** (Meta Model API) | Voice notes → text | `POST /v1/asr/transcribe`, multipart (`request` JSON + `audio` **WAV**), up to 10 min / 32 MB. Returns `transcript`, `audioDurationMs`, `turns`. A realtime WebSocket (`/v1/asr/realtime`) also exists; we don't need it. | `META_TRANSCRIBE_MODEL` = `muse-voice-transcribe-1.0` (listed by `/v1/models`, 30 Oct) |
 | **Muse Spark Open** (Baseten or Modal) | Eligibility on free-text rules, using profile data | OpenAI-compatible endpoint from the host **(confirm)** | `SPARK_OPEN_BASE`, `SPARK_OPEN_KEY`, `SPARK_OPEN_MODEL` (`meta-models/muse-spark-open-1026`) |
 
 **Routing rules** (enforced in the gateway, not by convention):
@@ -34,12 +34,15 @@ We use Spark and Voice Transcribe. S0 checks whether `muse-wonder-1.0` is worth 
 | Images (JPEG, PNG, GIF, WebP) | Yes | **Base64 data URL** in `image_url`. Remote URLs can fail when the host blocks Meta's downloader, so always send bytes. |
 | PDF | Yes | `{"type": "file", "file": {"filename": ..., "file_data": "data:application/pdf;base64,..."}}`. File URLs are rejected; `file_id` (upload first) also works. |
 | Video | **MP4 only** | `{"type": "video_url", "video_url": {"url": <MP4 URL>}}`. Answers carry timestamps. 5s sample took about 23s. |
-| **YouTube links** | **No** | Rejected (`text/html`, MP4 only), and Spark says it can't watch YouTube. **Decision: `VIDEO_MODE=spark_file` for videos we hold, plus `chapters_only` for YouTube.** |
+| **YouTube links** | **No** | Rejected (`text/html`, MP4 only), and Spark says it can't watch YouTube. |
+| Voice notes (Opus → WAV) | **Yes** | Convert with PyAV to 16 kHz mono WAV, then `/v1/asr/transcribe`. A 145s Nigerian-English note was accurate and took 38s; a 24s Pidgin note worked too. |
 | Muse Wonder | Yes | Same API, faster on simple JSON (3.7s vs 5.9s). Compare on `check.compare` in S6. |
 
 **Latency:** Spark is a reasoning model. Most output tokens are reasoning (about 300–800 per call). Use `reasoning_effort="low"` for reading and placing (simple extraction took 2.8s instead of 5–6s), and leave the default for `check.compare`, `ask.answer` and `prep.sheet`.
 
-**What this means for the prep sheet (S12):** the 14 YouTube demo videos can only give chapters, titles and descriptions. For the strongest demo moment, Isreal screen-records the 4–5 most useful speaking videos as MP4 (his own screen, no downloading) and adds them as saves. Spark then watches those and cites exact seconds.
+**Decision for YouTube (Isreal, 31 Oct):** read YouTube's **captions** with `youtube-transcript-api` (timestamped text, no video download), behind `FEATURE_YT_CAPTIONS`. Spark reads the captions and cites exact seconds. Revisit after asking at office hours ([ADR 0008](adr/0008-platform-rules.md)). Tested on the saved "10 Speaking Techniques" video: 545 timestamped lines over 20 minutes.
+
+**Known risk:** YouTube often blocks caption requests from cloud-server IPs. It works from Isreal's machine; check it from the deployed worker in S5.
 
 ## Purposes
 
@@ -113,9 +116,10 @@ and expects `list[Reading]` with matching IDs. Code rejects the batch if IDs are
 
 | Mode | How | When |
 |---|---|---|
+| `youtube_captions` | Fetch YouTube captions (`youtube-transcript-api`), then Spark reads the timestamped text | **default for YouTube** (Isreal's decision, 31 Oct) |
 | `spark_youtube_url` | Pass the YouTube URL to Spark | **ruled out**: the S0 check showed Spark rejects YouTube links |
 | `spark_file` | MP4 by URL (signed storage URL) or Files API upload, for files we hold (WhatsApp media, Instagram's own download, screen recordings) | **default** for any video file |
-| `chapters_only` | Use YouTube chapters plus title and description. No watching. | fallback. The prep sheet says "from chapters" |
+| `chapters_only` | Use YouTube chapters plus title and description. No watching. | fallback when captions are off or blocked. The prep sheet says "from chapters" |
 
 The output is always `VideoPoints {save_id, duration_s, points:[{text, t_start, t_end}]}`, validated by `verify/timestamps.py`.
 
@@ -162,7 +166,8 @@ Record the real numbers in `model_calls` after the first full import, and update
 ```
 META_API_BASE, META_API_KEY, META_SPARK_MODEL, META_TRANSCRIBE_MODEL
 SPARK_OPEN_BASE, SPARK_OPEN_KEY, SPARK_OPEN_MODEL
-VIDEO_MODE=chapters_only|spark_file|spark_youtube_url
+FEATURE_YT_CAPTIONS=true        # YouTube: captions, else chapters_only
+# Video files we hold always use spark_file
 SEARCH_PROVIDER, SEARCH_API_KEY
 YOUTUBE_API_KEY
 EMBED_MODEL=intfloat/multilingual-e5-small

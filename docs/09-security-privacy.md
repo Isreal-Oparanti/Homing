@@ -105,7 +105,7 @@ Per user, kept in Postgres with a fixed window:
 ## Platform rules (disqualification risks)
 
 The architecture treats these as constraints ([ADR 0008](adr/0008-platform-rules.md)):
-- No YouTube downloading or transcript scraping: no `yt-dlp`, no `youtube-transcript-api`. CI fails if either appears in the dependency lock.
+- No YouTube downloading: no `yt-dlp`. Captions are read with `youtube-transcript-api` behind `FEATURE_YT_CAPTIONS` (Isreal's decision, 31 Oct, [ADR 0008](adr/0008-platform-rules.md)). CI fails if a downloader appears in the dependency lock.
 - No Instagram or Facebook scraping. Only the official oEmbed, for embeds.
 - No WhatsApp bot or WhatsApp Business API usage.
 - X only through the official oEmbed, plus the user's own screenshots.

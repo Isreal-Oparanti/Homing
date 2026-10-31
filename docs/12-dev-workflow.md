@@ -124,7 +124,7 @@ We reuse *approaches*, not code. This repo is new code written during the event.
 | Fetching | Public-IP checks, size caps, robots, retries | Re-check on every redirect; re-check after connect |
 | Privacy | PII masking (emails, phones, IDs, Luhn) | Secret screen makes saves private and keeps them away from models |
 | Live updates | SSE relayed through a Next.js route with a long timeout | Resume with `Last-Event-ID` from a stored events table |
-| YouTube | Data API + oEmbed metadata | **Dropped** `yt-dlp` and `youtube-transcript-api` (platform rules) |
+| YouTube | Data API + oEmbed metadata; captions with `youtube-transcript-api` | **Dropped** `yt-dlp` (no downloading). Captions are behind a flag (Isreal's decision, 31 Oct) |
 | Dependencies | — | **Exact pins.** No `"latest"` |
 | Code size | — | **Small modules.** No 5,800-line service files |
 | Chat | Asking about your saves, and auditing them (the belief-audit idea) | **No chat thread or router.** Ask gives one verified answer page per question; Audit is a job that produces a report |

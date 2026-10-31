@@ -275,7 +275,7 @@ There's no chat thread. You search, ask one question at a time, or run an audit,
 | Job | Model or tool | Status |
 |---|---|---|
 | Reading images, PDFs and video; one long pass over the library; comparing a post with its source | Muse Spark (OpenAI-compatible API at `api.meta.ai/v1`) | Confirm the exact model ID in the Meta dashboard. Third-party docs list `muse-spark-1.1` (text, image, video, PDF). |
-| Voice notes | Muse Voice Transcribe | Confirm the ID (`muse-voice-transcribe-1.0` in third-party docs). Validated on 25 languages including English. Pidgin and Yoruba are untested. |
+| Voice notes | Muse Voice Transcribe (`muse-voice-transcribe-1.0`) | Works (S0, 31 Oct): `/v1/asr/transcribe`, WAV only, so Opus is converted first. Accurate on a Nigerian-English note; a short Pidgin note worked too. |
 | Matching your profile against eligibility rules | Muse Spark Open on Baseten or Modal (`meta-models/muse-spark-open-1026`) | Needs partner credits |
 | YouTube details | YouTube oEmbed, plus the YouTube Data API (description, chapters) | Needs a Google API key |
 | X posts | X oEmbed (publish.twitter.com) | Free, first post only |
@@ -321,7 +321,8 @@ Build the whole demo path roughly first, then make each part deep. The slice-by-
 
 | Risk | Fallback |
 |---|---|
-| Muse Spark can't read YouTube links (14 of the 16 demo videos are on YouTube) | **Plan B:** screen-record the videos playing, and Spark watches the recording. **Plan C:** make the "Now" scene the main Meta-model moment, plus Voice Transcribe. Decide by Sat 5 PM, after office hours (3–4 PM Lagos). |
+| Muse Spark can't read YouTube links (confirmed in S0) | **Decided (Isreal, 31 Oct):** read YouTube captions instead (option 2), behind a flag. Revisit after office hours. If captions are blocked from the server or ruled out, fall back to chapters. |
+| YouTube blocks caption requests from cloud servers | Test from the deployed worker in S5. If blocked, captions are fetched on import from a non-cloud network, or we fall back to chapters. Decide then. |
 | An official page blocks us | Say "couldn't open the official page". Never fill the gap. |
 | No web search in Meta's API | Links in the post, plus one search API key |
 | Voice Transcribe struggles with Nigerian voice notes | Show only what it gets right, and say it's English-first |
@@ -364,7 +365,7 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
 
 - ~~Can Muse Spark take a YouTube link?~~ No (S0, 30 Oct). We use MP4 files we hold plus YouTube chapters. Still open: can Muse Spark Open read video?
 - Does Meta's API include web search? If not, which search API do we use?
-- ~~What are the exact model IDs?~~ Answered 30 Oct: `muse-spark-1.3` and `muse-voice-transcribe-1.0`, among others (see [06](06-models.md#models-on-our-key)). Still open: what shape does the transcription endpoint take? Does Spark take files through a Files API or by URL?
+- ~~What are the exact model IDs?~~ Answered 30 Oct: `muse-spark-1.3` and `muse-voice-transcribe-1.0`, among others (see [06](06-models.md#models-on-our-key)). Also answered in S0: transcription is `POST /v1/asr/transcribe` (WAV); Spark takes images and PDFs inline as base64, and video as an MP4 URL ([06](06-models.md#what-the-s0-check-found-30-oct)).
 - Hosting: is Railway OK, or is the old Crowscap server still available? See [ADR 0007](adr/0007-hosting.md).
 - Does Meta offer an embedding model? We found none, so we run a small open model ourselves. See [ADR 0003](adr/0003-search-ask-audit.md).
 - How does the Community Vote work, and when does voting open?

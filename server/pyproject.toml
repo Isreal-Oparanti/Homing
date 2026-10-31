@@ -5,6 +5,7 @@ description = "Homing API and worker: save anything to use now or later."
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.1",
+    "av>=19.0.2",
     "fastapi>=0.162.0",
     "httpx>=0.28.1",
     "openai>=3.41.0",
@@ -15,6 +16,7 @@ dependencies = [
     "python-multipart>=0.0.32",
     "sqlalchemy>=2",
     "uvicorn[standard]>=0.54.0",
+    "youtube-transcript-api>=1.2.4",
 ]
 
 [dependency-groups]

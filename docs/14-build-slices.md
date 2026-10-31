@@ -252,7 +252,7 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **Done when:** the demo-video prep card opens a sheet whose points cite exact seconds in Isreal's saved speaking and demo videos, and clicking a chip plays from that second.
 - **If late:**
   - the reel goes first (PLAN cut order);
-  - if `VIDEO_MODE = chapters_only`, the sheet is built from chapters, titles and descriptions, and labelled "from chapters".
+  - YouTube videos are read through their **captions** (Isreal's decision, 31 Oct); if captions are off or blocked, the sheet is built from chapters, titles and descriptions, and labelled "from chapters".
 
 ### S13 · Audit
 - **Day:** Tue · **Estimate:** 2h · **Depends on:** S9 · **Priority:** P1, and the first thing cut at CP1 or CP3
@@ -292,7 +292,7 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 
 | ID | Extra | What it adds | Depends on |
 |---|---|---|---|
-| X1 | Voice notes | `ingest/audio.py` (ffmpeg, then Voice Transcribe), transcript snapshots. A second Meta model visible in the product. | S0 result, S8 |
+| X1 | Voice notes | `ingest/audio.py` (PyAV converts Opus to WAV, then `/v1/asr/transcribe`), transcript snapshots. A second Meta model visible in the product. | S0 result, S8 |
 | X2 | Daily re-check | `user.recheck_open`: deadline moved, closed, dead link, then a `went_bad` card | S6, S11 |
 | X3 | Android share-to-Homing | Web manifest `share_target` and `/share-target` | S3, S7 |
 

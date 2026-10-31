@@ -66,7 +66,8 @@ Each connector returns `Gathered(snapshots: list[Snapshot], media_urls: list[str
 - **YouTube Data API v3** `videos.list?part=snippet,contentDetails` gives description, `publishedAt` and duration (ISO 8601 → seconds). It needs `YOUTUBE_API_KEY`.
 - **Chapters:** parsed by code from description lines like `0:00 Intro`, `12:30 How to…`. They're kept in `snapshot.meta.chapters`.
 - Snapshot `metadata`: title, channel, description, chapters and duration.
-- **Never:** download video or audio, or scrape transcripts. That breaks YouTube's rules ([ADR 0008](adr/0008-platform-rules.md)).
+- **Captions** (when `FEATURE_YT_CAPTIONS` is on): `youtube-transcript-api` gives the timestamped caption text, stored as a `transcript` snapshot with `meta.segments: [{t, text}]`. This is Isreal's decision, with the risk noted in [ADR 0008](adr/0008-platform-rules.md).
+- **Never:** download video or audio (no `yt-dlp`).
 
 ### X (`x.py`)
 - `https://publish.twitter.com/oembed?omit_script=1&url=https://x.com/i/status/{id}` gives author, text (from the HTML) and date.
@@ -99,8 +100,8 @@ Each connector returns `Gathered(snapshots: list[Snapshot], media_urls: list[str
 - Flyers usually carry dates and requirements, so `is_checkable` is often true.
 
 ### Voice notes (`audio.py`)
-- WhatsApp voice notes are `.opus`. Convert with ffmpeg to 16 kHz mono `.mp3` **(confirm the accepted formats)**.
-- Send to Muse Voice Transcribe (`transcribe.voice`) and store a `transcript` snapshot, with segment timestamps if returned.
+- WhatsApp voice notes are `.opus`. Meta's endpoint takes **WAV only**, so convert with PyAV (bundled decoder, no system ffmpeg) to 16 kHz mono 16-bit WAV.
+- Send to `POST /v1/asr/transcribe` (`transcribe.voice`) and store a `transcript` snapshot. The response has `transcript`, `audioDurationMs` and `turns`. Notes over 10 minutes are split.
 - Pidgin and Yoruba are not validated languages. Mark `meta.language_validated = false` when detection says so.
 
 ### Video files (`video.py`)
