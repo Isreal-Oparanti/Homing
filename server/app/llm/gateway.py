@@ -10,18 +10,19 @@ import json
 import threading
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, TypeVar
 
 import openai
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
-from app.db.models import ModelCall, Save
-from app.jobs.errors import PermanentError, RetryableError
+from app.db.models import ModelCall, Save, User
+from app.jobs.errors import DeferredError, PermanentError, RetryableError
 from app.schemas.agents import Reading
 from app.verify.secrets import mask_phones
 
@@ -39,8 +40,15 @@ class Purpose:
 
 
 PURPOSES: dict[str, Purpose] = {
-    "read.text": Purpose("read.text", "read_text.v1.md", Reading, 90, "low"),
+    "read.text": Purpose("read.text", "read_text.v2.md", Reading, 90, "low"),
 }
+
+
+OUTPUT_TOKENS_ESTIMATE = 1500
+
+
+class BudgetExceeded(DeferredError):
+    """Today's token budget (all users, or this user) is used up. Runs again tomorrow."""
 
 
 @lru_cache
@@ -103,6 +111,27 @@ class ModelGateway:
         if private:
             raise PermanentError("This save is private, so it's never sent to a model.")
 
+    def _check_budget(self, user_id: str | None, input_estimate: int) -> None:
+        """Tokens used today, by everyone and by this user, plus this call must fit."""
+        today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        used = func.coalesce(ModelCall.tokens_in, 0) + func.coalesce(ModelCall.tokens_out, 0)
+        total, mine = self._db.execute(
+            select(
+                func.coalesce(func.sum(used), 0),
+                func.coalesce(func.sum(used).filter(ModelCall.user_id == user_id), 0),
+            ).where(ModelCall.created_at >= today)
+        ).one()
+        estimate = input_estimate + OUTPUT_TOKENS_ESTIMATE
+        user_limit = self._settings.model_user_daily_token_budget
+        if user_id and self._db.scalar(select(User.is_demo).where(User.id == user_id)):
+            user_limit //= 2
+        over_total = total + estimate > self._settings.model_daily_token_budget
+        over_user = bool(user_id) and mine + estimate > user_limit
+        if over_total or over_user:
+            raise BudgetExceeded(
+                "Today's model budget is used up.", until=today + timedelta(days=1, minutes=5)
+            )
+
     def run(
         self, purpose: str, *, user_id: str | None, inputs: dict[str, Any], save_ids: list[str]
     ) -> Any:
@@ -121,6 +150,9 @@ class ModelGateway:
         )
         if cached is not None:
             return p.output.model_validate(cached)
+
+        # Characters / 4 is a rough token count; good enough for a daily guard.
+        self._check_budget(user_id, (len(instructions) + len(user_text)) // 4)
 
         schema = inline_schema(p.output)
         messages: list[dict[str, Any]] = [

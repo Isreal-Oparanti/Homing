@@ -1,12 +1,12 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Lock } from "lucide-react";
+import { Eye, EyeOff, ExternalLink, Lock } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import { AGENTS } from "@/components/team/agents";
-import { type AgentEvent, type Answer, type SaveCard, savesApi } from "@/lib/api";
+import { type AgentEvent, type Answer, type Copy, type SaveCard, savesApi } from "@/lib/api";
 import { useEventStream } from "@/lib/events";
 
 const PLATFORM: Record<string, string> = {
@@ -16,6 +16,13 @@ const PLATFORM: Record<string, string> = {
   facebook: "Facebook",
   tiktok: "TikTok",
   web: "Web page",
+};
+
+const COPY_KIND: Record<string, string> = {
+  page_text: "Page text",
+  post_text: "Post text",
+  transcript: "Captions",
+  metadata: "Title and description",
 };
 
 const NOT_YET: Record<Exclude<Answer, "what">, string> = {
@@ -43,7 +50,7 @@ function AnswerRow({ answer, children }: { answer: Answer; children: React.React
   return (
     <div className="grid grid-cols-[22px_1fr] gap-2.5 border-t border-line py-3">
       <Icon className="mt-0.5 size-[18px] text-ink-2" strokeWidth={1.8} aria-hidden />
-      <div>
+      <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted">{label}</p>
         <div className="mt-0.5 text-[15px] leading-relaxed">{children}</div>
       </div>
@@ -60,9 +67,103 @@ function Working({ text }: { text: string }) {
   );
 }
 
+/** The owner's private text stays hidden until they ask, and is never kept in the query cache. */
+function PrivateText({ saveId }: { saveId: string }) {
+  const [text, setText] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function show() {
+    setLoading(true);
+    setError(null);
+    try {
+      setText(await savesApi.reveal(saveId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't show it. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      {text === null ? (
+        <div className="flex items-center gap-3 rounded-xl bg-grey-soft px-3 py-2.5">
+          <span className="select-none font-mono text-sm tracking-widest text-muted blur-[3px]" aria-hidden>
+            ••••-••••-••••
+          </span>
+          <button
+            type="button"
+            onClick={show}
+            disabled={loading}
+            className="ml-auto flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs font-semibold text-white disabled:opacity-60"
+          >
+            <Eye className="size-3.5" aria-hidden />
+            {loading ? "Showing…" : "Show"}
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-start gap-3 rounded-xl bg-grey-soft px-3 py-2.5">
+          <p className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-sm">{text}</p>
+          <button
+            type="button"
+            onClick={() => setText(null)}
+            className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold"
+          >
+            <EyeOff className="size-3.5" aria-hidden />
+            Hide
+          </button>
+        </div>
+      )}
+      {error && <p className="mt-1 text-sm text-amber">{error}</p>}
+    </div>
+  );
+}
+
+/** Our copy of the content: the proof behind "What is it?", kept even if the link dies. */
+function Copies({ copies }: { copies: Copy[] }) {
+  // Opened from a Team proof chip (/saves/{id}#copy). Only ever rendered in the browser.
+  const [open, setOpen] = useState(() => window.location.hash === "#copy");
+  if (copies.length === 0) return null;
+  return (
+    <details
+      id="copy"
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+      className="mt-2 border-t border-line pt-3"
+    >
+      <summary className="cursor-pointer text-sm font-semibold text-ink-2">
+        Our copy of the content
+      </summary>
+      <div className="mt-2 space-y-3">
+        {copies.map((copy) => (
+          <section key={copy.id}>
+            <p className="text-xs text-muted">
+              {COPY_KIND[copy.kind] ?? copy.kind} · {copy.chars.toLocaleString("en-GB")} characters
+              {copy.sourceUrl && (
+                <>
+                  {" · "}
+                  <a href={copy.sourceUrl} target="_blank" rel="noreferrer" className="underline">
+                    {hostOf(copy.sourceUrl)}
+                  </a>
+                </>
+              )}
+            </p>
+            <p className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-xl bg-grey-soft p-3 text-sm text-ink-2">
+              {copy.excerpt}
+              {copy.chars > copy.excerpt.length && "…"}
+            </p>
+          </section>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function Card({ card }: { card: SaveCard }) {
-  const { save, what, pending } = card;
+  const { save, what, copies, pending } = card;
   const isPrivate = save.visibility === "private";
+  const paused = !what && save.status !== "failed" && save.error;
   const title = isPrivate
     ? "Private save"
     : (what?.title ?? save.label ?? (save.url ? hostOf(save.url) : save.text?.slice(0, 80)) ?? "Your save");
@@ -81,7 +182,7 @@ function Card({ card }: { card: SaveCard }) {
         {isPrivate && " · Private"}
       </p>
       <h1 className="font-display mt-1 text-[22px] font-bold leading-snug tracking-[-0.02em]">{title}</h1>
-      {save.url && (
+      {save.url && !isPrivate && (
         <a
           href={save.url}
           target="_blank"
@@ -96,10 +197,13 @@ function Card({ card }: { card: SaveCard }) {
       <div className="mt-4">
         <AnswerRow answer="what">
           {isPrivate ? (
-            <p className="flex items-start gap-2 text-ink-2">
-              <Lock className="mt-1 size-4 shrink-0" aria-hidden />
-              {what?.what ?? "Kept private. We never send these to AI."}
-            </p>
+            <>
+              <p className="flex items-start gap-2 text-ink-2">
+                <Lock className="mt-1 size-4 shrink-0" aria-hidden />
+                {what?.what ?? "Kept private. We never send these to AI."}
+              </p>
+              <PrivateText saveId={save.id} />
+            </>
           ) : what ? (
             <>
               <p>{what.what}</p>
@@ -115,6 +219,8 @@ function Card({ card }: { card: SaveCard }) {
             </>
           ) : save.status === "failed" ? (
             <p className="text-amber">{save.error ?? "Couldn't read this save."}</p>
+          ) : paused ? (
+            <p className="text-amber">{save.error}</p>
           ) : (
             <Working text="Reading it…" />
           )}
@@ -130,6 +236,7 @@ function Card({ card }: { card: SaveCard }) {
             )}
           </AnswerRow>
         ))}
+        <Copies copies={copies} />
       </div>
     </article>
   );
@@ -141,8 +248,10 @@ export function SaveCardView() {
   const { data, isPending, isError, error } = useQuery({
     queryKey: ["save", id],
     queryFn: () => savesApi.get(id),
-    // Safety net for the live feed: keep asking while the reading is on its way.
-    refetchInterval: (q) => (q.state.data?.pending.includes("what") ? 3000 : false),
+    // Safety net for the live feed: keep asking while the reading is on its way, but not
+    // while it's paused (a budget pause lasts until tomorrow).
+    refetchInterval: (q) =>
+      q.state.data?.pending.includes("what") && !q.state.data.save.error ? 3000 : false,
   });
 
   const onEvent = useCallback(

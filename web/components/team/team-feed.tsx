@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ExternalLink, FileText } from "lucide-react";
+import Link from "next/link";
 import { useCallback } from "react";
 
 import { AGENTS } from "@/components/team/agents";
@@ -8,6 +10,34 @@ import { type AgentEvent, type TeamPage, teamApi } from "@/lib/api";
 import { useEventStream } from "@/lib/events";
 
 const relative = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+const CHIP = "inline-flex items-center gap-1 rounded-full bg-grey-soft px-2.5 py-0.5 text-xs text-ink-2 hover:bg-glass-strong";
+
+/** The proof behind each action: our copy of the content, or the original link. */
+function EvidenceChips({ event }: { event: AgentEvent }) {
+  if (event.evidence.length === 0) return null;
+  return (
+    <ul className="mt-2 flex flex-wrap gap-1.5">
+      {event.evidence.map((ev, i) => (
+        <li key={`${ev.label}-${i}`}>
+          {ev.snapshotId && event.saveId ? (
+            <Link href={`/saves/${event.saveId}#copy`} className={CHIP}>
+              <FileText className="size-3" aria-hidden />
+              {ev.label}
+            </Link>
+          ) : ev.url ? (
+            <a href={ev.url} target="_blank" rel="noreferrer" className={CHIP}>
+              <ExternalLink className="size-3" aria-hidden />
+              {ev.label}
+            </a>
+          ) : (
+            <span className={CHIP}>{ev.label}</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function timeAgo(iso: string): string {
   const seconds = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
@@ -83,7 +113,14 @@ export function TeamFeed({ showDevTools }: { showDevTools: boolean }) {
                 <p className="text-xs font-semibold uppercase tracking-[0.07em] text-muted">
                   {label} · {timeAgo(event.createdAt)}
                 </p>
-                <p className="mt-1">{event.summary}</p>
+                {event.saveId ? (
+                  <Link href={`/saves/${event.saveId}`} className="mt-1 block hover:underline">
+                    {event.summary}
+                  </Link>
+                ) : (
+                  <p className="mt-1">{event.summary}</p>
+                )}
+                <EvidenceChips event={event} />
               </div>
             </li>
           );

@@ -12,6 +12,8 @@ PRIVATE = [
         "seed phrase: apple river stone cloud mango tiger lemon paper glass ocean bread chair",
         "looks_like_seed_phrase",
     ),
+    ("1234-5678-9012-3456-7890", "looks_like_code"),  # prepaid meter token shape
+    ("482913570261", "looks_like_code"),
     ("Your OTP code is 482913", "looks_like_one_time_code"),
     ("OPAY 8123456789", "looks_like_account_number"),
     ("acct no: 0123456789 gtbank", "looks_like_account_number"),
@@ -20,6 +22,7 @@ PRIVATE = [
     ("sk-abc123def456ghi789jkl012", "looks_like_api_key"),
     ("https://example.com/api?key=LLM_1234567890_rm_abcdEFGH1234", "looks_like_api_key"),
     ("password: hunter22", "looks_like_password"),
+    ("my password is hunter22", "looks_like_password"),
     ("q8ZrT2vLmN4pXw9KsB7dYc1FhJ6gUe3ARtQ0zWv5", "looks_like_secret_token"),
 ]
 
@@ -37,6 +40,9 @@ NOT_PRIVATE = [
     "FoundrGeeks",
     "July 18th Dad's birthday",
     "How to store backup codes safely",
+    "08123456789",
+    "+234 812 345 6789",
+    "2026-10-31",
     "What is a seed phrase? https://example.com/seed-phrases-explained",
     "",
 ]

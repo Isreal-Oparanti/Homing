@@ -45,8 +45,9 @@ FastAPI. Base path `/api/v1`. The API is called only by the Next.js server ([ADR
 |---|---|---|---|
 | POST | `/saves` | `{text}` (may contain links) | `202 Save` |
 | POST | `/saves/file` | `{storage_key, note?}` | `202 Save` |
-| GET | `/saves` | `?thread_id&status&cursor&limit` | `{items: SaveSummary[], next_cursor}` |
+| GET | `/saves` | `?thread_id&status&cursor&limit` | `{items: SaveSummary[], next_cursor}`. Each item also carries the reading's `title` and `what` when there is one. |
 | GET | `/saves/{id}` | — | `SaveCard` |
+| GET | `/saves/{id}/reveal` | — | `{text}`: the owner's own text, for a private save they tap to show. `Cache-Control: no-store`. Another user gets 404. |
 | DELETE | `/saves/{id}` | — | `204` (also deletes snapshots and media) |
 | PUT | `/saves/{id}/when` | `{kind: "date", at} \| {kind: "moment", moment_id} \| {kind: "none"}` | `When` (user override, `source=user`) |
 | POST | `/saves/{id}/answer` | `{answer}` | `202`, re-runs the verdict with the answer stored on the profile or check |
@@ -66,7 +67,12 @@ FastAPI. Base path `/api/v1`. The API is called only by the Next.js server ([ADR
 }
 ```
 
-`pending` lists the answers still being worked on, so the UI shows a skeleton for each. Until S4 ships, `true`, `for` and `when` are `null` and stay in `pending`. `save.text` is `null` for private saves, and `save.error` holds a plain message when reading failed.
+`pending` lists the answers still being worked on, so the UI shows a skeleton for each. Until S4 ships, `true`, `for` and `when` are `null` and stay in `pending`.
+
+Also on the card:
+- `copies`: our copy of the content, kept at save time: `[{id, kind, source_url, chars, excerpt}]`, with `kind` one of `page_text`, `post_text`, `transcript` or `metadata` and the excerpt capped at 1,500 characters. It's the proof behind "What is it?", and The team's evidence chips point here.
+- For private saves, `save.text`, `save.url` and `save.label` are `null`. A key inside a link is one reason a save is private. The owner sees the text with `/reveal`.
+- `save.error` holds a plain message when reading failed, or "Paused until tomorrow…" when the day's model budget is used up (`status` is then `received`).
 
 ### Imports
 | Method | Path | Body | Returns |

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.logging import get_logger
 from app.jobs import queue
-from app.jobs.errors import PermanentError
+from app.jobs.errors import DeferredError, PermanentError
 
 log = get_logger("jobs")
 
@@ -78,19 +78,35 @@ class Runner:
                 db.commit()
             ms = round((time.perf_counter() - started) * 1000)
             log.info("job.done", extra={"fields": {**fields, "ms": ms}})
-        except PermanentError as exc:
-            self._record_failure(job, str(exc), retryable=False, fields=fields)
+        except DeferredError as exc:
+            with self._sessions() as db:
+                queue.defer(db, job, exc.until, str(exc))
+                db.commit()
+            log.info("job.deferred", extra={"fields": {**fields, "until": exc.until.isoformat()}})
+        except PermanentError as exc:  # our own plain messages, safe to log
+            self._record_failure(job, str(exc), str(exc), retryable=False, fields=fields)
         except Exception as exc:  # anything unexpected is retried with backoff
-            self._record_failure(job, f"{type(exc).__name__}: {exc}", retryable=True, fields=fields)
+            # The details go to jobs.last_error only. Logs get the type: messages from
+            # libraries can quote save text (docs/09-security-privacy.md).
+            detail = f"{type(exc).__name__}: {exc}"
+            self._record_failure(job, detail, type(exc).__name__, retryable=True, fields=fields)
         return True
 
     def _record_failure(
-        self, job: queue.ClaimedJob, error: str, *, retryable: bool, fields: dict[str, Any]
+        self,
+        job: queue.ClaimedJob,
+        error: str,
+        log_error: str,
+        *,
+        retryable: bool,
+        fields: dict[str, Any],
     ) -> None:
         with self._sessions() as db:
             status = queue.fail(db, job, error, retryable=retryable)
             db.commit()
-        log.warning("job.failed", extra={"fields": {**fields, "status": status, "error": error}})
+        log.warning(
+            "job.failed", extra={"fields": {**fields, "status": status, "error": log_error}}
+        )
 
     def _loop(self, index: int) -> None:
         last_stuck_check = 0.0
@@ -105,7 +121,7 @@ class Runner:
                 if not self.run_once():
                     self._stop.wait(IDLE_WAIT_S)
             except Exception as exc:  # keep the loop alive through DB blips
-                log.error("runner.loop_error", extra={"fields": {"error": repr(exc)}})
+                log.error("runner.loop_error", extra={"fields": {"error": type(exc).__name__}})
                 self._stop.wait(5.0)
 
     def start(self) -> None:

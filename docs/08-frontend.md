@@ -24,7 +24,7 @@
 |---|---|---|
 | `/` | Landing (signed out), otherwise redirect to `/today` | "Sign in with Google" · "Try the demo" |
 | `/today` | **Today** | Home. Up to 3 cards, plus a "What's coming up?" input (moments) |
-| `/threads` | **Threads** | List with counts and the next date |
+| `/threads` | **Threads** | List with counts and the next date. Until threads exist (S9), it lists every save, newest first, so any save can be found again. |
 | `/threads/[id]` | One thread | Saves in order, plus agent notes |
 | `/saves/[id]` | **Save card** | Full page. Also opens as a sheet over other screens |
 | `/team` | **The team** | Live feed, filterable by question |
@@ -60,7 +60,7 @@ Icons and labels are monochrome (`--ink-2`). Red is reserved for the brand and t
 
 | Component | What it shows |
 |---|---|
-| `SaveCard` | Header (title, platform, saved date, original link or media), then four `AnswerRow`s. Each row shows a skeleton while its key is in `pending`. |
+| `SaveCard` | Header (title, platform, saved date, original link or media), then four `AnswerRow`s. Each row shows a skeleton while its key is in `pending`. Below them, **Our copy of the content** (`copies`), which opens on its own from a Team chip (`/saves/{id}#copy`). Private saves show a blurred line with **Show**, which fetches `/reveal` and isn't cached. |
 | `AnswerRow` | Question label + icon, the answer in one line, an expandable detail |
 | `EvidenceQuote` | Source favicon + domain, the quoted line with the matched text highlighted, a "Verified on source" badge, a link to the source. **Only renders verified findings.** |
 | `VerdictBadge` | `fits_you` (green) · `needs_your_answer`, `couldnt_confirm` (amber) · `closed`, `not_for_you` (grey), in plain words ("Fits you", "Closed", "Not for you", "Needs your answer", "Couldn't confirm") |
@@ -68,7 +68,7 @@ Icons and labels are monochrome (`--ink-2`). Red is reserved for the brand and t
 | `TodayCard` | `why_now` (bold), title, `next_step`, proof chips, and the actions **Use it · Not for me · Later** |
 | `PrepSheet` | 5 points, each with source chips (`Video title · 4:12`) that open the player at that second; then "They agree" / "They disagree" sections |
 | `ReelPlayer` | YouTube IFrame API playing segments in order (`start`/`end`), or a `<video>` for files. Next/previous, with the segment source shown. |
-| `TeamFeed` | Virtualised list of `AgentEvent`s: avatar, question name, summary, relative time, evidence chips. New events slide in live. |
+| `TeamFeed` | Virtualised list of `AgentEvent`s: avatar, question name, summary (links to the save card), relative time, evidence chips ("Our copy of the page / post / captions" opens the card's copy; "Original link" opens the source). New events slide in live. |
 | `ThreadList`, `ThreadView` | Titles, counts, next date; rename inline (sets `locked_by_user`) |
 | `ImportPanel` | Drop zone → direct upload with progress → live counters from events (read, private, duplicates) → summary |
 | `AnswerQuestion` | Inline answer for `needs_your_answer` (e.g. a French level select) |

@@ -96,6 +96,33 @@ Grading uses the in-app **feedback** buttons (Right · Wrong · Nonsense) on sav
 
 **When:** grading takes about 1 hour on Monday 2 Nov ([PLAN §12](PLAN.md#12-build-plan)), with a second pass after fixes if time allows.
 
+### What is it? on the real pile (31 Oct)
+
+This is a check by code and by reading the outputs, not Isreal's grading. It doesn't replace the Monday grade.
+
+- **Sample:** 34 saves from the export, chosen by platform with a fixed seed, read through the real fetchers and Muse Spark, as the user `eval-s3`:
+  - 8 YouTube, 4 Instagram, 4 Facebook, 9 web, 5 X, 2 TikTok;
+  - 2 messages with several links.
+- **The pile it came from:** 486 link saves, of which 217 are YouTube, 89 Instagram, 81 Facebook, 75 web, 17 X and 2 TikTok.
+
+| Measure | `read_text.v1` | `read_text.v2` |
+|---|---|---|
+| Reads that failed | 0 / 34 | 0 / 34 |
+| Saves we couldn't read that said so instead of guessing | 12 / 12 | 12 / 12 |
+| Marked checkable (only 2–4 really are) | 15 | 5 |
+| Opportunities found (both real ones) | 2 / 2 | 2 / 2 |
+| Dates, amounts, requirements and places listed | 51 | 17 |
+| Of those dates, amounts and requirements, found word for word in the save or our copy | 34 / 39 | 16 / 16 |
+
+- **The 12 unreadable saves:**
+  - all 8 Instagram and Facebook posts;
+  - 3 web pages that refused us or were empty;
+  - a TikTok short link.
+
+  Instagram and Facebook are 35% of the pile's links, and we can't read them unless the user adds the file.
+- **v1's 5 misses** were captions where the model added punctuation the raw captions lack. The quote check in S4 must match loosely on transcripts.
+- **Re-run:** `eval/rerun_eval.py`, kept outside the repo because it reads the private export. The eval saves stay under `eval-s3` for S4 testing.
+
 ## The demo path test
 
 Playwright, on the demo user's data.

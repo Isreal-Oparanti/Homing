@@ -21,6 +21,8 @@ def get_engine() -> Engine:
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,
         connect_args={"prepare_threshold": None},
+        # Errors would otherwise quote the query's values, which can be save text (docs/09).
+        hide_parameters=True,
     )
 
 

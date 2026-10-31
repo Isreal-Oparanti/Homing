@@ -51,7 +51,7 @@ Every call declares a purpose. Each purpose fixes the model, prompt file, output
 | Purpose | Model | Prompt | Output schema | Timeout |
 |---|---|---|---|---|
 | `read.batch_links` | Spark | `prompts/read_batch_links.v1.md` | `list[Reading]` | 60s |
-| `read.text` | Spark | `read_text.v1.md` | `Reading` | 45s |
+| `read.text` | Spark | `read_text.v2.md` (v2 since 31 Oct: only facts someone could act on, a narrower `is_checkable`) | `Reading` | 90s |
 | `read.image` | Spark | `read_image.v1.md` | `Reading` | 45s |
 | `read.pdf` | Spark | `read_pdf.v1.md` | `Reading` | 90s |
 | `read.video` | Spark | `read_video.v1.md` | `Reading` | 120s |
@@ -82,12 +82,16 @@ result = gateway.run(
 
 1. **Guard:** check the private-save rule and the profile routing rule.
 2. **Cache:** `input_hash = sha256(model ‖ prompt_version ‖ canonical JSON of inputs)`. If an `ok` row exists in `model_calls`, return its output with no call and no cost.
-3. **Budget:** daily spend so far (`model_calls.cost_usd`) plus this call's estimate must stay under `MODEL_DAILY_BUDGET_USD`. Per user, it must stay under `MODEL_USER_DAILY_BUDGET_USD`. Over budget → `BudgetExceeded` → the job is re-queued for the next day and a system event is emitted.
+3. **Budget, in tokens** (Meta hasn't published prices, so dollars can't be counted yet). Two checks, each on tokens in plus out since midnight UTC, plus this call's estimate (characters / 4 + 1,500 for the output):
+   - everyone's total must stay under `MODEL_DAILY_TOKEN_BUDGET`;
+   - this user's must stay under `MODEL_USER_DAILY_TOKEN_BUDGET`, halved for the demo user.
+
+   Cached answers skip this check (they cost nothing). Over budget → `BudgetExceeded` → the job waits until just after midnight without using up an attempt. The save card says "Paused until tomorrow", and The team gets one "paused" line per user per day.
 4. **Concurrency:** a semaphore per provider (`SPARK_MAX_CONCURRENCY=6`, `TRANSCRIBE_MAX_CONCURRENCY=2`, `SPARK_OPEN_MAX_CONCURRENCY=2`).
 5. **Call:** JSON output requested via `response_format` (JSON schema if supported, else JSON mode **(confirm)**). Timeout per purpose.
 6. **Validate** with Pydantic. On failure, make **one** repair call that includes the validation error. If it fails again → `invalid_output`, raise `RetryableError` (max 2 job retries for this cause).
 7. **Retries:** 429 and 5xx → exponential backoff with jitter, honouring `Retry-After`, up to 3 tries inside the call. Anything beyond that goes back to the job runner.
-8. **Record** a `model_calls` row: tokens, latency, cost estimate (`PRICES` table in config, **(confirm)** with Meta's pricing), and status.
+8. **Record** a `model_calls` row: tokens, latency and status. `cost_usd` stays empty until Meta publishes prices.
 
 ## Prompts
 
@@ -172,8 +176,8 @@ SEARCH_PROVIDER, SEARCH_API_KEY
 YOUTUBE_API_KEY
 EMBED_MODEL=intfloat/multilingual-e5-small
 EMBED_DIM=384
-MODEL_DAILY_BUDGET_USD=10
-MODEL_USER_DAILY_BUDGET_USD=3
+MODEL_DAILY_TOKEN_BUDGET=5000000        # everyone, per day
+MODEL_USER_DAILY_TOKEN_BUDGET=1500000   # per user per day; the demo user gets half
 SPARK_MAX_CONCURRENCY=6
 TRANSCRIBE_MAX_CONCURRENCY=2
 SPARK_OPEN_MAX_CONCURRENCY=2

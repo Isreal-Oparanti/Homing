@@ -13,7 +13,7 @@ from app.db.repo.users import ensure_user
 from app.db.session import get_db
 from app.ingest.gather import Gathered, SnapshotIn
 from app.jobs.handlers import HANDLERS
-from app.jobs.runner import Runner
+from app.jobs.runner import JobContext, Runner
 from app.main import create_app
 from app.schemas.agents import KeyFacts
 from app.schemas.agents import Reading as ReadingOut
@@ -91,6 +91,11 @@ def test_secret_looking_note_is_private_and_not_echoed(client: TestClient) -> No
     body = res.json()
     assert body["visibility"] == "private" and body["text"] is None
 
+    keyed = "https://example.com/api?key=sk-abc123def456ghi789jkl012"
+    body = client.post("/api/v1/saves", json={"text": keyed}, headers=HEADERS).json()
+    assert body["visibility"] == "private"
+    assert (body["text"], body["url"], body["label"]) == (None, None, None)
+
 
 @pytest.mark.integration
 def test_read_one_writes_reading_snapshot_and_event(
@@ -109,11 +114,40 @@ def test_read_one_writes_reading_snapshot_and_event(
         event = db.scalars(select(AgentEvent).where(AgentEvent.save_id == save_id)).one()
         assert (event.agent, event.action) == ("what", "read")
         assert event.summary.startswith("Read a page: ")
+        assert [e["label"] for e in event.evidence] == ["Our copy of the page", "Original link"]
 
     card = client.get(f"/api/v1/saves/{save_id}", headers=HEADERS).json()
     assert card["what"]["title"] == "Afreximbank internship call"
     assert "what" not in card["pending"] and "for" in card
+    assert [(c["kind"], c["excerpt"]) for c in card["copies"]] == [
+        ("page_text", "Internship Opportunities. Cairo, Egypt.")
+    ]
     assert FakeGateway.calls[0]["purpose"] == "read.text"
+
+    listed = client.get("/api/v1/saves", headers=HEADERS).json()["items"]
+    assert listed[0]["title"] == "Afreximbank internship call"
+
+
+@pytest.mark.integration
+def test_any_error_on_the_last_attempt_fails_the_save(
+    client: TestClient,
+    sessions: sessionmaker[Session],
+    fakes: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def broken(save: Save) -> Gathered:
+        raise UnicodeDecodeError("utf-8", b"", 0, 1, "bad page")
+
+    monkeypatch.setattr(what_is_it, "_gather", broken)
+    save_id = client.post("/api/v1/saves", json={"text": AFREXIM}, headers=HEADERS).json()["id"]
+    with sessions() as db:
+        with pytest.raises(UnicodeDecodeError):
+            last_try = JobContext(db, 0, "save.read", ALICE.id, attempt=5, max_attempts=5)
+            what_is_it.read_one(last_try, {"save_id": save_id})
+        save = db.get(Save, save_id)
+        assert save is not None and save.status == "failed"
+        events = db.scalars(select(AgentEvent.action).where(AgentEvent.save_id == save_id)).all()
+        assert events == ["failed"]
 
 
 @pytest.mark.integration
@@ -127,6 +161,27 @@ def test_private_save_never_reaches_the_model(
     assert FakeGateway.calls == []
     with sessions() as db:
         assert db.get(Reading, save_id).title == "Kept private"  # type: ignore[union-attr]
+
+
+@pytest.mark.integration
+def test_only_the_owner_can_reveal_a_private_save(
+    client: TestClient, sessions: sessionmaker[Session]
+) -> None:
+    save_id = client.post(
+        "/api/v1/saves", json={"text": "8XK2-9QPL 7MZT-4WQR"}, headers=HEADERS
+    ).json()["id"]
+    card = client.get(f"/api/v1/saves/{save_id}", headers=HEADERS).json()
+    assert card["save"]["text"] is None
+
+    res = client.get(f"/api/v1/saves/{save_id}/reveal", headers=HEADERS)
+    assert res.json() == {"text": "8XK2-9QPL 7MZT-4WQR"}
+    assert res.headers["cache-control"] == "no-store"
+
+    with sessions() as db:
+        ensure_user(db, CurrentUser(id="u-bob", email="bob@example.com"))
+        db.commit()
+    bob = {**HEADERS, "X-Homing-User-Id": "u-bob", "X-Homing-User-Email": "bob@example.com"}
+    assert client.get(f"/api/v1/saves/{save_id}/reveal", headers=bob).status_code == 404
 
 
 @pytest.mark.integration

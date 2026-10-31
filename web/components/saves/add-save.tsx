@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -9,10 +9,12 @@ import { savesApi } from "@/lib/api";
 /** Paste anything: a link, a note, a post. It opens the save card straight away. */
 export function AddSave({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const save = useMutation({
     mutationFn: () => savesApi.create(text),
     onSuccess: (created) => {
+      void queryClient.invalidateQueries({ queryKey: ["saves"] });
       onClose();
       router.push(`/saves/${created.id}`);
     },

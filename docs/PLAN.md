@@ -43,11 +43,11 @@ People save things because they mean to use them. Three things go wrong.
 
 The cost is highest for people outside the default user that big products are built around. For them, the deadline is in another time zone, the rules may exclude their country, and nobody nearby has done it before.
 
-**Evidence from Isreal's WhatsApp "message yourself" chat** (624 messages, 28 Jun 2025 – 28 Oct 2026):
+**Evidence from Isreal's WhatsApp "message yourself" chat** (624 text messages, plus photos, videos and files, 28 Jun 2025 – 28 Oct 2026):
 
 | Finding | Detail |
 |---|---|
-| Most saves don't say why they were saved | About 6 in 10 messages are video links (YouTube, Instagram, Facebook). Only 13% of links have a label typed next to them. |
+| Most saves don't say why they were saved | About 6 in 10 messages are video links (YouTube, Instagram, Facebook). Few links say why: only 11 of 486 links have a label in the same message (counted 31 Oct). An earlier count gave 13%, which likely included labels sent as a separate message; settle the method before quoting it. |
 | Goals show up even though they were never written down | Getting into YC: 7 saves, from the YC account page (11 Sep 2025) to a funding digest (12 Oct 2026). Funding and opportunities: about 25. Speaking better: 10. Making a product demo video: 7. AI and agent engineering: about 15. |
 | What was needed had already been saved | The 12 Oct digest gives the YC Winter 2027 deadline as 2 Nov. Before this hackathon's demo video, 16 videos on speaking and demo-making were already saved. |
 | Things get saved twice | 4 items were saved again on a later day, one of them 11 weeks after the first time. |
@@ -85,8 +85,8 @@ Together, these give the theme fit. A save you trust, with a "when", stops takin
 Saving something (paste, upload, share, or importing the WhatsApp export) creates a **save card** with the four answers. Two examples from the real pile:
 
 > **Afreximbank internship call**, saved from a WhatsApp community post
-> - **What is it?** Internship programme, Cairo, on-site. $1,000 a month tax-free; $500 housing if you relocate.
-> - **Is it true?** The post left out the location, the second-language requirement, and that full-time study is only preferred. The post says it closes 31 Oct; the official posting shows no closing date. _(Each point links to the official line.)_
+> - **What is it?** An internship call from Afreximbank, read from the post.
+> - **Is it true?** The official posting adds what the post left out: it's on-site in Cairo, you need the second language too, full-time study is only preferred, and the $500 housing is only for interns who relocate. The post says it closes 31 Oct; the official posting shows no closing date. _(Each point links to the official line.)_
 > - **What's it for?** Funding and opportunities: your 26th save on this.
 > - **When will you need it?** Now. If it's real, it closes tomorrow. Needs your answer: do you have a working knowledge of French?
 
@@ -105,7 +105,7 @@ Each agent keeps its own memory, runs on its own schedule, and logs every action
 - **Does:** reads the save and writes down what it is and its key facts (dates, amounts, requirements, links). Keeps a copy of the content.
 - **How each kind of save is read:**
   - Text notes: directly.
-  - YouTube: title from oEmbed, plus description and chapters from the official YouTube Data API.
+  - YouTube: title from oEmbed, plus the captions (`youtube-transcript-api`, behind a flag; Isreal's decision, 31 Oct). Description and chapters from the YouTube Data API when a key is set.
   - X posts: text from the official oEmbed.
   - Web pages: one fetch.
   - Images, flyers and PDFs: Muse Spark.
@@ -277,7 +277,7 @@ There's no chat thread. You search, ask one question at a time, or run an audit,
 | Reading images, PDFs and video; one long pass over the library; comparing a post with its source | Muse Spark (OpenAI-compatible API at `api.meta.ai/v1`) | Confirm the exact model ID in the Meta dashboard. Third-party docs list `muse-spark-1.1` (text, image, video, PDF). |
 | Voice notes | Muse Voice Transcribe (`muse-voice-transcribe-1.0`) | Works (S0, 31 Oct): `/v1/asr/transcribe`, WAV only, so Opus is converted first. Accurate on a Nigerian-English note; a short Pidgin note worked too. |
 | Matching your profile against eligibility rules | Muse Spark Open on Baseten or Modal (`meta-models/muse-spark-open-1026`) | Needs partner credits |
-| YouTube details | YouTube oEmbed, plus the YouTube Data API (description, chapters) | Needs a Google API key |
+| YouTube details | YouTube oEmbed for the title; captions with `youtube-transcript-api` (behind `FEATURE_YT_CAPTIONS`); YouTube Data API for description and chapters | Captions decided 31 Oct (option 2). The Data API needs a Google key (optional) |
 | X posts | X oEmbed (publish.twitter.com) | Free, first post only |
 | Finding official sources | Links in the post first, then a search API | Check whether Meta's API includes web search |
 | Reel of moments | YouTube embed with start and end times | No downloading |
@@ -363,7 +363,7 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
 
 ## 16. Open questions
 
-- ~~Can Muse Spark take a YouTube link?~~ No (S0, 30 Oct). We use MP4 files we hold plus YouTube chapters. Still open: can Muse Spark Open read video?
+- ~~Can Muse Spark take a YouTube link?~~ No (S0, 30 Oct). We read YouTube's captions instead (Isreal's decision, 31 Oct), and MP4 files we hold go to Muse Spark. Still open: can Muse Spark Open read video?
 - Does Meta's API include web search? If not, which search API do we use?
 - ~~What are the exact model IDs?~~ Answered 30 Oct: `muse-spark-1.3` and `muse-voice-transcribe-1.0`, among others (see [06](06-models.md#models-on-our-key)). Also answered in S0: transcription is `POST /v1/asr/transcribe` (WAV); Spark takes images and PDFs inline as base64, and video as an MP4 URL ([06](06-models.md#what-the-s0-check-found-30-oct)).
 - Hosting: is Railway OK, or is the old Crowscap server still available? See [ADR 0007](adr/0007-hosting.md).
@@ -396,3 +396,10 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
 - **30 Oct, v6:** brand changed to warm glass with a red primary, a new "h" icon and a wordmark. Relic added as a close competitor.
 - **30 Oct, v7:** build slices with checkpoints added ([14-build-slices.md](14-build-slices.md)). Saturday's rough path uses pasted saves; the WhatsApp import moves to Monday.
 - **31 Oct, v8:** YouTube read through captions behind a flag (Isreal's decision, option 2; revisit after office hours). Voice Transcribe confirmed on real voice notes. Storage rules approved: text-only database; videos kept as 480p copies plus thumbnails; stickers, contact cards and nested zips skipped ([04](04-ingestion.md#storage-rules-approved-by-isreal-31-oct)).
+- **31 Oct, v9:** after the S3 audit (Isreal's yes to all):
+  - The sample Afreximbank card now shows "What is it?" from the post, and the facts only the official page has under "Is it true?".
+  - The YouTube lines in 5.2, 11 and 16 now match the captions decision.
+  - The label figure is stated with its method.
+  - Spending is capped in tokens per day (everyone, per user, half for the demo user) until Meta publishes prices.
+  - Rate limits are added to S5, before the public deploy.
+  - A Workable reader is added to S4's "Is it true?", because the official Afreximbank page only shows its description to a plain fetch.

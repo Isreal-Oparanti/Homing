@@ -60,7 +60,16 @@ def get_reading(db: Session, save_id: str) -> Reading | None:
 
 
 def snapshots_for(db: Session, save_id: str) -> Sequence[Snapshot]:
-    return db.scalars(select(Snapshot).where(Snapshot.save_id == save_id)).all()
+    return db.scalars(
+        select(Snapshot).where(Snapshot.save_id == save_id).order_by(Snapshot.id)
+    ).all()
+
+
+def readings_for(db: Session, save_ids: Sequence[str]) -> dict[str, Reading]:
+    if not save_ids:
+        return {}
+    rows = db.scalars(select(Reading).where(Reading.save_id.in_(save_ids))).all()
+    return {r.save_id: r for r in rows}
 
 
 def upsert_reading(db: Session, save_id: str, values: dict) -> None:

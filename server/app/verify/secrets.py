@@ -32,9 +32,15 @@ _API_KEY = re.compile(
     r"\b(sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[bpas]-[A-Za-z0-9-]{10,}"
     r"|LLM_\d{6,}_[A-Za-z0-9_-]{8,})"
 )
-_PASSWORD = re.compile(r"\b(password|passwd|pwd|pass)\s*[:=]\s*\S+", re.I)
+_PASSWORD = re.compile(
+    r"\b(password|passwd|pwd|pass)\s*[:=]\s*\S+"
+    r"|\b(password|passwd|passcode|pwd)\s+is\s+\S+",  # "my password is …"
+    re.I,
+)
 _LONG_TOKEN = re.compile(r"\b[A-Za-z0-9+/_=-]{32,}\b")
 _URL = re.compile(r"https?://\S+|www\.\S+", re.I)
+# A message that is only a long number: a meter token, voucher or PIN (phones are let through).
+_BARE_NUMBER = re.compile(r"\+?[\d\s-]+")
 _PHONE = re.compile(r"(?<!\d)(?:\+?234[\s-]?|0)[789][01]\d(?:[\s-]?\d){7}(?!\d)")
 
 
@@ -81,6 +87,13 @@ def _looks_like_seed_phrase(text: str) -> bool:
     return False
 
 
+def _looks_like_bare_number(text: str) -> bool:
+    text = text.strip()
+    if not _BARE_NUMBER.fullmatch(text) or _PHONE.fullmatch(text):
+        return False
+    return len(re.sub(r"\D", "", text)) >= 10
+
+
 def screen(text: str | None) -> ScreenResult:
     """Decide whether a save must stay private. Order: most specific first."""
     if not text or not text.strip():
@@ -101,7 +114,11 @@ def screen(text: str | None) -> ScreenResult:
         digits = re.sub(r"\D", "", match.group())
         if 13 <= len(digits) <= 19 and _luhn_ok(digits):
             return ScreenResult(True, "looks_like_card_number")
-    if _looks_like_backup_codes(text) or _looks_like_labelled_codes(text):
+    if (
+        _looks_like_backup_codes(text)
+        or _looks_like_labelled_codes(text)
+        or _looks_like_bare_number(text)
+    ):
         return ScreenResult(True, "looks_like_code")
     if _looks_like_seed_phrase(text):
         return ScreenResult(True, "looks_like_seed_phrase")

@@ -126,12 +126,22 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
   - an agent test using `FakeModelGateway` (replays recorded output);
   - an API test that `POST /saves` returns 202 and enqueues `save.read` once.
 - **If late:** TikTok and the Instagram/Facebook embed connectors wait. Those saves show the link only.
+- **As built (31 Oct, after the audit):**
+  - The platform readers live together in `ingest/gather.py`. `read.batch_links` isn't built: a list of links is read as one text until S7.
+  - Added so the proof is visible:
+    - The team shows evidence chips and links each entry to its save card.
+    - The save card shows "Our copy of the content".
+    - Threads lists every save until S9 groups them.
+  - Private saves stay hidden even from their owner until tapped (`GET /saves/{id}/reveal`).
+  - The gateway caps tokens per day (see [06](06-models.md#gateway-behaviour)).
+  - Prompt `read_text.v2` keeps only facts someone could act on and narrows `is_checkable`. Measured on 34 real saves in [11](11-testing-evals.md#what-is-it-on-the-real-pile-31-oct).
 
 ### S4 · Rough answers for the other three questions + rough Today
 - **Day:** Sat · **Estimate:** 3h · **Depends on:** S3
 - **Builds:** the simplest honest version of each remaining question.
   - **Is it true?:**
     - fetch the first link in the post and run `check.compare`;
+    - a **Workable reader**: a plain fetch of an `apply.workable.com` job page returns only its description. Its public job JSON (`/api/v2/accounts/{account}/jobs/{shortcode}`) has the location, languages, requirements and benefits, and Workable's robots.txt allows AI input. Without it, the Afreximbank example comes back "couldn't confirm";
     - `verify/quotes.py` runs **for real**, so the proof rule holds from day one;
     - no eligibility yet, and the verdict is `couldnt_confirm` or `nothing_to_check` until S6.
   - **What's it for?:** `place.assign` against the existing threads, creating new ones as needed.
@@ -148,7 +158,8 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
   - **Server host:** Railway (`api` and `worker` services from `server/Dockerfile`), or the fallback from [ADR 0007](adr/0007-hosting.md).
   - **Vercel:** the `web/` project.
   - **Config:** every env var from [10](10-deployment-ops.md#environment-variables), and the Google redirect URL.
-- **Done when:** **CP1** passes on the live URL ([10 · Deploy steps](10-deployment-ops.md#deploy-steps), smoke test).
+  - **Rate limits** from [09](09-security-privacy.md#rate-limits) (per user, fixed window in Postgres, 429 with `Retry-After`). The demo login is public once deployed, so these ship with the first deploy.
+- **Done when:** **CP1** passes on the live URL ([10 · Deploy steps](10-deployment-ops.md#deploy-steps), smoke test), and the 61st save in an hour gets a 429.
 - **If late:** keep going locally, but deploy before Sunday noon. Deploy surprises only get worse.
 
 ---

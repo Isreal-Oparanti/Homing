@@ -37,8 +37,10 @@ class Settings(BaseSettings):
     youtube_api_key: str = ""
     # YouTube captions via youtube-transcript-api (Isreal's decision, docs/adr/0008).
     feature_yt_captions: bool = True
-    # Spend guards. Prices aren't published yet, so cost is tracked only when known.
-    model_daily_budget_usd: float = 10.0
+    # Spend guards in tokens (in + out), because Meta hasn't published prices.
+    # The demo user gets half the per-user budget (docs/06-models.md#gateway-behaviour).
+    model_daily_token_budget: int = 5_000_000
+    model_user_daily_token_budget: int = 1_500_000
     spark_max_concurrency: int = 6
 
     @field_validator("database_url", "test_database_url")

@@ -4,18 +4,21 @@ See docs/03-agents.md#what-is-it. Never calls a model on a private save, never i
 it couldn't read, and never edits what the user saved.
 """
 
+from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import select
+
 from app.core.config import get_settings
-from app.db.models import Save, Snapshot
+from app.db.models import AgentEvent, Save, Snapshot
 from app.db.repo import saves as saves_repo
 from app.events.emitter import emit
 from app.ingest.fetch import SafeFetcher
 from app.ingest.gather import Gathered, gather_link
 from app.jobs import queue
-from app.jobs.errors import PermanentError, RetryableError
+from app.jobs.errors import DeferredError, PermanentError
 from app.jobs.runner import JobContext
-from app.llm.gateway import ModelGateway
+from app.llm.gateway import PURPOSES, ModelGateway
 from app.schemas.agents import Reading
 
 SNAPSHOT_CHARS_FOR_MODEL = 40_000  # about 10k tokens
@@ -39,6 +42,15 @@ KIND_WORDS = {
     "tiktok": "a TikTok",
     "web": "a page",
 }
+
+COPY_LABELS = {
+    "page_text": "Our copy of the page",
+    "post_text": "Our copy of the post",
+    "transcript": "Our copy of the captions",
+    "metadata": "Our copy of the title and description",
+}
+
+PAUSED = "Paused until tomorrow: today's reading budget is used up."
 
 # Tests swap these for fakes; agents never build clients themselves.
 gateway_factory: Any = ModelGateway
@@ -83,6 +95,28 @@ def _model_inputs(save: Save, gathered: Gathered, snapshots: list[Snapshot]) -> 
 
 def _small_meta(meta: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in meta.items() if k not in ("segments",)}
+
+
+def _note_pause_once(ctx: JobContext, user_id: str) -> None:
+    """One "paused" line in The team per user per day, not one per save."""
+    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    already = ctx.db.scalar(
+        select(AgentEvent.id)
+        .where(
+            AgentEvent.user_id == user_id,
+            AgentEvent.action == "paused",
+            AgentEvent.created_at >= today,
+        )
+        .limit(1)
+    )
+    if already is None:
+        emit(
+            ctx.db,
+            user_id=user_id,
+            agent="system",
+            action="paused",
+            summary="Paused reading: today's model budget is used up. It carries on tomorrow.",
+        )
 
 
 def _hand_over(ctx: JobContext, save: Save, reading: Reading) -> None:
@@ -157,7 +191,17 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
             inputs=_model_inputs(save, gathered, snapshots),
             save_ids=[save.id],
         )
-    except (RetryableError, PermanentError) as exc:
+    except DeferredError:
+        ctx.db.rollback()
+        paused = saves_repo.get_save(ctx.db, ctx.user_id, save.id)
+        if paused is not None:
+            paused.status = "received"
+            paused.error = PAUSED
+            _note_pause_once(ctx, paused.user_id)
+            ctx.db.commit()
+        raise
+    except Exception as exc:
+        # Any error, not only the model's: a save must never sit on "Reading it…" for good.
         if isinstance(exc, PermanentError) or ctx.attempt >= ctx.max_attempts:
             ctx.db.rollback()
             failed = saves_repo.get_save(ctx.db, ctx.user_id, save.id)
@@ -185,7 +229,7 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
             "is_checkable": reading.is_checkable,
             "is_opportunity": reading.is_opportunity,
             "model": get_settings().meta_spark_model,
-            "prompt_version": "read_text.v1",
+            "prompt_version": PURPOSES["read.text"].prompt.removesuffix(".md"),
         },
     )
     save.status = "ready"
@@ -193,7 +237,10 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
     thing = KIND_WORDS.get(
         save.platform or "", "a note" if save.kind == "note" else "a list of links"
     )
-    evidence = [{"label": "Our copy of the content", "snapshot_id": s.id} for s in snapshots[:2]]
+    evidence = [
+        {"label": COPY_LABELS.get(s.kind, "Our copy of the content"), "snapshot_id": s.id}
+        for s in snapshots[:2]
+    ]
     if save.url:
         evidence.append({"label": "Original link", "url": save.url})
     emit(

@@ -28,22 +28,23 @@ People's saves are personal. Our own pile contains phone numbers, an account num
 | Backup or recovery codes | a note made only of 4+ upper-case alphanumeric groups containing digits, e.g. `8XK2-9QPL` | private |
 | Labelled codes | "backup codes", "recovery codes", "2FA codes" followed by 2+ code-like groups, any case, digits only allowed (Google's are digits, GitHub's lower-case) | private |
 | Seed phrases | "seed phrase", "recovery phrase", "mnemonic" followed by 12+ words | private |
+| Bare long numbers | a message that is only a number of 10+ digits, spaced or dashed (meter tokens, vouchers, PINs), unless it's a phone number | private |
 | One-time codes | "code is 123456", "OTP" near 4–8 digits | private |
 | Nigerian bank account (NUBAN) | 10 digits near a bank name or "acct", "account" | private |
 | BVN or NIN | 11 digits near "BVN" or "NIN" | private |
 | Card numbers | 13–19 digits passing a Luhn check | private |
 | API keys and tokens | `sk-…`, `AKIA…`, `ghp_…`, `xox[bp]-…`, long high-entropy strings ≥ 32 chars | private |
-| Passwords | "password", "pwd", "pass:" followed by a value | private |
+| Passwords | "password", "pwd", "pass:" followed by a value, or "my password is …" | private |
 | Phone numbers | `+234…`, `0[789]0…` (11 digits) | **not private**, but **masked** before any model call and in the demo UI |
 
 **Private saves:**
-- stored and shown blurred to the owner only;
+- stored and shown blurred to the owner only. The text, link and label are left out of every API response; the owner taps **Show**, which calls `GET /saves/{id}/reveal` (`no-store`, owner only);
 - never sent to any model (the gateway refuses, see [06](06-models.md#providers));
 - never shown in The team or in exports;
 - `private_reason` stores the *type*, never the matched value;
 - never embedded, never returned by search, and never used in Ask answers or audits (audits only count them).
 
-**Logs** never contain save text, snapshots, model inputs or model outputs. Only IDs, sizes and statuses.
+**Logs** never contain save text, snapshots, model inputs or model outputs. Only IDs, sizes and statuses. Two guards make this hold for errors too: the database engine runs with `hide_parameters=True`, so errors never quote query values, and the job runner logs only the error's type (the full message goes to `jobs.last_error` in the database).
 
 ## SSRF and fetching
 

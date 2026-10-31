@@ -11,6 +11,8 @@ from fastapi import Depends, Header
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError
 
+DEMO_USER_ID = "demo"  # the "Try the demo" login (web/lib/auth.ts)
+
 
 @dataclass(frozen=True)
 class CurrentUser:

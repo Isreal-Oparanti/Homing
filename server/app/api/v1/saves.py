@@ -3,13 +3,13 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.auth import CurrentUser, require_user
 from app.core.errors import AppError
-from app.db.models import Save
+from app.db.models import Save, Snapshot
 from app.db.repo import saves as saves_repo
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
@@ -18,6 +18,7 @@ from app.jobs import queue
 router = APIRouter(prefix="/saves", tags=["saves"])
 
 MAX_TEXT = 20_000
+COPY_EXCERPT_CHARS = 1_500
 
 
 class SaveIn(BaseModel):
@@ -40,8 +41,39 @@ class SaveOut(BaseModel):
     def of(cls, save: Save) -> "SaveOut":
         out = cls.model_validate(save, from_attributes=True)
         if save.visibility == "private":
-            out.text = None  # shown blurred in the UI; never echoed back
+            # Never echoed back; the owner taps Show (GET /saves/{id}/reveal). The link and
+            # label go too, since a key inside a URL is one reason a save is private.
+            out.text = out.url = out.label = None
         return out
+
+
+class SaveListItem(SaveOut):
+    title: str | None = None
+    what: str | None = None
+
+
+class CopyOut(BaseModel):
+    """Our copy of the content, kept at save time: the proof behind "What is it?"."""
+
+    id: str
+    kind: str
+    source_url: str | None
+    chars: int
+    excerpt: str
+
+    @classmethod
+    def of(cls, snap: Snapshot) -> "CopyOut":
+        return cls(
+            id=snap.id,
+            kind=snap.kind,
+            source_url=snap.source_url,
+            chars=len(snap.text),
+            excerpt=snap.text[:COPY_EXCERPT_CHARS],
+        )
+
+
+class PrivateText(BaseModel):
+    text: str
 
 
 class WhatOut(BaseModel):
@@ -58,11 +90,12 @@ class SaveCard(BaseModel):
     true: dict[str, Any] | None = None
     for_: dict[str, Any] | None = Field(default=None, serialization_alias="for")
     when: dict[str, Any] | None = None
+    copies: list[CopyOut] = Field(default_factory=list)
     pending: list[str]
 
 
 class SavePage(BaseModel):
-    items: list[SaveOut]
+    items: list[SaveListItem]
     next_cursor: str | None
 
 
@@ -97,8 +130,19 @@ def list_saves(
     db: Session = Depends(get_db),
 ) -> SavePage:
     rows = saves_repo.list_saves(db, user.id, limit=limit, before_id=cursor)
+    readings = saves_repo.readings_for(db, [s.id for s in rows])
+    items = []
+    for s in rows:
+        reading = readings.get(s.id)
+        items.append(
+            SaveListItem(
+                **SaveOut.of(s).model_dump(),
+                title=reading.title if reading else None,
+                what=reading.what if reading else None,
+            )
+        )
     return SavePage(
-        items=[SaveOut.of(s) for s in rows],
+        items=items,
         next_cursor=rows[-1].id if len(rows) == limit else None,
     )
 
@@ -123,5 +167,21 @@ def save_card(
     return SaveCard(
         save=SaveOut.of(save),
         what=WhatOut.model_validate(reading, from_attributes=True) if reading else None,
+        copies=[CopyOut.of(snap) for snap in saves_repo.snapshots_for(db, save.id)],
         pending=pending,
     )
+
+
+@router.get("/{save_id}/reveal", response_model=PrivateText)
+def reveal(
+    save_id: str,
+    response: Response,
+    user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> PrivateText:
+    """The owner's own text, shown on tap. Private saves leave out their text everywhere else."""
+    save = saves_repo.get_save(db, user.id, save_id)
+    if save is None or save.text is None:
+        raise AppError("save_not_found", "That save doesn't exist.", status=404)
+    response.headers["Cache-Control"] = "no-store"
+    return PrivateText(text=save.text)

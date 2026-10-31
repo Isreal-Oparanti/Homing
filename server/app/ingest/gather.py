@@ -209,7 +209,7 @@ def gather_x(url: str, fetcher: SafeFetcher) -> Gathered:
     }
     return Gathered(
         snapshots=[SnapshotIn("post_text", text, f"https://x.com/i/status/{sid}", meta)],
-        notes=["Only the first post of a thread can be read. Add screenshots for the rest."],
+        notes=["If this post starts a thread, only this first post can be read."],
     )
 
 

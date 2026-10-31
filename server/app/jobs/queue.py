@@ -121,6 +121,22 @@ def fail(db: Session, job: ClaimedJob, error: str, *, retryable: bool) -> str:
     return status
 
 
+def defer(db: Session, job: ClaimedJob, until: datetime, reason: str) -> None:
+    """Put a job back until `until`. The attempt it just used doesn't count."""
+    db.execute(
+        update(Job)
+        .where(Job.id == job.id)
+        .values(
+            status="queued",
+            run_after=until,
+            attempts=Job.attempts - 1,
+            locked_by=None,
+            locked_at=None,
+            last_error=reason[:2000],
+        )
+    )
+
+
 def requeue_stuck(db: Session, older_than: timedelta = STUCK_AFTER) -> int:
     """Put back jobs whose worker probably died mid-run. Returns how many were requeued."""
     cutoff = datetime.now(UTC) - older_than

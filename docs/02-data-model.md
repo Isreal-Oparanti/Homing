@@ -40,7 +40,7 @@ erDiagram
 | name | text | |
 | image_url | text null | |
 | tz | text | IANA zone, default `Africa/Lagos` |
-| is_demo | bool | demo user, reset nightly |
+| is_demo | bool | demo user (set when the id is `demo`), reset nightly |
 | created_at | timestamptz | |
 
 ### profiles

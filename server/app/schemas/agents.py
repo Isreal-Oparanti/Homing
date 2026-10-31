@@ -30,7 +30,8 @@ class Reading(BaseModel):
     what: str = Field(description="One plain sentence saying what this is, at most 160 characters.")
     key_facts: KeyFacts = Field(default_factory=KeyFacts)
     is_checkable: bool = Field(
-        description="True if it states dates, requirements, prices or outside claims."
+        description="True only for claims an official source could confirm: deadlines, "
+        "eligibility, prices, offers, availability, event dates."
     )
     is_opportunity: bool = Field(
         description="True for grants, programmes, jobs, competitions, scholarships, hackathons."

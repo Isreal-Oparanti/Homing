@@ -60,8 +60,8 @@ YOUTUBE_API_KEY=
 EMBED_MODEL=intfloat/multilingual-e5-small
 EMBED_DIM=384
 
-MODEL_DAILY_BUDGET_USD=10
-MODEL_USER_DAILY_BUDGET_USD=3
+MODEL_DAILY_TOKEN_BUDGET=5000000
+MODEL_USER_DAILY_TOKEN_BUDGET=1500000
 
 # Feature flags (kill switches)
 FEATURE_CHECKS=true
@@ -128,7 +128,7 @@ FEATURE_AUDIT=true
 | Save card stuck on "Working on it…" | `queue_lag_s` in `/health/deep`; jobs `running` > 15 min | Restart `worker`; stuck jobs requeue themselves. If `queue_lag_s` keeps growing, lower `WORKER_THREADS` (rate limits) or pause imports. |
 | Many `invalid_output` model calls | `model_calls` grouped by purpose and status | Look at one failing output; bump the prompt version with a clearer schema; redeploy. |
 | 429s from Meta | `model_calls.error` | Lower `SPARK_MAX_CONCURRENCY`. Backoff already applies. |
-| Budget exceeded | `/health/deep` spend | Raise `MODEL_DAILY_BUDGET_USD` if credits allow; otherwise imports wait until tomorrow. |
+| Budget exceeded | A "Paused reading" line in The team; save cards say "Paused until tomorrow" | Raise `MODEL_DAILY_TOKEN_BUDGET` or `MODEL_USER_DAILY_TOKEN_BUDGET` if credits allow; otherwise paused reads carry on just after midnight UTC. |
 | Checks all `couldnt_confirm` | Search provider errors; official pages 403 | Set `FEATURE_SEARCH_FOR_SOURCES=false` and rely on post links; tell the user plainly. |
 | Live feed not updating | Browser devtools EventSource; `/api/stream` status | Vercel function timeout (reconnect is automatic); check `HOMING_API_URL`. |
 | Upload fails | Signed URL expired; bucket policy | Re-sign; check the bucket is private and the service key is set. |

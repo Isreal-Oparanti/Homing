@@ -136,7 +136,19 @@ export type Reading = {
 
 export type Answer = "what" | "true" | "for" | "when";
 
-export type SaveCard = { save: SaveSummary; what: Reading | null; pending: Answer[] };
+/** Our copy of the content, kept at save time. */
+export type Copy = {
+  id: string;
+  kind: "page_text" | "post_text" | "transcript" | "metadata" | string;
+  sourceUrl: string | null;
+  chars: number;
+  excerpt: string;
+};
+
+export type SaveCard = { save: SaveSummary; what: Reading | null; copies: Copy[]; pending: Answer[] };
+
+/** A row in the saves list: the save plus its reading's title, when there is one. */
+export type SaveListItem = SaveSummary & { title: string | null; what: string | null };
 
 type RawSave = {
   id: string;
@@ -150,6 +162,8 @@ type RawSave = {
   visibility: SaveSummary["visibility"];
   error: string | null;
 };
+
+type RawCopy = { id: string; kind: string; source_url: string | null; chars: number; excerpt: string };
 
 type RawReading = {
   title: string;
@@ -178,10 +192,26 @@ export const savesApi = {
   async create(text: string): Promise<SaveSummary> {
     return toSave(await api<RawSave>("saves", { method: "POST", body: JSON.stringify({ text }) }));
   },
-  async get(id: string): Promise<SaveCard> {
-    const raw = await api<{ save: RawSave; what: RawReading | null; pending: Answer[] }>(
-      `saves/${encodeURIComponent(id)}`,
+  async list(): Promise<SaveListItem[]> {
+    const page = await api<{ items: (RawSave & { title: string | null; what: string | null })[] }>(
+      "saves?limit=50",
     );
+    return page.items.map((raw) => ({ ...toSave(raw), title: raw.title, what: raw.what }));
+  },
+  /** The owner's own text of a private save, fetched only when they tap Show. */
+  async reveal(id: string): Promise<string> {
+    const raw = await api<{ text: string }>(`saves/${encodeURIComponent(id)}/reveal`, {
+      cache: "no-store",
+    });
+    return raw.text;
+  },
+  async get(id: string): Promise<SaveCard> {
+    const raw = await api<{
+      save: RawSave;
+      what: RawReading | null;
+      copies: RawCopy[];
+      pending: Answer[];
+    }>(`saves/${encodeURIComponent(id)}`);
     return {
       save: toSave(raw.save),
       what: raw.what && {
@@ -191,6 +221,13 @@ export const savesApi = {
         isCheckable: raw.what.is_checkable,
         isOpportunity: raw.what.is_opportunity,
       },
+      copies: raw.copies.map((c) => ({
+        id: c.id,
+        kind: c.kind,
+        sourceUrl: c.source_url,
+        chars: c.chars,
+        excerpt: c.excerpt,
+      })),
       pending: raw.pending,
     };
   },
