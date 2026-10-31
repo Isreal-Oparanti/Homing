@@ -274,6 +274,14 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
   - `card.prep` job.
   - **web:** `PrepSheet` (5 points, each with chips like `Video · 4:12`, plus "they agree" and "they disagree") and `ReelPlayer` (YouTube embed playing start/end segments, at most 3 minutes).
 - **Done when:** the demo-video prep card opens a sheet whose points cite exact seconds in Isreal's saved speaking and demo videos, and clicking a chip plays from that second.
+- **Built early (31 Oct test, Isreal's call):** `agents/prep.py` and `verify/timestamps.py`, with the purposes `video.points` and `prep.sheet`.
+  - **Run:** the 13 saved YouTube videos (10 speaking, 3 on making demos) for "Recording my 3-minute demo video".
+  - **Result:** all 13 had captions. 56 points were kept and 3 dropped by code: a second that wasn't a real caption start, a quote not said there, or a number the speaker never said ("10-minute"). No sheet citation was dropped.
+  - **Time:** about 40s to read all the videos (4 at a time) and 22–33s for the sheet.
+  - **Left for S12:**
+    - the card and the trigger;
+    - the 2 Instagram demo examples, which need the export's MP4s;
+    - the reel player in the app.
 - **If late:**
   - the reel goes first (PLAN cut order);
   - YouTube videos are read through their **captions** (Isreal's decision, 31 Oct); if captions are off or blocked, the sheet is built from chapters, titles and descriptions, and labelled "from chapters".

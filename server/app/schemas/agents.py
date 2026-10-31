@@ -78,3 +78,43 @@ class Placement(BaseModel):
         default=None, description="A new goal, 2-5 words, e.g. 'Getting into YC'. Or null."
     )
     reason: str = Field(description="One short line on why it serves that goal.")
+
+
+class VideoPoint(BaseModel):
+    point: str = Field(
+        description="One practical thing to do, in plain words, e.g. 'Pause before key points.'"
+    )
+    t_start: int = Field(description="The second this point starts, from a transcript line.")
+    t_end: int = Field(description="The second it ends.")
+    quote: str = Field(
+        description="Words copied exactly from the transcript between t_start and t_end."
+    )
+
+
+class VideoPoints(BaseModel):
+    """What one video says that helps with the moment. Code checks every second and quote."""
+
+    points: list[VideoPoint] = Field(default_factory=list, max_length=6)
+
+
+class Cite(BaseModel):
+    video: str = Field(description="A video id from POINTS, e.g. 'V3'.")
+    t: int = Field(description="The t_start of a point from that video, exactly as given.")
+
+
+class SheetItem(BaseModel):
+    text: str = Field(description="One plain sentence.")
+    cites: list[Cite] = Field(min_length=1)
+
+
+class Disagreement(BaseModel):
+    topic: str
+    sides: list[SheetItem] = Field(min_length=2, max_length=3)
+
+
+class PrepSheet(BaseModel):
+    """The prep sheet for a moment, built only from verified points (docs/03, card.prep)."""
+
+    agree: list[SheetItem] = Field(default_factory=list, max_length=6)
+    disagree: list[Disagreement] = Field(default_factory=list, max_length=3)
+    checklist: list[SheetItem] = Field(default_factory=list, max_length=5)

@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.db.models import ModelCall, Save, User
 from app.jobs.errors import DeferredError, PermanentError, RetryableError
-from app.schemas.agents import Placement, ProposedCheck, Reading
+from app.schemas.agents import Placement, PrepSheet, ProposedCheck, Reading, VideoPoints
 from app.verify.secrets import mask_phones
 
 T = TypeVar("T", bound=BaseModel)
@@ -44,6 +44,8 @@ PURPOSES: dict[str, Purpose] = {
     # Comparing with a source is the hardest call, so it keeps the default reasoning effort.
     "check.compare": Purpose("check.compare", "check_compare.v1.md", ProposedCheck, 120),
     "place.assign": Purpose("place.assign", "place_assign.v1.md", Placement, 45, "low"),
+    "video.points": Purpose("video.points", "video_points.v1.md", VideoPoints, 120, "low"),
+    "prep.sheet": Purpose("prep.sheet", "prep_sheet.v1.md", PrepSheet, 120),
 }
 
 
