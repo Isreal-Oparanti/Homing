@@ -3,12 +3,12 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.auth import CurrentUser
 from app.core.config import Settings, get_settings
-from app.db.models import AgentEvent, Job
+from app.db.models import AgentEvent, Job, User
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
 from app.events.emitter import emit
@@ -167,3 +167,25 @@ def test_team_feed_is_per_user(sessions: sessionmaker[Session]) -> None:
     }
     items = client.get("/api/v1/team", headers=headers).json()["items"]
     assert [i["summary"] for i in items] == ["for alice"]
+
+
+@pytest.mark.integration
+def test_me_creates_the_user_once(sessions: sessionmaker[Session]) -> None:
+    def override_db():  # type: ignore[no-untyped-def]
+        with sessions() as session:
+            yield session
+
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(proxy_secret="s")
+    app.dependency_overrides[get_db] = override_db
+    client = TestClient(app)
+    headers = {
+        "X-Homing-Proxy-Secret": "s",
+        "X-Homing-User-Id": ALICE.id,
+        "X-Homing-User-Email": ALICE.email,
+    }
+    for _ in range(2):
+        response = client.get("/api/v1/me", headers=headers)
+        assert response.json() == {"id": ALICE.id, "email": ALICE.email, "name": None}
+    with sessions() as db:
+        assert db.scalar(select(func.count()).select_from(User)) == 1

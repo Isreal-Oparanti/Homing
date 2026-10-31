@@ -1,4 +1,10 @@
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+
+import { SignInButtons } from "@/components/auth/sign-in-buttons";
 import { Logo } from "@/components/brand/logo";
+import { authOptions, DEMO_ENABLED, GOOGLE_ENABLED } from "@/lib/auth";
 
 const questions = [
   { q: "What is it?", a: "Every save is read, whatever the format: links, flyers, PDFs, voice notes, videos." },
@@ -7,9 +13,19 @@ const questions = [
   { q: "When will you need it?", a: "Each save gets a date or moment, and comes back then with the next step." },
 ];
 
+/** Signed-in visitors go straight to Today. Reading the session is request-time work. */
+async function RedirectIfSignedIn() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.id) redirect("/today");
+  return null;
+}
+
 export default function Home() {
   return (
     <main className="mx-auto max-w-6xl px-5 pb-24 pt-6">
+      <Suspense fallback={null}>
+        <RedirectIfSignedIn />
+      </Suspense>
       <nav className="glass mx-auto flex max-w-3xl items-center justify-between rounded-full py-2.5 pl-5 pr-3">
         <Logo />
         <a
@@ -30,12 +46,7 @@ export default function Home() {
           Links, flyers, voice notes, videos. Homing reads every save, checks it against the source,
           and brings it back at the right moment.
         </p>
-        <a
-          href="#how-it-works"
-          className="mt-8 inline-block rounded-full bg-red px-6 py-3 text-sm font-semibold text-white shadow-[0_6px_20px_rgb(210_64_47/0.35)] hover:bg-red-600"
-        >
-          See how it works
-        </a>
+        <SignInButtons demo={DEMO_ENABLED} google={GOOGLE_ENABLED} />
       </section>
 
       <section id="how-it-works" className="grid gap-4 sm:grid-cols-2">

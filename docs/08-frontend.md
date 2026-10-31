@@ -143,3 +143,11 @@ Each one is designed and built:
 ## Design tokens
 
 The tokens, type and logo come from [13-brand.md](13-brand.md). Define them as CSS variables in `app/globals.css` and map them into the Tailwind theme, so components use `bg-glass`, `text-ink`, `bg-red` and so on, never raw hex values. Surfaces use the glass tokens (`--glass` + backdrop blur) over the warm background glows, with a solid fallback. Dark mode is out of scope for the hackathon.
+
+## Next 16 notes (learned building S2)
+
+- **Auth:** `next-auth` 4.24.15 (supports Next 16). Demo login is a credentials provider with id `demo`. Google is added automatically when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. User ids: `demo`, or `google:{sub}`.
+- **Cache Components are on by default.** Reading the session (`getServerSession`) is request-time work, so it must sit inside `<Suspense>`. The `(app)` layout and the landing page's "already signed in?" check both do this. The rest of each page pre-renders as a static shell.
+- **No `export const dynamic`** in route handlers. It's rejected with Cache Components, and handlers that read the request are dynamic anyway.
+- **Testing in a hidden browser tab:** React 19 reveals streamed content on an animation frame, and hidden tabs pause animation frames. Streamed sections can look stuck in a background tab while working fine in a visible one.
+- **Dev server on Windows:** if `npm run dev` crashes with Turbopack error `0xc0000142` (a CSS helper process failing to start), use `npm run build && npm run start` to check the app. This was seen when the dev server was started from a background shell.
