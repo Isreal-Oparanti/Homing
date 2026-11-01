@@ -7,6 +7,7 @@ secret screen, and are read at low priority. Running the same export again adds 
 import hashlib
 import re
 import zipfile
+import zlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -34,6 +35,11 @@ MAX_TOTAL_BYTES = 2 * 1024**3
 MAX_ENTRIES = 20_000
 MAX_MEDIA_BYTES = 50 * 1024**2  # the storage bucket's limit per file
 COMMIT_EVERY = 50
+DAMAGED = (
+    "Couldn't open this export. It may be damaged or cut short: export the chat again "
+    "from WhatsApp and import the new file."
+)
+STOPPED = "The import stopped before it finished. Try importing the file again."
 
 # What each kind of file becomes. Files not listed here are skipped and counted.
 SAVE_KINDS = {
@@ -82,6 +88,10 @@ class Export:
             data = f.read(MAX_MEDIA_BYTES + 1)
         return data if len(data) <= MAX_MEDIA_BYTES else None
 
+    def close(self) -> None:
+        if self.archive is not None:
+            self.archive.close()  # Windows can't delete the upload while it's open
+
 
 def _safe_name(name: str) -> bool:
     path = PurePosixPath(name.replace("\\", "/"))
@@ -91,21 +101,32 @@ def _safe_name(name: str) -> bool:
 def open_export(path: Path) -> Export:
     """The chat text and the files beside it. Refuses unsafe zips before reading anything."""
     if not zipfile.is_zipfile(path):
+        with path.open("rb") as f:
+            if f.read(4) == b"PK\x03\x04":
+                raise ImportRefused(DAMAGED)  # a zip whose end is missing
         return Export(chat=path.read_bytes().decode("utf-8-sig", errors="replace"))
     archive = zipfile.ZipFile(path)
-    infos = [i for i in archive.infolist() if not i.is_dir()]
-    if len(infos) > MAX_ENTRIES or sum(i.file_size for i in infos) > MAX_TOTAL_BYTES:
-        raise ImportRefused("This export is too big to import.")
-    if not all(_safe_name(i.filename) for i in infos):
-        raise ImportRefused("This zip has unsafe file paths, so Homing didn't open it.")
-    chats = [i for i in infos if i.filename.lower().endswith(".txt")]
-    chat = next((i for i in chats if "whatsapp chat" in i.filename.lower()), None)
-    if chat is None and len(chats) == 1:
-        chat = chats[0]
-    if chat is None:
-        raise ImportRefused("There's no WhatsApp chat file in this zip.")
-    files = {PurePosixPath(i.filename).name: i for i in infos if i is not chat}
-    text = archive.read(chat).decode("utf-8-sig", errors="replace")
+    try:
+        # A cut-short export can still look like a zip: Python then finds the directory of a
+        # zip stored inside it. A real export's first file starts at its very first byte.
+        if min((i.header_offset for i in archive.infolist()), default=0) != 0:
+            raise ImportRefused(DAMAGED)
+        infos = [i for i in archive.infolist() if not i.is_dir()]
+        if len(infos) > MAX_ENTRIES or sum(i.file_size for i in infos) > MAX_TOTAL_BYTES:
+            raise ImportRefused("This export is too big to import.")
+        if not all(_safe_name(i.filename) for i in infos):
+            raise ImportRefused("This zip has unsafe file paths, so Homing didn't open it.")
+        chats = [i for i in infos if i.filename.lower().endswith(".txt")]
+        chat = next((i for i in chats if "whatsapp chat" in i.filename.lower()), None)
+        if chat is None and len(chats) == 1:
+            chat = chats[0]
+        if chat is None:
+            raise ImportRefused("There's no WhatsApp chat file in this zip.")
+        files = {PurePosixPath(i.filename).name: i for i in infos if i is not chat}
+        text = archive.read(chat).decode("utf-8-sig", errors="replace")
+    except BaseException:
+        archive.close()
+        raise
     return Export(chat=text, files=files, archive=archive)
 
 
@@ -143,6 +164,13 @@ def _media_save(
 
 def run_import(db: Session, storage: Storage, imp: Import, path: Path, tz: str) -> dict[str, Any]:
     export = open_export(path)
+    try:
+        return _import(db, storage, imp, export, tz)
+    finally:
+        export.close()
+
+
+def _import(db: Session, storage: Storage, imp: Import, export: Export, tz: str) -> dict[str, Any]:
     chat = parse(export.chat)
     if not chat.messages:
         raise ImportRefused("This doesn't look like a WhatsApp chat export.")
@@ -216,10 +244,16 @@ def import_whatsapp(ctx: JobContext, payload: dict[str, Any]) -> None:
         counts = run_import(
             ctx.db, storage_factory(), imp, path, owner.tz if owner else "Africa/Lagos"
         )
-    except (ImportRefused, zipfile.BadZipFile, FileNotFoundError) as exc:
+    except Exception as exc:
+        # A refused or damaged export won't get better by trying again. Anything else gets the
+        # usual retries, and the import says it failed on the last one: never "Opening…" for good.
+        damaged = isinstance(exc, (zipfile.BadZipFile, OSError, EOFError, zlib.error))
+        final = isinstance(exc, ImportRefused) or damaged
+        if not final and ctx.attempt < ctx.max_attempts:
+            raise
         ctx.db.rollback()
         imp.status = "failed"
-        imp.error = str(exc) if isinstance(exc, ImportRefused) else "Couldn't open this export."
+        imp.error = str(exc) if isinstance(exc, ImportRefused) else DAMAGED if damaged else STOPPED
         imp.finished_at = datetime.now(UTC)
         ctx.db.commit()
         path.unlink(missing_ok=True)

@@ -239,6 +239,19 @@ def test_a_zip_with_unsafe_paths_is_refused(
 
 
 @pytest.mark.integration
+def test_an_export_cut_short_fails_with_a_plain_message_instead_of_hanging(
+    client: TestClient, sessions: sessionmaker[Session]
+) -> None:
+    whole = _export()
+    sent = _upload(client, whole[:-300])  # the end of a zip holds its table of contents
+    _run_import(sessions)
+    with sessions() as db:
+        imp = db.get(Import, sent["id"])
+        assert imp is not None and imp.status == "failed"
+        assert imp.error == importer.DAMAGED
+
+
+@pytest.mark.integration
 def test_a_file_that_isnt_a_chat_is_refused(
     client: TestClient, sessions: sessionmaker[Session]
 ) -> None:
