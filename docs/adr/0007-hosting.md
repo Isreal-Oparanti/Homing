@@ -18,7 +18,7 @@ We need a live URL for judges, an always-on worker, no cold starts during the de
 
 ## As built (1 Nov 2026)
 - **API on AWS, not Railway** (Isreal, 1 Nov: for speed), in `eu-west-3` (Paris), the same region as the Supabase database. Every request makes several database round trips, so this is where most of the speed comes from.
-- **Plain EC2, no Docker** (Isreal, 1 Nov): Python and `uv`, `ffmpeg`, two systemd services (`homing-api`, `homing-worker`) and Caddy for HTTPS at `homing-api.crowscap.xyz`. On one small server Docker would only add memory and slower deploys. Separate services mean restarting the API never cuts off a job. Files: `deploy/ec2/`.
+- **Plain EC2, no Docker** (Isreal, 1 Nov): Python and `uv`, `ffmpeg`, two systemd services (`homing-api`, `homing-worker`) and Caddy for HTTPS at `homing-api.crowscap.xyz`. Docker isn't on Isreal's laptop, so an image couldn't be tested before it ships, while `uv` and systemd run the server the same way it runs locally. On one small server Docker would also only add memory and slower deploys. Separate services mean restarting the API never cuts off a job. Files: `deploy/ec2/`.
 - **Vercel functions** run in `cdg1` (Paris, `web/vercel.json`), next to the database.
 
 ## Consequences
