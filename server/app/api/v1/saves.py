@@ -356,7 +356,14 @@ def save_card(
                 seen.setdefault(q["id"], q)
         questions = list(seen.values())
     true = true_out(check, user_tz, questions, save.url)
-    if true is None and reading is not None and not reading.is_checkable and not is_private:
+    worth_checking = reading is not None and (
+        reading.is_checkable or reading.is_opportunity or len(reading.items or []) >= 2
+    )
+    if true is None and worth_checking and save.import_id and not is_private:
+        if "true" not in pending and save.status == "ready":
+            # Is it true? held off: an imported opportunity that looks closed or old.
+            true = {"verdict": "not_checked"}
+    elif true is None and reading is not None and not reading.is_checkable and not is_private:
         true = {"verdict": "nothing_to_check"}
 
     for_ = None
@@ -388,6 +395,30 @@ class AnswerIn(BaseModel):
 
 class AnswerOut(BaseModel):
     summary: str
+
+
+@router.post("/{save_id}/check", status_code=202)
+def check_now(
+    save_id: str,
+    user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
+    """Check a save Is it true? held off on (an imported opportunity that looked closed)."""
+    save = saves_repo.get_save(db, user.id, save_id)
+    if save is None:
+        raise AppError("save_not_found", "That save doesn't exist.", status=404)
+    if save.visibility == "private":
+        raise AppError("private", "Private saves are never sent to AI.", status=409)
+    queue.enqueue(
+        db,
+        "save.check",
+        {"save_id": save.id},
+        user_id=user.id,
+        priority=queue.PRIORITY_USER,
+        dedupe_key=f"check:{save.id}",
+    )
+    db.commit()
+    return {"queued": True}
 
 
 @router.post("/{save_id}/answer", response_model=AnswerOut)

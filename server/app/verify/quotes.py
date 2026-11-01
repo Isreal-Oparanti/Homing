@@ -77,3 +77,13 @@ def match_quote(quote: str, source: str) -> QuoteMatch | None:
     if end <= start:
         return None
     return QuoteMatch(round(found.score, 1), where[start], where[end - 1] + 1)
+
+
+def appears_in(words: str, source: str) -> bool:
+    """Whether `words` were copied from `source`: exactly once spacing, case and punctuation
+    are evened out (short facts like "Lagos" or "$100k"), or as a close quote (longer ones)."""
+    q, _ = _normalise(words)
+    src, _ = _normalise(source)
+    if not q or not src:
+        return False
+    return q in src or match_quote(words, source) is not None

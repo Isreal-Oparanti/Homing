@@ -259,8 +259,31 @@ function TrueAnswerView({
       }
     },
   });
+  const checkNow = useMutation({
+    mutationFn: () => savesApi.checkNow(saveId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["save", saveId] }),
+  });
 
   if (answer.verdict === "nothing_to_check") return <Muted>Nothing to check.</Muted>;
+  if (answer.verdict === "not_checked") {
+    return (
+      <div>
+        <p className="text-sm text-ink-2">
+          Not checked yet. It came in with your WhatsApp import and looks closed or old, so Homing held off to
+          save effort.
+        </p>
+        <button
+          type="button"
+          onClick={() => checkNow.mutate()}
+          disabled={checkNow.isPending || checkNow.isSuccess}
+          className="mt-2 rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {checkNow.isSuccess ? "Checking…" : "Check it now"}
+        </button>
+        {checkNow.isError && <p className="mt-1 text-sm text-red">{checkNow.error.message}</p>}
+      </div>
+    );
+  }
   // Questions Homing remembers for every opportunity (age, languages, country) come first;
   // the ones only this opportunity needs come after.
   const questions = [

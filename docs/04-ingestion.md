@@ -49,6 +49,12 @@ How things come in, and how **What is it?** gets content to read. Code lives in 
 - **Files:** photos and PDFs are read as in S7. Videos, voice notes and Office documents are stored and marked "kept, not read yet" (step 2 reads them with Meta's models). Videos are stored as they are for now; the 480p copy comes later (Isreal's videos total 185 MB, the largest 15 MB, under the bucket's 50 MB per-file limit).
 - **Skipped and counted:** stickers (`STK-`), contact cards, zips inside the zip, files the export left out, empty and punctuation-only messages.
 - **Zip safety:** paths with `..` or a drive or root are refused before anything is read; 2 GB and 20k entries at most; each file 50 MB at most.
+- **Token budget for an import (1 Nov, Isreal: "we need to optimize for token management" while staying agentic):**
+  - **Nothing to read, no model:** a link whose content can't be fetched (Instagram and Facebook posts, dead pages) and that carries no words of the person's own is kept with an honest note instead of a model's guess. With a label or text, the agent reads those words.
+  - **Shorter input:** an imported save sends the reader at most 8,000 characters (fresh saves: 40,000). The first reading needs the gist; Is it true? reads the official page itself.
+  - **Read together:** small saves are read 20 per call (`read.batch`). Measured on 20 of Isreal's saves with the real model: 40,703 tokens one at a time, 9,322 together (77% fewer), all 20 returned, the same opportunity call on 20 of 20, titles equivalent.
+  - **Only open opportunities are checked:** an imported opportunity is checked when a date it names is still ahead, or when it names none and was saved in the last six months. Otherwise Is it true? says in The team why it held off ("Didn't check …: its date passed on …"), and the card offers **Check it now**.
+  - **Low priority:** an import's checks, placements and dates wait behind anything saved by hand.
 - **Where the upload waits:** the API writes it to `IMPORT_DIR` on its own disk, and only a worker on the same machine can read it. That's why jobs have lanes ([03](03-agents.md)).
 
 ### Storage rules (approved by Isreal, 31 Oct)

@@ -253,6 +253,8 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **If late:** media read as "kept, not read yet". Text and links still go through.
 
 - **As built, step 1 (1 Nov):** parser, importer, `POST /imports/whatsapp` (upload ticket, straight to the API), `GET /imports/{id}`, the Import page (upload progress, then live counts, then a summary), and job lanes. Photos and PDFs are read; videos, voice notes and Word docs are kept, not read yet.
+  - **Token-light import (1 Nov):** no model where there's nothing to read, 8,000-character input for imported saves, 20 small saves per call (77% fewer tokens, measured), checks only for opportunities still open. Estimate for Isreal's pile: about 0.6 to 0.8 million tokens instead of about 3 million.
+  - **Isreal's pile goes into his own account** (Google sign-in, `GOOGLE_ALLOWED_EMAILS`), not the demo account: it's personal.
   - **Step 2:** read videos and voice notes with Meta's models.
   - **Still to do for the done-when:** import Isreal's real export, and check counts, reading time and that a second run is a cache hit.
 

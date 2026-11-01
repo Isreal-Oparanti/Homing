@@ -4,13 +4,13 @@ See docs/03-agents.md#what-is-it. Never calls a model on a private save, never i
 it couldn't read, and never edits what the user saved.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
 
 from app.core.config import get_settings
-from app.db.models import AgentEvent, Media, Save, Snapshot
+from app.db.models import AgentEvent, Media, Save, Snapshot, User
 from app.db.repo import saves as saves_repo
 from app.events.emitter import emit
 from app.ingest.fetch import SafeFetcher
@@ -21,11 +21,22 @@ from app.jobs import queue
 from app.jobs.errors import DeferredError, PermanentError
 from app.jobs.runner import JobContext
 from app.llm.gateway import PURPOSES, Attachment, ModelGateway
-from app.schemas.agents import FileReading, Reading
+from app.schemas.agents import BatchItem, FileReading, KeyFacts, ListItem, Reading
 from app.storage import get_storage
+from app.verify.dates import display, parse_deadline
+from app.verify.quotes import appears_in
 from app.verify.secrets import screen
 
 SNAPSHOT_CHARS_FOR_MODEL = 40_000  # about 10k tokens
+# Imported saves are a backlog: the first reading needs the gist, and Is it true? reads the
+# official page itself. About 2k tokens.
+BACKLOG_CHARS_FOR_MODEL = 8_000
+# An imported opportunity with no date is checked only if it was saved this recently.
+STALE_AFTER = timedelta(days=180)
+# An import's small saves are read up to BATCH_SIZE at a time in one call (read.batch).
+BATCH_SIZE = 20
+BATCH_ITEM_CHARS = 2_000  # more to read than this, and a save gets a call of its own
+BATCH_KINDS = ("link", "note", "list")
 
 PRIVATE_REASONS = {
     "looks_like_code": "it looks like a code",
@@ -138,7 +149,7 @@ def _gather(save: Save) -> Gathered:
 
 def _model_inputs(save: Save, gathered: Gathered, snapshots: list[Snapshot]) -> dict[str, Any]:
     content = []
-    budget = SNAPSHOT_CHARS_FOR_MODEL
+    budget = BACKLOG_CHARS_FOR_MODEL if save.import_id else SNAPSHOT_CHARS_FOR_MODEL
     for snap in snapshots:
         text = snap.text[:budget]
         budget -= len(text)
@@ -199,8 +210,12 @@ def _hand_over(ctx: JobContext, save: Save, reading: Reading) -> None:
     # Opportunities are always checked: even a bare link is the page whose rules and date matter.
     # Lists are checked item by item too.
     to_check = reading.is_checkable or reading.is_opportunity or len(reading.items) >= 2
+    if to_check and save.import_id and not _still_open(ctx, save, reading):
+        to_check = False
     nxt = ["save.check"] if to_check else ["save.when"]
     nxt += ["save.place", "save.embed"]
+    # An import's saves wait behind anything the person saves by hand.
+    priority = queue.PRIORITY_BACKLOG if save.import_id else queue.PRIORITY_USER
     for kind in nxt:
         if kind in HANDLERS:
             prefix = kind.split(".")[1]
@@ -209,9 +224,50 @@ def _hand_over(ctx: JobContext, save: Save, reading: Reading) -> None:
                 kind,
                 {"save_id": save.id},
                 user_id=save.user_id,
-                priority=queue.PRIORITY_USER,
+                priority=priority,
                 dedupe_key=f"{prefix}:{save.id}",
             )
+
+
+def _still_open(ctx: JobContext, save: Save, reading: Reading) -> bool:
+    """For a save brought in by an import: is checking it worth the model's time? Yes if a
+    date it names is still ahead, or if it names none and was saved in the last six months.
+    Otherwise Is it true? says why it held off, and the card offers to check it anyway."""
+    owner = ctx.db.get(User, save.user_id)
+    tz = owner.tz if owner else "Africa/Lagos"
+    now = datetime.now(UTC)
+    dates = [
+        d.at
+        for fact in reading.key_facts.dates
+        if fact.role in ("deadline", "event")
+        and (d := parse_deadline(fact.text, base=save.saved_at, user_tz=tz))
+    ]
+    if dates and max(dates) > now:
+        return True
+    if not dates and now - save.saved_at < STALE_AFTER:
+        return True
+    why = (
+        f"its date passed on {display(max(dates), tz)}"
+        if dates
+        else f"it was saved on {display(save.saved_at, tz).split(',')[0]} and names no date"
+    )
+    emit(
+        ctx.db,
+        user_id=save.user_id,
+        agent="true",
+        action="held_off",
+        summary=f"Didn't check {reading.title}: {why}. Tap Check it now if you still want it.",
+        save_id=save.id,
+    )
+    return False
+
+
+def _own_words(save: Save) -> bool:
+    """Whether the person wrote anything with the link: a label, or text around it."""
+    words = save.text or ""
+    for url in find_urls(words):
+        words = words.replace(url, "")
+    return bool(save.label or words.strip())
 
 
 def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
@@ -294,6 +350,10 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
         ]
         ctx.db.add_all(snapshots)
         ctx.db.flush()
+        if file_reading is None and save.kind == "link" and not snapshots and not _own_words(save):
+            # Nothing came back and the person wrote nothing: a model could only guess.
+            _nothing_to_read(ctx, save, gathered)
+            return
         reading: Reading = file_reading or gateway_factory(ctx.db).run(
             "read.text",
             user_id=save.user_id,
@@ -328,6 +388,13 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
                 ctx.db.commit()
         raise
 
+    _finish(ctx, save, reading, snapshots, "read.file" if file_reading else "read.text")
+
+
+def _finish(
+    ctx: JobContext, save: Save, reading: Reading, snapshots: list[Snapshot], purpose: str
+) -> None:
+    """Store the reading, tell The team, and hand over to the next questions."""
     saves_repo.upsert_reading(
         ctx.db,
         save.id,
@@ -339,9 +406,7 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
             "is_opportunity": reading.is_opportunity,
             "items": [i.model_dump() for i in reading.items] or None,
             "model": get_settings().meta_spark_model,
-            "prompt_version": PURPOSES[
-                "read.file" if file_reading is not None else "read.text"
-            ].prompt.removesuffix(".md"),
+            "prompt_version": PURPOSES[purpose].prompt.removesuffix(".md"),
         },
     )
     save.status = "ready"
@@ -369,3 +434,163 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
         evidence=evidence,
     )
     _hand_over(ctx, save, reading)
+
+
+def _nothing_to_read(ctx: JobContext, save: Save, gathered: Gathered) -> None:
+    thing = KIND_WORDS.get(save.platform or "", "a link")
+    note = gathered.notes[0] if gathered.notes else "Homing couldn't open this link."
+    saves_repo.upsert_reading(
+        ctx.db,
+        save.id,
+        {
+            "title": f"{thing[0].upper()}{thing[1:]} you saved",
+            "what": note,
+            "key_facts": {},
+            "is_checkable": False,
+            "is_opportunity": False,
+            "model": "none",
+            "prompt_version": "none",
+        },
+    )
+    save.status = "ready"
+    save.error = None
+    emit(
+        ctx.db,
+        user_id=save.user_id,
+        agent="what",
+        action="nothing_to_read",
+        summary=f"Kept {thing} without guessing at it: {note}",
+        save_id=save.id,
+        evidence=[{"label": "Original link", "url": save.url}] if save.url else [],
+    )
+
+
+def _enqueue_read(ctx: JobContext, save: Save) -> None:
+    queue.enqueue(
+        ctx.db,
+        "save.read",
+        {"save_id": save.id},
+        user_id=save.user_id,
+        priority=queue.PRIORITY_BACKLOG if save.import_id else queue.PRIORITY_USER,
+        dedupe_key=f"read:{save.id}",
+    )
+
+
+def _own_facts_only(item: BatchItem, save: Save, snapshots: list[Snapshot]) -> Reading:
+    """A batch reading keeps only facts found in its own save's words, so saves read together
+    can never borrow from each other."""
+    own = "\n".join(
+        [save.text or "", save.label or "", save.url or ""]
+        + [s.text[:BATCH_ITEM_CHARS] for s in snapshots]
+    )
+    facts = item.key_facts
+    kept = KeyFacts(
+        dates=[d for d in facts.dates if appears_in(d.text, own)],
+        amounts=[a for a in facts.amounts if appears_in(a.text, own)],
+        requirements=[r for r in facts.requirements if appears_in(r.text, own)],
+        links=[u for u in facts.links if u in own],
+        organisations=[o for o in facts.organisations if appears_in(o, own)],
+        places=[p for p in facts.places if appears_in(p, own)],
+    )
+    items = [
+        ListItem(name=i.name, url=i.url if i.url and i.url in own else None, note=i.note)
+        for i in item.items
+        if appears_in(i.name, own)
+    ]
+    return Reading(
+        title=item.title,
+        what=item.what,
+        key_facts=kept,
+        is_checkable=item.is_checkable,
+        is_opportunity=item.is_opportunity,
+        items=items,
+    )
+
+
+def read_batch(ctx: JobContext, payload: dict[str, Any]) -> None:
+    """What is it? for an import's small saves, up to 20 in one model call, so the instructions
+    are sent once instead of 20 times. A save with more to read gets a call of its own; a
+    private save, or one with nothing to read, never reaches the model."""
+    if ctx.user_id is None:
+        raise PermanentError("save.read_batch needs a user.")
+    ids = [str(i) for i in payload.get("save_ids", [])][:BATCH_SIZE]
+    saves = [
+        s
+        for i in ids
+        if (s := saves_repo.get_save(ctx.db, ctx.user_id, i)) is not None and s.status == "received"
+    ]
+    gateway = gateway_factory(ctx.db)
+    try:
+        batch: list[tuple[str, Save, Gathered, list[Snapshot]]] = []
+        for save in saves:
+            if save.visibility == "private" or save.kind not in BATCH_KINDS:
+                _enqueue_read(ctx, save)  # private and file saves have their own path
+                continue
+            gathered = _gather(save)
+            snapshots = [
+                Snapshot(
+                    save_id=save.id, kind=x.kind, source_url=x.source_url, text=x.text, meta=x.meta
+                )
+                for x in gathered.snapshots
+            ]
+            ctx.db.add_all(snapshots)
+            ctx.db.flush()
+            if save.kind == "link" and not snapshots and not _own_words(save):
+                _nothing_to_read(ctx, save, gathered)
+            elif sum(len(x.text) for x in snapshots) > BATCH_ITEM_CHARS:
+                inputs = _model_inputs(save, gathered, snapshots)
+                reading = gateway.run(
+                    "read.text", user_id=save.user_id, inputs=inputs, save_ids=[save.id]
+                )
+                _finish(ctx, save, reading, snapshots, "read.text")
+            else:
+                batch.append((f"S{len(batch) + 1}", save, gathered, snapshots))
+        if not batch:
+            return
+        out = gateway.run(
+            "read.batch",
+            user_id=ctx.user_id,
+            inputs={
+                "saves": [
+                    {"id": sid, **_model_inputs(save, gathered, snapshots)}
+                    for sid, save, gathered, snapshots in batch
+                ]
+            },
+            save_ids=[save.id for _, save, _, _ in batch],
+        )
+        got = {r.id: r for r in out.readings}
+        read = 0
+        for sid, save, _gathered, snapshots in batch:
+            item = got.get(sid)
+            if item is None:
+                _enqueue_read(ctx, save)  # skipped by the model: read it on its own
+                continue
+            _finish(ctx, save, _own_facts_only(item, save, snapshots), snapshots, "read.batch")
+            read += 1
+        if read > 1:
+            emit(
+                ctx.db,
+                user_id=ctx.user_id,
+                agent="what",
+                action="read_batch",
+                summary=f"Read {read} small saves together in one go, to save effort.",
+            )
+    except DeferredError:
+        ctx.db.rollback()
+        for save in saves:
+            paused = saves_repo.get_save(ctx.db, ctx.user_id, save.id)
+            if paused is not None and paused.status == "received":
+                paused.error = PAUSED
+        _note_pause_once(ctx, ctx.user_id)
+        ctx.db.commit()
+        raise
+    except Exception as exc:
+        if isinstance(exc, PermanentError) or ctx.attempt >= ctx.max_attempts:
+            # Reading together keeps failing: read each save on its own instead.
+            ctx.db.rollback()
+            for save in saves:
+                fresh = saves_repo.get_save(ctx.db, ctx.user_id, save.id)
+                if fresh is not None and fresh.status == "received":
+                    _enqueue_read(ctx, fresh)
+            ctx.db.commit()
+        raise

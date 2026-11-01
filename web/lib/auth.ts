@@ -7,6 +7,13 @@ export const GOOGLE_ENABLED = Boolean(
   process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
 );
 
+// Google sign-in only for the emails listed here (comma-separated), so strangers can't spend
+// the model budget; judges use the demo. Empty: anyone with a Google account.
+const GOOGLE_ALLOWED = (process.env.GOOGLE_ALLOWED_EMAILS ?? "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 const providers: NextAuthOptions["providers"] = [];
 
 if (GOOGLE_ENABLED) {
@@ -37,6 +44,10 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   pages: { signIn: "/" },
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider !== "google" || GOOGLE_ALLOWED.length === 0) return true;
+      return GOOGLE_ALLOWED.includes((user.email ?? "").toLowerCase());
+    },
     async jwt({ token, user, account }) {
       if (user) {
         token.uid =

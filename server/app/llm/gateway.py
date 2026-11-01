@@ -25,6 +25,7 @@ from app.core.config import Settings, get_settings
 from app.db.models import ModelCall, Save, User
 from app.jobs.errors import DeferredError, PermanentError, RetryableError
 from app.schemas.agents import (
+    BatchReadings,
     FileReading,
     Placement,
     PrepSheet,
@@ -64,6 +65,8 @@ class Purpose:
 
 PURPOSES: dict[str, Purpose] = {
     "read.text": Purpose("read.text", "read_text.v3.md", Reading, 90, "low"),
+    # Up to 20 small saves from an import at once: the instructions are sent once, not 20 times.
+    "read.batch": Purpose("read.batch", "read_batch.v1.md", BatchReadings, 150, "low"),
     "read.file": Purpose("read.file", "read_file.v1.md", FileReading, 120, "low"),
     # Comparing with a source is the hardest call, so it keeps the default reasoning effort.
     "check.compare": Purpose("check.compare", "check_compare.v2.md", ProposedCheck, 120),

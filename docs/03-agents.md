@@ -40,6 +40,7 @@ def handle_save_read(ctx: JobContext, payload: SaveReadPayload) -> None: ...
 | `save.read` | API on new save; import | `what_is_it.read_one` | 10 user / 90 import | `read:{save_id}` |
 | | **Lanes (1 Nov):** every job carries `lane` (`JOB_LANE`, "main" in production, "dev" on a laptop). Workers take and requeue only their own lane's jobs, because development and production share the database and an upload exists only on the machine that received it. | | | |
 | `save.read_batch` | import (small link saves) | `what_is_it.read_batch` | 90 | `readb:{hash of ids}` |
+| | **As built (1 Nov):** the importer queues its notes, links and lists 20 to a job (`readb:{first save id}`). Each save is opened as usual; one with nothing to read is kept without a model; one with more than 2,000 characters gets its own `read.text`; the rest share one `read.batch` call. Code keeps only facts found in each save's own words, so saves read together can't borrow from each other. A save the model skips, or a batch that keeps failing, falls back to `save.read`. | | | |
 | `save.check` | after read, if `is_checkable` | `is_it_true.check` | 20 | `check:{save_id}` |
 | `save.place` | after read | `whats_it_for.place` | 30 | `place:{save_id}` |
 | `save.when` | after check (or after read if not checkable) | `when_needed.set_when` | 30 | `when:{save_id}` |

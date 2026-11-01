@@ -202,8 +202,12 @@ def test_an_export_with_media_imports_and_a_second_run_adds_nothing(
         assert link.saved_at == datetime(2026, 10, 28, 8, 1, tzinfo=UTC)  # 09:01 in Lagos
         assert saves["image"].text == "Flyer from the hub"
         assert saves["note"].visibility == "private"
+        # The link waits to be read together with other small saves; the private note, the
+        # image and the video are read on their own.
         reads = db.scalars(select(Job).where(Job.kind == "save.read")).all()
-        assert len(reads) == 4 and {j.priority for j in reads} == {90}
+        assert len(reads) == 3 and {j.priority for j in reads} == {90}
+        batch = db.scalars(select(Job).where(Job.kind == "save.read_batch")).one()
+        assert batch.payload["save_ids"] == [link.id] and batch.priority == 90
     assert not list((tmp_path / "imports").iterdir())  # the upload is deleted
 
     shown = client.get(f"/api/v1/imports/{first['id']}", headers=_headers()).json()

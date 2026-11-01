@@ -165,6 +165,8 @@ export type TrueAnswer = {
     | "needs_your_answer"
     | "couldnt_confirm"
     | "nothing_to_check"
+    /** An imported opportunity that looked closed or old, so Is it true? held off. */
+    | "not_checked"
     | "checked";
   officialUrl: string | null;
   /** The save is just a link to the official page itself. */
@@ -440,6 +442,10 @@ export const savesApi = {
       body: JSON.stringify({ question_id: questionId, value }),
     });
     return raw.summary;
+  },
+  /** Check a save Is it true? held off on. */
+  async checkNow(id: string): Promise<void> {
+    await api(`saves/${encodeURIComponent(id)}/check`, { method: "POST" });
   },
   /** The owner's own text of a private save, fetched only when they tap Show. */
   async reveal(id: string): Promise<string> {

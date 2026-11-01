@@ -63,6 +63,20 @@ class Reading(BaseModel):
         return v if len(v) <= 200 else v[:199].rstrip() + "…"
 
 
+class BatchItem(Reading):
+    """One save's reading inside a batch, matched back by its id."""
+
+    id: str = Field(description="The save's id from SAVES, e.g. 'S3'.")
+
+
+class BatchReadings(BaseModel):
+    """What is it? for up to 20 small saves read in one call."""
+
+    readings: list[BatchItem] = Field(
+        max_length=20, description="One reading per save in SAVES, in the same order."
+    )
+
+
 class ProposedFinding(BaseModel):
     point: str = Field(
         description="One plain sentence for the person, e.g. 'It's on-site in Cairo.'"

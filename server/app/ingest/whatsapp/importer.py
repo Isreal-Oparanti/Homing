@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.agents.what_is_it import BATCH_KINDS, BATCH_SIZE
 from app.core.config import get_settings
 from app.db.models import Import, Save, User
 from app.db.repo import media as media_repo
@@ -199,6 +200,20 @@ def _import(db: Session, storage: Storage, imp: Import, export: Export, tz: str)
         ).all()
     }
     hashes = set(db.scalars(select(Save.content_hash).where(Save.user_id == imp.user_id)).all())
+    batch: list[str] = []  # small text saves waiting to be read together
+
+    def read_batch() -> None:
+        if batch:
+            queue.enqueue(
+                db,
+                "save.read_batch",
+                {"save_ids": list(batch)},
+                user_id=imp.user_id,
+                priority=queue.PRIORITY_BACKLOG,
+                dedupe_key=f"readb:{batch[0]}",
+            )
+            batch.clear()
+
     for n, item in enumerate(planned, 1):
         if item.attachment:
             save = _media_save(db, storage, imp.user_id, item, export, counts)
@@ -219,17 +234,24 @@ def _import(db: Session, storage: Storage, imp: Import, export: Export, tz: str)
                 imported.add((save.saved_at, save.content_hash))
                 db.add(save)
                 db.flush()
-                queue.enqueue(
-                    db,
-                    "save.read",
-                    {"save_id": save.id},
-                    user_id=imp.user_id,
-                    priority=queue.PRIORITY_BACKLOG,
-                    dedupe_key=f"read:{save.id}",
-                )
+                if save.kind in BATCH_KINDS and save.visibility == "normal":
+                    batch.append(save.id)
+                    if len(batch) == BATCH_SIZE:
+                        read_batch()
+                else:
+                    queue.enqueue(
+                        db,
+                        "save.read",
+                        {"save_id": save.id},
+                        user_id=imp.user_id,
+                        priority=queue.PRIORITY_BACKLOG,
+                        dedupe_key=f"read:{save.id}",
+                    )
         if n % COMMIT_EVERY == 0:
+            read_batch()  # every committed save already has its reading queued
             imp.counts = {**imp.counts, **counts, "done": n}
             db.commit()
+    read_batch()
     imp.counts = {**imp.counts, **counts, "done": len(planned)}
     return counts
 
