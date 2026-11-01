@@ -119,6 +119,14 @@ def test_pasting_is_not_quoting() -> None:
             False,
             False,
         ),
+        # YC's page, 1 Nov: "on-time" made the date search find only "8pm".
+        (
+            "The deadline to apply on-time is November 2 at 8pm PT",
+            datetime(2026, 11, 1, 10, tzinfo=UTC),
+            "Tue 3 Nov, 05:00",
+            True,
+            True,
+        ),
     ],
 )
 def test_deadlines(

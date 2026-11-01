@@ -45,6 +45,7 @@ _MONTH = re.compile(
     re.I,
 )
 _NUMERIC_DATE = re.compile(r"\b\d{1,2}[/.]\d{1,2}[/.]\d{2,4}\b")
+_LETTER_HYPHEN = re.compile(r"(?<=[A-Za-z])-(?=[A-Za-z])")
 END_OF_DAY = time(23, 59)
 
 
@@ -94,8 +95,11 @@ def _find(text: str, local_base: datetime) -> tuple[str, datetime] | None:
         "DATE_ORDER": "DMY",
         "RETURN_AS_TIMEZONE_AWARE": False,
     }
-    # Labels like "Date limite :" can throw the search off, so also try what follows them.
-    for candidate in (text, text.rsplit(":", 1)[-1]):
+    # Some words throw the search off, so also try what follows a label ("Date limite :")
+    # and the text with hyphens between letters as spaces ("apply on-time is November 2 at
+    # 8pm" finds only "8pm").
+    candidates = (text, text.rsplit(":", 1)[-1], _LETTER_HYPHEN.sub(" ", text))
+    for candidate in dict.fromkeys(candidates):
         found = search_dates(candidate, languages=["en", "fr"], settings=settings) or []
         for words, parsed in found:
             if _is_a_date(words):
