@@ -41,8 +41,32 @@ class SupabaseStorage:
     """Supabase Storage over its REST API, with the service key (server only)."""
 
     def __init__(self, url: str, key: str, bucket: str):
-        self.base = f"{url.rstrip('/')}/storage/v1/object/{bucket}"
-        self.headers = {"Authorization": f"Bearer {key}", "apikey": key}
+        self.root = f"{url.rstrip('/')}/storage/v1"
+        self.bucket = bucket
+        self.base = f"{self.root}/object/{bucket}"
+        # New secret keys (sb_secret_…) aren't JWTs and go in `apikey` alone; the older
+        # service_role key is a JWT and goes in both.
+        self.headers = (
+            {"apikey": key}
+            if key.startswith("sb_")
+            else {"Authorization": f"Bearer {key}", "apikey": key}
+        )
+
+    def ensure_bucket(self) -> bool:
+        """Create the private bucket if it's missing. True if it was created."""
+        res = httpx.get(f"{self.root}/bucket/{self.bucket}", headers=self.headers, timeout=30)
+        if res.status_code == 200:
+            if res.json().get("public"):
+                raise RuntimeError(f"Bucket {self.bucket!r} is public; it must be private.")
+            return False
+        res = httpx.post(
+            f"{self.root}/bucket",
+            json={"id": self.bucket, "name": self.bucket, "public": False},
+            headers=self.headers,
+            timeout=30,
+        )
+        res.raise_for_status()
+        return True
 
     def put(self, key: str, data: bytes, mime: str) -> None:
         res = httpx.post(

@@ -108,7 +108,7 @@ Each connector returns `Gathered(snapshots: list[Snapshot], media_urls: list[str
 - If the content type is PDF, hand over to the PDF connector.
 
 ### Files (`files.py`), as built in S7
-- **Upload:** `POST /saves/file` through the web proxy: 1–6 images, or one PDF, 10 MB each. Vercel limits a request to about 4.5 MB, so bigger files will need the signed-upload route (`/uploads/sign`) before launch.
+- **Upload:** `POST /saves/file`: 1–6 images, or one PDF, 10 MB each. The browser sends the files straight to the API with a 5-minute upload ticket from the web server, because Vercel limits a request to about 4.5 MB ([07](07-api.md#conventions)).
 - **Types** are sniffed from the bytes (PNG, JPEG, WebP, GIF, PDF), never from the name.
 - **Storage:** `STORAGE_BACKEND=local` in development (git-ignored `server/data/`), `supabase` in production (private bucket `saves`). Keys are `u/{user_id}/{sha256}.{ext}`, so the same file is stored once.
 - **Reading:**

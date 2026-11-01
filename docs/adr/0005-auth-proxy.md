@@ -13,4 +13,7 @@ This approach worked in the current Crowscap: Next.js owns the Google session, a
 
 ## Consequences
 - **Gains:** one auth system, no tokens in the browser, and no CORS.
-- **Costs:** the proxy adds a hop, and Vercel's body and time limits apply. So uploads go direct to storage, and SSE reconnects with `Last-Event-ID`.
+- **Costs:** the proxy adds a hop, and Vercel's body and time limits apply. So SSE reconnects with `Last-Event-ID`, and uploads skip the proxy.
+
+## Update (1 Nov 2026)
+Uploads go from the browser straight to the API with a 5-minute ticket that the Next.js server signs (HMAC, key derived from `PROXY_SECRET`). Only `POST /saves/file` accepts it. CORS is open for that call; the API never reads cookies, so that's safe.

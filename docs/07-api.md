@@ -7,6 +7,7 @@ FastAPI. Base path `/api/v1`. The API is called only by the Next.js server ([ADR
 - **Auth headers** (set by the Next.js proxy):
   - `X-Homing-Proxy-Secret`: must equal `PROXY_SECRET`, else 401;
   - `X-Homing-User-Id`, `X-Homing-User-Email`, `X-Homing-User-Name`.
+  - **One exception, uploads (1 Nov):** `POST /saves/file` also takes `Authorization: Bearer <upload ticket>`, so the browser can send files straight to the API (Vercel caps request bodies at about 4.5 MB). The web server's `POST /api/upload-ticket` signs `{uid, email, name?, exp}` with an HMAC key derived from `PROXY_SECRET`; a ticket lasts 5 minutes. CORS allows any origin for `POST` with `Authorization`, which gives nothing away because the API never reads cookies.
 - **JSON:** request and response bodies are Pydantic models in `server/app/schemas/api.py`. Field names are `snake_case`; the web app maps them to camelCase in `web/lib/api.ts`.
 - **Slow work** returns `202 Accepted` with the created resource. Progress arrives over SSE.
 - **Pagination** is cursor-based: `?cursor=<opaque>&limit=<≤100>` → `{items, next_cursor}`.
@@ -45,7 +46,7 @@ FastAPI. Base path `/api/v1`. The API is called only by the Next.js server ([ADR
 |---|---|---|---|
 | POST | `/saves` | `{text}` (may contain links) | `202 Save` |
 | POST | `/saves/file` | `{storage_key, note?}` | `202 Save` |
-| | | **As built (S7):** multipart `files` (1–6 images, or one PDF, 10 MB each) plus an optional `note` | `202 Save`. The type is sniffed from the bytes (415 otherwise). Several images become one save read in order (screenshots of one thread). The same file twice is stored once (`media.sha256`). |
+| | | **As built (S7, ticket 1 Nov):** sent by the browser straight to the API with an upload ticket; multipart `files` (1–6 images, or one PDF, 10 MB each) plus an optional `note` | `202 Save`. The type is sniffed from the bytes (415 otherwise). Several images become one save read in order (screenshots of one thread). The same file twice is stored once (`media.sha256`). |
 | GET | `/saves/{id}/files/{n}` | — | the owner's file `n` (image or PDF) for the card; 404 for anyone else |
 | GET | `/saves` | `?thread_id&status&cursor&limit` | `{items: SaveSummary[], next_cursor}`. Each item also carries the reading's `title` and `what` when there is one. |
 | GET | `/saves/{id}` | — | `SaveCard` |

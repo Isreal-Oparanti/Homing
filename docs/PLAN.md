@@ -366,7 +366,7 @@ When stuck, re-read section 1, then section 8, then the cut order in section 12.
 - ~~Can Muse Spark take a YouTube link?~~ No (S0, 30 Oct). We read YouTube's captions instead (Isreal's decision, 31 Oct), and MP4 files we hold go to Muse Spark. Still open: can Muse Spark Open read video?
 - Does Meta's API include web search? If not, which search API do we use?
 - ~~What are the exact model IDs?~~ Answered 30 Oct: `muse-spark-1.3` and `muse-voice-transcribe-1.0`, among others (see [06](06-models.md#models-on-our-key)). Also answered in S0: transcription is `POST /v1/asr/transcribe` (WAV); Spark takes images and PDFs inline as base64, and video as an MP4 URL ([06](06-models.md#what-the-s0-check-found-30-oct)).
-- Hosting: is Railway OK, or is the old Crowscap server still available? See [ADR 0007](adr/0007-hosting.md).
+- ~~Hosting: is Railway OK, or is the old Crowscap server still available?~~ Answered 1 Nov: the API goes on AWS (Paris), the web app on Vercel. See [ADR 0007](adr/0007-hosting.md).
 - Does Meta offer an embedding model? We found none, so we run a small open model ourselves. See [ADR 0003](adr/0003-search-ask-audit.md).
 - How does the Community Vote work, and when does voting open?
 - What's the YouTube Data API key setup?

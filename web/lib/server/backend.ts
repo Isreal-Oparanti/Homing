@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHmac } from "node:crypto";
+
 import type { Session } from "next-auth";
 import { NextResponse } from "next/server";
 
@@ -23,6 +25,27 @@ export function identityHeaders(session: Session): Record<string, string> | null
     // Header values must be plain ASCII; skip names that aren't.
     ...(name && ASCII.test(name) ? { "X-Homing-User-Name": name } : {}),
   };
+}
+
+const TICKET_SECONDS = 300; // server/app/core/auth.py
+
+/**
+ * A short-lived ticket that lets the browser send files straight to the API: Vercel caps
+ * request bodies at 4.5 MB, and files may be 10 MB. Signed like server/app/core/auth.py.
+ */
+export function uploadTicket(session: Session): string | null {
+  const secret = process.env.HOMING_PROXY_SECRET;
+  if (!secret) return null;
+  const { id, email, name } = session.user;
+  const payload = {
+    uid: id,
+    email: email ?? "",
+    ...(name ? { name } : {}),
+    exp: Math.floor(Date.now() / 1000) + TICKET_SECONDS,
+  };
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const key = createHmac("sha256", secret).update("upload-ticket").digest();
+  return `${body}.${createHmac("sha256", key).update(body).digest("base64url")}`;
 }
 
 export function errorResponse(status: number, code: string, message: string) {

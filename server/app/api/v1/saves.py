@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agents import is_it_true
-from app.core.auth import CurrentUser, require_user
+from app.core.auth import CurrentUser, require_uploader, require_user
 from app.core.errors import AppError
 from app.db.models import Check, Media, Save, Snapshot, User, When
 from app.db.repo import answers as answers_repo
@@ -250,7 +250,7 @@ def _store_file(db: Session, storage: Storage, user_id: str, upload: UploadFile)
 def create_file_save(
     files: list[UploadFile] = File(...),
     note: str | None = Form(default=None, max_length=MAX_TEXT),
-    user: CurrentUser = Depends(require_user),
+    user: CurrentUser = Depends(require_uploader),
     db: Session = Depends(get_db),
     storage: Storage = Depends(get_storage),
 ) -> SaveOut:

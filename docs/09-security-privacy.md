@@ -5,7 +5,7 @@ People's saves are personal. Our own pile contains phone numbers, an account num
 ## Authentication
 
 - **Sign-in:** NextAuth with Google, plus a **demo** credentials provider that signs into the shared demo user. The demo user is flagged `is_demo` and reset nightly.
-- **The browser never calls the API.** The Next.js server adds `X-Homing-Proxy-Secret` and the user headers ([ADR 0005](adr/0005-auth-proxy.md)).
+- **The browser never calls the API,** except to send files: the Next.js server adds `X-Homing-Proxy-Secret` and the user headers ([ADR 0005](adr/0005-auth-proxy.md)). For uploads it signs a 5-minute ticket naming the user, and the browser sends the files to the API with it ([07](07-api.md#conventions)).
 - **API checks:**
   - compares the secret in constant time (`hmac.compare_digest`);
   - creates the user on first sight (upsert by ID);

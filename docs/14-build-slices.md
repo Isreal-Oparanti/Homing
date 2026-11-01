@@ -168,7 +168,7 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **Day:** Sat evening · **Estimate:** 2h · **Depends on:** S1–S4 and the accounts (Isreal)
 - **Builds:**
   - **Supabase:** the project, with the `vector` and `pg_trgm` extensions and a private `saves` bucket.
-  - **Server host:** Railway (`api` and `worker` services from `server/Dockerfile`), or the fallback from [ADR 0007](adr/0007-hosting.md).
+  - **Server host:** AWS in `eu-west-3` (Paris), one container from `server/Dockerfile` (Isreal, 1 Nov; [ADR 0007](adr/0007-hosting.md)).
   - **Vercel:** the `web/` project.
   - **Config:** every env var from [10](10-deployment-ops.md#environment-variables), and the Google redirect URL.
   - **Rate limits** from [09](09-security-privacy.md#rate-limits) (per user, fixed window in Postgres, 429 with `Retry-After`). The demo login is public once deployed, so these ship with the first deploy.
@@ -222,7 +222,7 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **Proved by:** a unit test for scanned-PDF detection, and an agent test for list items using recorded output.
 - **If late:** check the first 10 list items only.
 - **As built (31 Oct):**
-  - **Uploads:** `POST /saves/file` is multipart through the proxy, not signed uploads (fine up to Vercel's ~4.5 MB; signed uploads come with the WhatsApp import). Storage is `app/storage.py`, local or Supabase. `ingest/files.py` handles type sniffing, PDF text and image shrinking. `read.file` reads images and scanned PDFs. Migration 0005 adds `saves.media_ids` and `checks.items`.
+  - **Uploads:** `POST /saves/file` is multipart. Since 1 Nov the browser sends it straight to the API with a 5-minute upload ticket, so Vercel's ~4.5 MB limit doesn't apply. Storage is `app/storage.py`, local or Supabase. `ingest/files.py` handles type sniffing, PDF text and image shrinking. `read.file` reads images and scanned PDFs. Migration 0005 adds `saves.media_ids` and `checks.items`.
   - **Web:** the Add sheet takes files by button, drag-and-drop or pasting a screenshot. The card shows the images (or "Open the PDF") and, for lists, each item with its verdict and a running count.
   - **On real files from Isreal's pile:**
     - The Startup Abuja flyer (JPG) was read word for word: dates, prizes, "Age 14 - 45 years", "Nigerians/Other Africans". Its link now goes to a generic page, so who can apply is taken from the flyer's own words. It's `closed` by its own 20 July 2025 deadline.

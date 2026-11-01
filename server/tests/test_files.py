@@ -1,4 +1,5 @@
 import io
+import time
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.agents import is_it_true, what_is_it, whats_it_for
-from app.core.auth import CurrentUser
+from app.core.auth import TICKET_SECONDS, CurrentUser, sign_ticket, user_from_ticket
 from app.core.config import Settings, get_settings
 from app.db.models import AgentEvent, Snapshot
 from app.db.session import get_db
@@ -258,6 +259,48 @@ def test_files_we_cant_read_are_refused(client: TestClient) -> None:
     assert _upload(client, [("x.png", b"not really an image")]).status_code == 415
     pdf = _pdf_with_text("hello")
     assert _upload(client, [("a.pdf", pdf), ("b.png", _png())]).status_code == 422
+
+
+def test_an_upload_ticket_names_its_user_until_it_expires() -> None:
+    alice = {"uid": ALICE.id, "email": ALICE.email, "exp": 1000}
+    good = sign_ticket(alice, "s")
+    assert user_from_ticket(good, "s", now=999) == ALICE
+    assert user_from_ticket(good, "s", now=1001) is None
+    assert user_from_ticket(good, "another secret", now=999) is None
+    # Someone else's name with Alice's signature.
+    bob = sign_ticket({**alice, "uid": "u-bob"}, "s").split(".")[0]
+    assert user_from_ticket(f"{bob}.{good.split('.')[1]}", "s", now=999) is None
+    for junk in ("", ".", "garbage", "é.é", good + "x"):
+        assert user_from_ticket(junk, "s", now=999) is None
+
+
+@pytest.mark.integration
+def test_the_browser_sends_files_straight_to_the_api_with_a_ticket(client: TestClient) -> None:
+    """Vercel caps request bodies at 4.5 MB, so files skip the web server."""
+    ticket = sign_ticket(
+        {"uid": ALICE.id, "email": ALICE.email, "exp": int(time.time()) + TICKET_SECONDS}, "s"
+    )
+    preflight = client.options(
+        "/api/v1/saves/file",
+        headers={
+            "Origin": "https://homing.example",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization",
+        },
+    )
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == "*"
+
+    def post(auth: str) -> int:
+        return client.post(
+            "/api/v1/saves/file",
+            files=[("files", ("a.png", _png()))],
+            headers={"Authorization": auth},
+        ).status_code
+
+    assert post(f"Bearer {ticket}") == 202
+    assert post("Bearer garbage") == 401
+    assert post(ticket) == 401  # not a Bearer ticket, and no proxy secret either
 
 
 class FakeSearch:

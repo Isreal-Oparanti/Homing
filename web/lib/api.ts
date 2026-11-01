@@ -30,6 +30,15 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return (res.status === 204 ? undefined : await res.json()) as T;
 }
 
+async function uploadTicket(): Promise<{ url: string; ticket: string }> {
+  const res = await fetch("/api/upload-ticket", { method: "POST" });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => null))?.error;
+    throw new HomingApiError(res.status, err?.code ?? "error", err?.message ?? "Please sign in again.");
+  }
+  return res.json();
+}
+
 export type Agent = "what" | "true" | "for" | "when" | "system";
 
 export type Evidence = {
@@ -404,8 +413,16 @@ export const savesApi = {
     const form = new FormData();
     for (const f of files) form.append("files", f);
     if (note.trim()) form.append("note", note.trim());
-    // No JSON content type here: the browser sets the multipart boundary itself.
-    const res = await fetch("/api/backend/saves/file", { method: "POST", body: form });
+    // Files go straight to the API with a short-lived ticket, because the web server caps
+    // request bodies at 4.5 MB. No content type: the browser sets the multipart boundary.
+    const { url, ticket } = await uploadTicket();
+    const res = await fetch(url, {
+      method: "POST",
+      body: form,
+      headers: { Authorization: `Bearer ${ticket}` },
+    }).catch(() => {
+      throw new HomingApiError(503, "unreachable", "Homing's server isn't reachable right now.");
+    });
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       throw new HomingApiError(

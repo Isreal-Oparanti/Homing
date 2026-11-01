@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import router as v1_router
 from app.core.config import get_settings
@@ -37,6 +38,15 @@ def create_app() -> FastAPI:
         redoc_url=None,
         openapi_url="/openapi.json" if settings.is_local else None,
         lifespan=lifespan,
+    )
+    # Browsers send files straight here with an upload ticket. The API never reads cookies,
+    # so letting any page call it gives nothing away: every route still needs the proxy
+    # secret or a signed ticket.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["POST"],
+        allow_headers=["Authorization"],
     )
     register_error_handlers(app)
     app.include_router(v1_router)

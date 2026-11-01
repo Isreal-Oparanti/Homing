@@ -5,14 +5,14 @@
 | Env | Web | API + worker | Database and storage | Notes |
 |---|---|---|---|---|
 | `local` | `npm run dev` on :3000 | `uvicorn` on :8000, worker inside the API (`RUN_WORKER_IN_API=true`) | Postgres (Docker or a Supabase dev database); storage on the local disk (`STORAGE_BACKEND=local`) | see [12-dev-workflow.md](12-dev-workflow.md#local-setup) |
-| `prod` | Vercel | One Docker image, two services: `api` and `worker` | Supabase (Postgres + Storage) | See [ADR 0007](adr/0007-hosting.md) |
+| `prod` | Vercel (functions in Paris) | AWS `eu-west-3` (Paris): one container with the worker inside (`RUN_WORKER_IN_API=true`); split into `api` and `worker` later if needed | Supabase (Postgres + Storage) | See [ADR 0007](adr/0007-hosting.md) |
 
 There's no staging environment, because there's no time. Use feature flags and the demo user instead.
 
 ## Hosting (from ADR 0007)
 
 - **Web:** Vercel, linked to the GitHub repo, root `web/`.
-- **API and worker:** Railway, two services from `server/Dockerfile` with different start commands.
+- **API and worker:** AWS in `eu-west-3` (Paris, next to Supabase), one container from `server/Dockerfile`, worker inside the API. Two containers (`api`, and `worker` started with `python -m app.worker`) remain an option.
   - **Fallback:** a VM with Docker Compose and Caddy (for example the existing Crowscap server, if it's still running and has room).
 - **Postgres and Storage:** Supabase project `crowscap-hack` (free tier). Bucket `saves`, private.
 - **Muse Spark Open:** a Baseten (or Modal) deployment of `meta-models/muse-spark-open-1026`, using partner credits **(confirm)**.
@@ -90,9 +90,15 @@ FEATURE_AUDIT=true
   - `worker`: `python -m app.worker`
 - Healthcheck: `GET /health`.
 
+## First deploy, as done (1 Nov)
+- **Settings files:** `server/.env.production` and `web/.env.vercel` (git-ignored) hold every production variable, with production's own `PROXY_SECRET`, `ADMIN_TOKEN` and `NEXTAUTH_SECRET`. The first goes to the AWS container, the second into Vercel's variable editor.
+- **One database:** development and production share the Supabase database, so the demo pile is already there. Files must therefore live in the bucket in both: run `python -m app.scripts.setup_storage` once (creates the private `saves` bucket, copies local files in, reads each back), then set `STORAGE_BACKEND=supabase` locally too.
+- **While the local server runs,** its worker also takes jobs from production's queue. Stop it once judging starts.
+- **Uploads** skip Vercel with an upload ticket ([07](07-api.md#conventions)), so Vercel's 4.5 MB limit doesn't apply.
+
 ## Deploy steps
 
-1. Push to `main`. Vercel builds `web/`, and Railway builds `server/`. **Only when Isreal says push.**
+1. Push to `main`. Vercel builds `web/`; the API image is built from `server/` and deployed to AWS. **Only when Isreal says push.**
 2. The `api` service runs `alembic upgrade head` before starting. Migrations must be backwards-compatible with the running worker: add columns first, use them later.
 3. `worker` restarts. Running jobs are picked up again after 15 minutes if they were cut off ([03](03-agents.md#job-catalogue)).
 4. Smoke test after deploy:
@@ -112,7 +118,7 @@ FEATURE_AUDIT=true
   - **Storage:** create the private `saves` bucket (S7).
   - **Data API:** turn it off in project settings, or at least make sure every table has RLS on. Every migration enables RLS ([02](02-data-model.md)), because we never use Supabase's REST API.
 - Google OAuth: add the redirect URL `https://<web>/api/auth/callback/google`.
-- Railway: create two services from the repo.
+- AWS: one container in `eu-west-3` (Paris) from `server/Dockerfile`, with HTTPS.
 - Vercel: create the project and set the env vars.
 - Seed the demo data with `python -m app.scripts.seed_demo --from <export.zip>`.
 
