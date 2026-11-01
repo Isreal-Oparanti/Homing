@@ -269,6 +269,8 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **Proved by:** an agent test that rebuild respects locked threads, and a unit test for the title validator.
 - **If late:** no merge or split UI. Rename only.
 
+- **As built (1 Nov):** `threads.rebuild` with a second look, repeats linked by code, `GET /threads`, `GET /threads/{id}`, `PATCH /threads/{id}` (rename locks it), `POST /threads/rebuild`, the Threads screen (goals, "Organise my saves") and the Thread screen (saves, rename). Done-when on Isreal's pile: "Getting into YC" (8) and "Improving communication skills" (12, the "Speaking better" one), 15 repeats linked, a renamed thread keeps its name (tested). Details and numbers in [03](03-agents.md#whats-it-for).
+
 ### S10 · Search by meaning + Ask
 - **Day:** Mon · **Estimate:** 4h · **Depends on:** S8, S9 · **Scene:** anytime
 - **Builds:**

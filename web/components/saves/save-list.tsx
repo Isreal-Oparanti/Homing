@@ -18,7 +18,29 @@ function line(save: SaveListItem) {
   return save.error ?? "Reading it…";
 }
 
-/** Every save, newest first. Until threads exist, this is how you find a save again. */
+/** Saves as rows that open their card. */
+export function SaveRows({ saves }: { saves: SaveListItem[] }) {
+  return (
+    <ul className="mt-3 space-y-2">
+      {saves.map((save) => (
+        <li key={save.id}>
+          <Link
+            href={`/saves/${save.id}`}
+            className="glass block rounded-[var(--radius-card)] px-4 py-3 hover:bg-glass-strong"
+          >
+            <p className="flex items-center gap-1.5 truncate font-semibold">
+              {save.visibility === "private" && <Lock className="size-3.5 shrink-0" aria-hidden />}
+              <span className="truncate">{label(save)}</span>
+            </p>
+            <p className="mt-0.5 line-clamp-2 text-sm text-ink-2">{line(save)}</p>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Every save, newest first, so anything can be found again. */
 export function SaveList() {
   const { data, isPending, isError, error } = useQuery({
     queryKey: ["saves"],
@@ -30,24 +52,9 @@ export function SaveList() {
   if (data.length === 0) return null;
   return (
     <section className="mt-6">
-      <h2 className="font-display text-lg font-bold tracking-[-0.02em]">Your saves</h2>
-      <p className="text-sm text-ink-2">Not grouped into threads yet.</p>
-      <ul className="mt-3 space-y-2">
-        {data.map((save) => (
-          <li key={save.id}>
-            <Link
-              href={`/saves/${save.id}`}
-              className="glass block rounded-[var(--radius-card)] px-4 py-3 hover:bg-glass-strong"
-            >
-              <p className="flex items-center gap-1.5 truncate font-semibold">
-                {save.visibility === "private" && <Lock className="size-3.5 shrink-0" aria-hidden />}
-                <span className="truncate">{label(save)}</span>
-              </p>
-              <p className="mt-0.5 line-clamp-2 text-sm text-ink-2">{line(save)}</p>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <h2 className="font-display text-lg font-bold tracking-[-0.02em]">Latest saves</h2>
+      <p className="text-sm text-ink-2">Newest first.</p>
+      <SaveRows saves={data} />
     </section>
   );
 }

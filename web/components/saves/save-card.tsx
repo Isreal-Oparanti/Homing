@@ -431,7 +431,9 @@ function ForAnswerView({ answer }: { answer: ForAnswer }) {
       )}
       {thread ? (
         <p>
-          <span className="font-semibold">{thread.title}</span>
+          <Link href={`/threads/${thread.id}`} className="font-semibold hover:underline">
+            {thread.title}
+          </Link>
           {thread.count > 1 ? `: your ${ordinal(thread.position)} save on this.` : ": the first save on this."}
         </p>
       ) : (

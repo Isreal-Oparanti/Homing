@@ -192,6 +192,14 @@ class Reading(BaseModel):
 - **Apply by code:** create and merge only where it doesn't conflict with user edits. Emit one `rebuilt` event with counts.
 - Threads are **goals**, phrased as such ("Getting into YC", "Speaking better"). The prompt forbids traits and personality labels. Output with person-describing titles is rejected by a validator (word list plus pattern) and retried once.
 
+**Rebuild, as built (S9, 1 Nov):** job `threads.rebuild`, queued by an import when it finishes (it waits, without using attempts, while the import's saves are still being read; after 3 hours it goes with what's ready) or by the person (`POST /threads/rebuild`, "Organise my saves"). Imported saves no longer get `save.place` one by one.
+- **Repeats first, by code** (`link_repeats`): a later save with the same `content_hash` gets `duplicate_of` and a `merged` event; after placing, repeats join their original's threads.
+- **Only saves with something to go on are sent:** a model reading or the person's own words. "An Instagram post you saved" with no words isn't.
+- **One long-context call** (`place.rebuild`): numbered lines plus the existing threads (T1, T2…, `locked` when the person named them).
+- **Code checks the plan:** real line numbers only; titles through `clean_title` (never about the person); a new goal needs 2 saves, an existing one can take 1; at most 2 goals a save; a locked thread keeps its name. Agent memberships of unlocked threads are replaced; the person's own are kept; threads left empty are archived, never deleted.
+- **A second look:** one long answer under-places, so when 10 or more saves were left out, the agent gets only those plus the goals it made (`note`: second look), and adds what clearly fits.
+- **Measured on Isreal's pile (605 saves, 405 with something to go on):** first pass alone placed 224 (55%) into 20 goals for 25,150 tokens; with the second look, 340 (84%) into 24 goals for 42,560 tokens, against about 900,000 for placing one by one. The 65 left out were jokes, greetings, booking links and unreadable videos. Goals include "Starting and scaling startups" (64), "Learning Agentic AI" (33), "Finding funding and grants" (27), "Improving communication skills" (12), "Getting into YC" (8). 15 repeats linked.
+
 **Never:**
 - labels the user as a person;
 - deletes a save;

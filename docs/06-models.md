@@ -52,6 +52,7 @@ Every call declares a purpose. Each purpose fixes the model, prompt file, output
 |---|---|---|---|---|
 | `read.batch_links` | Spark | `prompts/read_batch_links.v1.md` | `list[Reading]` | 60s |
 | `read.batch` (as built, 1 Nov) | Spark, low effort | `prompts/read_batch.v1.md` | `BatchReadings` (one `Reading` per id) | 150s |
+| `place.rebuild` (as built, 1 Nov) | Spark, default effort | `prompts/place_rebuild.v1.md` | `Rebuild` (goals with line numbers) | 300s |
 | `read.text` | Spark | `read_text.v3.md` (v2 since 31 Oct: only facts someone could act on, a narrower `is_checkable`; v3 adds `items` for saves that list several things) | `Reading` | 90s |
 | `read.file` | Spark | `read_file.v1.md`, with the images or the PDF attached | `FileReading` (`Reading` plus every word on the file as `text`) | 120s |
 | `read.image` | Spark | `read_image.v1.md` | `Reading` | 45s |

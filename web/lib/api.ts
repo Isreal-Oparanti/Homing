@@ -644,3 +644,65 @@ export const importApi = {
     return (await api<RawImport[]>("imports")).map(toImport);
   },
 };
+
+/** A goal and the saves that serve it (server/app/api/v1/threads.py). */
+export type ThreadSummary = {
+  id: string;
+  title: string;
+  summary: string | null;
+  /** The person named it; rebuilds keep the name. */
+  locked: boolean;
+  saves: number;
+  lastSavedAt: string | null;
+};
+
+export type ThreadDetail = ThreadSummary & { items: SaveListItem[] };
+
+type RawThread = {
+  id: string;
+  title: string;
+  summary: string | null;
+  locked: boolean;
+  saves: number;
+  last_saved_at: string | null;
+};
+
+function toThread(raw: RawThread): ThreadSummary {
+  return {
+    id: raw.id,
+    title: raw.title,
+    summary: raw.summary,
+    locked: raw.locked,
+    saves: raw.saves,
+    lastSavedAt: raw.last_saved_at,
+  };
+}
+
+export const threadsApi = {
+  async list(): Promise<{ items: ThreadSummary[]; unplaced: number }> {
+    const page = await api<{ items: RawThread[]; unplaced: number }>("threads");
+    return { items: page.items.map(toThread), unplaced: page.unplaced };
+  },
+  async get(id: string): Promise<ThreadDetail> {
+    const raw = await api<RawThread & { items: (RawSave & { title: string | null; what: string | null })[] }>(
+      `threads/${encodeURIComponent(id)}`,
+    );
+    return {
+      ...toThread(raw),
+      items: raw.items.map((i) => ({ ...toSave(i), title: i.title, what: i.what })),
+    };
+  },
+  /** The person's own name for a goal; it locks the thread. */
+  async rename(id: string, title: string): Promise<ThreadSummary> {
+    return toThread(
+      await api<RawThread>(`threads/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title }),
+      }),
+    );
+  },
+  /** What's it for? organises the whole pile again. */
+  async rebuild(): Promise<void> {
+    await api("threads/rebuild", { method: "POST" });
+  },
+};

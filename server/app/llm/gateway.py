@@ -31,6 +31,7 @@ from app.schemas.agents import (
     PrepSheet,
     ProposedCheck,
     Reading,
+    Rebuild,
     VideoPoints,
 )
 from app.verify.secrets import mask_phones
@@ -71,6 +72,8 @@ PURPOSES: dict[str, Purpose] = {
     # Comparing with a source is the hardest call, so it keeps the default reasoning effort.
     "check.compare": Purpose("check.compare", "check_compare.v2.md", ProposedCheck, 120),
     "place.assign": Purpose("place.assign", "place_assign.v1.md", Placement, 45, "low"),
+    # The whole pile in one long-context call: it sees every save, so it groups them well.
+    "place.rebuild": Purpose("place.rebuild", "place_rebuild.v1.md", Rebuild, 300),
     "video.points": Purpose("video.points", "video_points.v1.md", VideoPoints, 120, "low"),
     "prep.sheet": Purpose("prep.sheet", "prep_sheet.v2.md", PrepSheet, 120),
 }

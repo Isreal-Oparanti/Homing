@@ -282,6 +282,15 @@ def import_whatsapp(ctx: JobContext, payload: dict[str, Any]) -> None:
         raise PermanentError(imp.error) from exc
     imp.status = "done"
     imp.finished_at = datetime.now(UTC)
+    # What's it for? organises the whole pile once it's read (it waits for the reads).
+    queue.enqueue(
+        ctx.db,
+        "threads.rebuild",
+        {"since": imp.finished_at.isoformat()},
+        user_id=imp.user_id,
+        priority=queue.PRIORITY_BACKLOG,
+        dedupe_key=f"rebuild:{imp.user_id}",
+    )
     files = f", {counts['media']} files" if counts["media"] else ""
     private = f", {counts['private']} kept private" if counts["private"] else ""
     emit(

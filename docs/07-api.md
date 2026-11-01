@@ -106,6 +106,7 @@ As built in S4, the three answers differ slightly from the example above:
 | GET | `/threads/{id}` | `?cursor` | `{thread, saves: SaveSummary[], next_cursor}` |
 | PATCH | `/threads/{id}` | `{title?, summary?, archived?}` | `Thread` (sets `locked_by_user`) |
 | POST | `/threads/{id}/merge` | `{into_thread_id}` | `Thread` |
+| | | **As built (S9, 1 Nov):** `GET /threads` returns `{items, unplaced}` (goals with saves, fullest first); `GET /threads/{id}` returns the thread with all its saves, newest first; `PATCH` takes `{title}` only (a goal title, checked like the agent's) and locks the thread; `POST /threads/rebuild` queues What's it for? over the whole pile. Merge and split are not built. | |
 | PUT | `/threads/{id}/saves/{save_id}` | — | add (user) |
 | DELETE | `/threads/{id}/saves/{save_id}` | — | remove (remembered by **What's it for?**) |
 

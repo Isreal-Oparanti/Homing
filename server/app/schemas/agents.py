@@ -146,6 +146,24 @@ class Placement(BaseModel):
     reason: str = Field(description="One short line on why it serves that goal.")
 
 
+class GoalThread(BaseModel):
+    """One goal and the saves that serve it."""
+
+    title: str = Field(description="A goal, 2 to 5 words, e.g. 'Getting into YC'.")
+    keep: str | None = Field(
+        default=None,
+        description="The id of a thread from THREADS this goal continues (e.g. 'T2'), or null.",
+    )
+    why: str = Field(description="One short line on what ties these saves to the goal.")
+    saves: list[int] = Field(description="Line numbers from SAVES that serve this goal.")
+
+
+class Rebuild(BaseModel):
+    """What's it for? over the whole pile at once: the goals, and which saves serve each."""
+
+    threads: list[GoalThread] = Field(max_length=40)
+
+
 class VideoPoint(BaseModel):
     point: str = Field(
         description="One practical thing to do, in plain words, e.g. 'Pause before key points.'"
