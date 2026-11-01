@@ -66,6 +66,8 @@ STORAGE_DIR=data/storage        # local backend only
 SUPABASE_URL=                    # supabase backend: project URL
 SUPABASE_SERVICE_KEY=            # supabase backend: service role key (server only)
 STORAGE_BUCKET=saves             # private bucket
+SEARCH_PROVIDER=serper
+SEARCH_API_KEY=                  # serper.dev key (rotate before launch)
 
 # Feature flags (kill switches)
 FEATURE_CHECKS=true

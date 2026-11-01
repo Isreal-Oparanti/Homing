@@ -25,6 +25,8 @@ from app.jobs import queue
 from app.jobs.errors import DeferredError, PermanentError
 from app.jobs.runner import JobContext
 from app.llm.gateway import PURPOSES, ModelGateway
+from app.llm.search import find_site as search_site
+from app.llm.search import get_search
 from app.schemas.agents import ProposedCheck
 from app.verify.dates import parse_deadline
 from app.verify.eligibility import Facts, accept_rule, assess
@@ -40,6 +42,7 @@ TRIES = 2  # official candidates to try
 # Tests swap these for fakes; agents never build clients themselves.
 gateway_factory: Any = ModelGateway
 fetcher_factory: Any = SafeFetcher
+search_factory: Any = get_search
 
 
 def _fetch_source(url: str, hint: str, fetcher: SafeFetcher) -> SnapshotIn | None:
@@ -63,9 +66,26 @@ def _candidates(save: Save, reading: Reading) -> list[str]:
     return official_candidates(urls, facts.get("organisations", []))[:TRIES]
 
 
+def _searched_candidates(reading: Reading) -> list[str]:
+    """Official-page candidates from a web search, when the save itself has no usable link."""
+    search = search_factory()
+    if search is None:
+        return []
+    facts = reading.key_facts or {}
+    orgs = facts.get("organisations", [])
+    words = [orgs[0]] if orgs and orgs[0].lower() not in reading.title.lower() else []
+    query = " ".join([*words, reading.title, "apply" if reading.is_opportunity else ""]).strip()
+    try:
+        results = search.search(query)
+    except Exception:  # a search outage just means we say we couldn't find the page
+        return []
+    return official_candidates([r.url for r in results], orgs)[:TRIES]
+
+
 def _find_official(save: Save, reading: Reading) -> tuple[str, SnapshotIn] | None:
     fetcher = fetcher_factory()
-    for url in _candidates(save, reading):
+    linked = _candidates(save, reading)
+    for url in linked or _searched_candidates(reading):
         if (page := _fetch_source(url, reading.title, fetcher)) is not None:
             return url, page
     return None
@@ -384,7 +404,7 @@ def check(ctx: JobContext, payload: dict[str, Any]) -> None:
         save,
         verdict="couldnt_confirm",
         official_url=official,
-        official_found_by="post_link",
+        official_found_by="post_link" if url in _candidates(save, reading) else "search",
         deadline_at=deadline.at if deadline else None,
         deadline_source_text=deadline.source_text if deadline else None,
         deadline_tz_stated=deadline.tz_stated if deadline else False,
@@ -471,12 +491,10 @@ def rejudge_all(db: Any, user_id: str) -> list[tuple[Check, str, str]]:
     changed = []
     for check in checks:
         if check.items:
-            reading = db.get(Reading, check.save_id)
-            is_opportunity = bool(reading and reading.is_opportunity)
             items = [dict(i) for i in check.items]
             for item in items:
                 before = item.get("verdict")
-                judge_item(db, user_id, item, is_opportunity=is_opportunity)
+                judge_item(db, user_id, item)
                 if before and item.get("verdict") != before:
                     changed.append((check, before, item["verdict"]))
             check.items = items
@@ -602,8 +620,12 @@ def _start_items(ctx: JobContext, save: Save, reading: Reading) -> None:
     _then_when(ctx, save)
 
 
-def judge_item(db: Any, user_id: str, item: dict[str, Any], *, is_opportunity: bool) -> None:
-    """An item's rules and verdict, by code. Items use the profile only (no one-off answers)."""
+def judge_item(db: Any, user_id: str, item: dict[str, Any]) -> None:
+    """An item's rules and verdict, by code. Items use the profile only (no one-off answers).
+
+    Whether an item is an opportunity is decided by its own page: who-can-apply rules or a
+    closing date make it one. A directory or a news page is just checked.
+    """
     if item.get("status") != "done" or not item.get("official_url"):
         return
     now = datetime.now(UTC)
@@ -611,12 +633,17 @@ def judge_item(db: Any, user_id: str, item: dict[str, Any], *, is_opportunity: b
     found = assess(item.get("rules") or [], facts_for(db, user_id, None), ref_year=now.year)
     item["rules"] = found.rules
     item["questions"] = [q for q in found.questions if not q["id"].startswith("rule:")]
+    # There's no per-item question, so "Are you building in Africa?"-style rules don't block the
+    # verdict; the card lists them under "Check yourself".
+    blocking = [
+        r for r in found.rules if not (r.get("rule") == "other" and r.get("result") == "unknown")
+    ]
     item["verdict"] = decide(
         closed=bool(item.get("closed")),
         past_deadline=deadline is not None and deadline < now,
         source_opened=True,
-        rules=found.rules,
-        is_opportunity=is_opportunity,
+        rules=blocking,
+        is_opportunity=bool(found.rules or item.get("deadline_at")),
     )
 
 
@@ -636,11 +663,17 @@ def check_item(ctx: JobContext, payload: dict[str, Any]) -> None:
     user_tz = user.tz if user else "Africa/Lagos"
     result: dict[str, Any] = {"status": "done"}
 
+    if not url and (search := search_factory()) is not None:
+        try:
+            url = search_site(search, name, reading.title)
+        except Exception:  # a search outage just means we say we couldn't find it
+            url = None
+        result["found_by"] = "search" if url else None
     source = _fetch_source(url, name, fetcher_factory()) if url else None
     if not url:
-        result.update(verdict="couldnt_confirm", note="No link in the save to check.")
+        result.update(verdict="couldnt_confirm", problem="We couldn't find its website.")
     elif source is None:
-        result.update(verdict="couldnt_confirm", note=f"We couldn't open {_host(url)}.")
+        result.update(verdict="couldnt_confirm", problem=f"We couldn't open {_host(url)}.")
     else:
         page = Snapshot(
             save_id=save.id,
@@ -675,7 +708,7 @@ def check_item(ctx: JobContext, payload: dict[str, Any]) -> None:
             closed=closed.quote if closed else None,
         )
         result = {**item, **result}
-        judge_item(ctx.db, save.user_id, result, is_opportunity=reading.is_opportunity)
+        judge_item(ctx.db, save.user_id, result)
 
     # Several item jobs write to the same check: take the row lock to merge safely.
     locked = ctx.db.scalar(

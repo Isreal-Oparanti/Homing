@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_service_key: str = ""
     storage_bucket: str = "saves"
+    # Web search for Is it true? when a save has no link to its official page.
+    search_provider: str = "serper"
+    search_api_key: str = ""
 
     @field_validator("database_url", "test_database_url")
     @classmethod

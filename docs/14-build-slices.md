@@ -227,7 +227,15 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
   - **On real files from Isreal's pile:**
     - The Startup Abuja flyer (JPG) was read word for word: dates, prizes, "Age 14 - 45 years", "Nigerians/Other Africans". Its link now goes to a generic page, so who can apply is taken from the flyer's own words. It's `closed` by its own 20 July 2025 deadline.
     - The 5-link funding-directories message gave 5 side-by-side checks: 2 checked against their pages, 3 sites refused us (said so).
-  - **Still needed for the done-when:** screenshots of the real 18-opportunity thread (Isreal), and a web search key so items without links can find their official pages.
+  - **Done-when, run 1 Nov on Isreal's screenshots instead of the 18-opportunity thread** (he couldn't screenshot it):
+    - **A LinkedIn list of 14 investors backing Nigerian startups** (names only, no links). Search found each fund's own site, then 24 items across both lists were checked side by side in about 2.5 minutes.
+      - 12 investors were checked against their own sites.
+      - Microtraction: "$100k at the earliest stage" confirmed, plus what the post left out (a team of 2–3 with a technical founder, an MVP built, capital-efficient).
+      - Ingressive: "up to $500k" confirmed, and it targets 10% ownership.
+      - TLCOM differs from the post: "seed to growth", not "seed to Series B".
+      - 2 sites couldn't be opened.
+    - **A WhatsApp list of 10 funding directories:** 3 checked, 2 real opportunities (New Africa Fund grants, and NIH Fogarty with a 3 Dec 2026 deadline, found by search after the screenshot cut its link off), 5 couldn't be opened.
+  - **Sites that block automated visitors (403) aren't worked around.** Homing identifies itself and says "We couldn't open …". Pick demo lists whose sites open.
 
 ### S8 · WhatsApp import
 - **Day:** Mon morning · **Estimate:** 4h · **Depends on:** S3, S7 · **Scene:** Past

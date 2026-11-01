@@ -17,6 +17,7 @@ from app.ingest.files import UnsupportedFile, pdf_text, sniff
 from app.ingest.gather import Gathered, SnapshotIn
 from app.jobs.handlers import HANDLERS
 from app.jobs.runner import Runner
+from app.llm.search import SearchResult, find_site, own_site
 from app.main import create_app
 from app.schemas.agents import (
     FileReading,
@@ -25,6 +26,7 @@ from app.schemas.agents import (
     Placement,
     ProposedCheck,
     ProposedFinding,
+    ProposedRule,
     Reading,
 )
 from app.storage import LocalStorage, get_storage
@@ -105,6 +107,17 @@ class FakeModels:
                         point="It's for African founders.",
                         quote="Grants for African founders",
                         kind="left_out",
+                    )
+                ],
+                # A who-can-apply rule makes the item an opportunity; only the person can judge
+                # it, so it's listed to check rather than blocking the verdict.
+                rules=[
+                    ProposedRule(
+                        rule="other",
+                        strength="required",
+                        quote="Grants for African founders",
+                        plain="For African founders",
+                        question="Are you an African founder?",
                     )
                 ],
             )
@@ -191,8 +204,9 @@ def test_screenshots_of_a_list_are_checked_item_by_item(
     items = card["true"]["items"]
     assert [i["name"] for i in items] == ["TripleFunds", "New Africa Fund"]
     assert items[0]["status"] == "done" and items[0]["verdict"] == "fits_you"
+    assert items[0]["rules"][0]["result"] == "unknown"  # shown under "Check yourself"
     assert items[0]["findings"][0]["quote"] == "Grants for African founders"
-    assert items[1]["note"] == "No link in the save to check."
+    assert items[1]["problem"] == "We couldn't find its website."  # no link, search off in tests
     assert FakeModels.calls.count("read.file") == 1  # both screenshots in one reading
     assert card["save"]["files"] == 2
     shown = client.get(f"/api/v1/saves/{save_id}/files/1", headers=HEADERS)
@@ -244,3 +258,52 @@ def test_files_we_cant_read_are_refused(client: TestClient) -> None:
     assert _upload(client, [("x.png", b"not really an image")]).status_code == 415
     pdf = _pdf_with_text("hello")
     assert _upload(client, [("a.pdf", pdf), ("b.png", _png())]).status_code == 422
+
+
+class FakeSearch:
+    def __init__(self, results: list[SearchResult]):
+        self.results = results
+        self.queries: list[str] = []
+
+    def search(self, query: str, *, num: int = 8) -> list[SearchResult]:
+        self.queries.append(query)
+        return self.results
+
+
+def test_an_organisations_own_site_is_found_from_search_results() -> None:
+    results = [
+        SearchResult(
+            "https://ng.linkedin.com/company/microtraction", "Microtraction | LinkedIn", ""
+        ),
+        SearchResult("https://www.crunchbase.com/organization/microtraction", "Microtraction", ""),
+        SearchResult("https://www.microtraction.com/press", "Press - Microtraction", ""),
+    ]
+    assert own_site(results, "Microtraction") == "https://www.microtraction.com/press"
+    assert find_site(FakeSearch(results), "Microtraction") == "https://www.microtraction.com/"
+
+
+def test_a_renamed_organisation_is_found_by_its_page_title() -> None:
+    results = [SearchResult("https://vkav.vc/", "Verod-Kepple Africa Ventures", "")]
+    assert find_site(FakeSearch(results), "Kepple Africa Ventures") == "https://vkav.vc/"
+
+
+def test_no_match_means_no_site() -> None:
+    results = [SearchResult("https://example.com/", "Something else", "")]
+    assert find_site(FakeSearch(results), "TLCOM") is None
+
+
+@pytest.mark.integration
+def test_a_list_item_without_a_link_is_found_by_search(
+    client: TestClient, sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    search = FakeSearch(
+        [SearchResult("https://www.newafricafund.org/aifgrants", "New Africa Fund", "")]
+    )
+    monkeypatch.setattr(is_it_true, "search_factory", lambda: search)
+    save_id = _upload(client, [("thread.png", _png())]).json()["id"]
+    _run(sessions)
+    items = client.get(f"/api/v1/saves/{save_id}", headers=HEADERS).json()["true"]["items"]
+    assert items[1]["found_by"] == "search"
+    assert items[1]["official_url"] == "https://www.newafricafund.org/"
+    assert items[1]["status"] == "done" and items[1]["verdict"] == "fits_you"
+    assert search.queries == ["New Africa Fund"]

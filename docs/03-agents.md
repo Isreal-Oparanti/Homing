@@ -141,6 +141,7 @@ class Reading(BaseModel):
    - Saves that aren't opportunities get `checked`, never a fit verdict.
    - Opportunities are always checked, even when saved as a bare link.
    - **No official page, or the link goes to a different page:** the rules are taken from the post's own words (quotes checked against the post), and the card says so. With no official page, a closing date the post itself gives that has passed makes it `closed`. An opened official page always wins over the post.
+   - **List items** (1 Nov): an item with no link has its own site found by search (`found_by: "search"`). Whether an item is an opportunity is decided by its own page: who-can-apply rules or a closing date make it one, so a directory or a news page is just `checked`. Rules only the person can judge ("Are you building in Africa?") don't block an item's verdict; the card lists them under "Check yourself". `note` keeps what the post said about the item, and `problem` says why it couldn't be checked.
    - **Lists (S7):** a save whose reading has 2+ `items` fans out to one `save.check_item` job per item (up to 20). Each item's page is fetched and compared, and its rules and verdict are judged by code. Several items write to the same check under a row lock. The team gets one line per item ("Checked TripleFunds on triple-funds.com: it fits you.").
 6. **Verdict by code** (never by a model):
    1. if the page says closed, or `deadline_at < now` → `closed`;

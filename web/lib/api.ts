@@ -177,8 +177,13 @@ export type CheckedItem = {
   url: string | null;
   status: "queued" | "done";
   verdict: TrueAnswer["verdict"] | null;
+  /** What the post said about this item. */
   note: string | null;
+  /** Why it couldn't be checked, e.g. "We couldn't open triple-funds.com." */
+  problem: string | null;
   officialUrl: string | null;
+  /** "search" when the save had no link and Homing found the site itself. */
+  foundBy: string | null;
   findings: TrueAnswer["findings"];
   rules: EligibilityRule[];
   deadline: { at: string; display: string } | null;
@@ -283,7 +288,9 @@ type RawTrue = {
     status: CheckedItem["status"];
     verdict: CheckedItem["verdict"];
     note: string | null;
+    problem?: string | null;
     official_url: string | null;
+    found_by?: string | null;
     findings: TrueAnswer["findings"];
     rules: EligibilityRule[];
     deadline: { at: string; display: string } | null;
@@ -329,7 +336,9 @@ function toTrue(raw: RawTrue | null): TrueAnswer | null {
       status: i.status,
       verdict: i.verdict,
       note: i.note,
+      problem: i.problem ?? null,
       officialUrl: i.official_url,
+      foundBy: i.found_by ?? null,
       findings: i.findings ?? [],
       rules: i.rules ?? [],
       deadline: i.deadline,

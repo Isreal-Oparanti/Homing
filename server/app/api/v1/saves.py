@@ -122,8 +122,10 @@ def _item_out(item: dict[str, Any], user_tz: str) -> dict[str, Any]:
         "url": item.get("url"),
         "status": item.get("status", "queued"),
         "verdict": item.get("verdict"),
-        "note": item.get("note"),
+        "note": item.get("note"),  # what the post said about it
+        "problem": item.get("problem"),  # e.g. "We couldn't open triple-funds.com."
         "official_url": item.get("official_url"),
+        "found_by": item.get("found_by"),  # "search" when the save had no link for it
         "findings": [
             {"point": f["point"], "quote": f["quote"], "kind": f["kind"]}
             for f in item.get("findings") or []

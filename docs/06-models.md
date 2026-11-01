@@ -152,6 +152,11 @@ This is web search for **Is it true?**, not for searching saves.
 
 - **Provider:** first, check whether Meta's API offers a web search tool **(confirm)**. Otherwise use one search API, picked at scaffold time by current free tier (Tavily or Brave), set with `SEARCH_PROVIDER` and `SEARCH_API_KEY`.
 - **Use:** results are links only. **Is it true?** fetches and reads the pages itself, so the search provider's summaries are never trusted.
+- **As built (1 Nov):** Serper (`SEARCH_PROVIDER=serper`, Google results; free tier 2,500 searches). Two uses:
+  - **A post with no link to its official page:** search "{organisation} {title} apply" and keep results that `verify/sources.py` accepts.
+  - **A list item with no link** (an investor's name, a fund's name): `find_site` searches the name, then the name plus the list's topic. It takes the first result whose address carries the name ("Future Africa" → future.africa), or failing that, whose page title does ("Kepple Africa Ventures" → vkav.vc, renamed Verod-Kepple). Profile and news sites never count (LinkedIn, Crunchbase, Tracxn, TechCabal…), and it goes to the home page.
+  - **Measured:** all 14 investors in a real LinkedIn list were found on their own sites.
+  - **Tests never call the real service** (an autouse fixture turns search off).
 
 ## Cost estimate (to be measured on Day 1)
 

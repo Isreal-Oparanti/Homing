@@ -73,3 +73,11 @@ def sessions(db_engine: Engine) -> sessionmaker[Session]:
 def db(sessions: sessionmaker[Session]) -> Iterator[Session]:
     with sessions() as session:
         yield session
+
+
+@pytest.fixture(autouse=True)
+def no_web_search(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never call the real search service; tests that need search pass a fake."""
+    from app.agents import is_it_true
+
+    monkeypatch.setattr(is_it_true, "search_factory", lambda: None)

@@ -154,6 +154,13 @@ const ITEM_VERDICT: Record<string, string> = {
   checked: "Checked",
 };
 
+/** Rules only the person can judge, with no per-item question: listed for them to check. */
+function checkYourself(item: CheckedItem): string[] {
+  return item.rules
+    .filter((r) => r.rule === "other" && r.strength === "required" && r.result === "unknown")
+    .map((r) => r.plain);
+}
+
 /** A save that lists several opportunities: each one checked on its own page, side by side. */
 function ItemsView({ items }: { items: CheckedItem[] }) {
   const done = items.filter((i) => i.status === "done");
@@ -172,13 +179,16 @@ function ItemsView({ items }: { items: CheckedItem[] }) {
         {items.map((item, i) => {
           const verdict = item.verdict ? VERDICT[item.verdict] : null;
           const failing = item.rules.filter((r) => r.strength === "required" && r.result === "fails");
+          // A difference first, then something left out, then a confirmation.
+          const telling = ["differs", "left_out", "confirmed"]
+            .map((kind) => item.findings.find((f) => f.kind === kind))
+            .find(Boolean);
           const reason =
             item.status !== "done"
               ? null
-              : item.note ??
+              : item.problem ??
                 (failing.length ? `You don't meet: ${failing.map((r) => r.plain).join("; ")}` : null) ??
-                item.findings[0]?.point ??
-                null;
+                (telling ? `${telling.kind === "differs" ? "Differs: " : ""}${telling.point}` : null);
           return (
             <li key={i} className="py-2">
               <div className="flex items-center gap-2">
@@ -199,7 +209,20 @@ function ItemsView({ items }: { items: CheckedItem[] }) {
                   </span>
                 )}
               </div>
+              {item.note && <p className="mt-0.5 text-xs text-muted">The post says: {item.note}</p>}
               {reason && <p className="mt-0.5 text-sm text-ink-2">{reason}</p>}
+              {item.status === "done" && checkYourself(item).length > 0 && (
+                <p className="mt-0.5 text-sm text-ink-2">Check yourself: {checkYourself(item).join("; ")}</p>
+              )}
+              {item.officialUrl && (
+                <p className="text-xs text-muted">
+                  Checked on{" "}
+                  <a href={item.officialUrl} target="_blank" rel="noreferrer" className="underline">
+                    {hostOf(item.officialUrl)}
+                  </a>
+                  {item.foundBy === "search" && " · found by searching"}
+                </p>
+              )}
               {item.deadline && <p className="text-xs text-muted">Closes {item.deadline.display}</p>}
             </li>
           );
