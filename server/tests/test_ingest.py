@@ -1,3 +1,5 @@
+from typing import Any
+
 import httpx
 import pytest
 
@@ -181,6 +183,29 @@ def test_captions_retry_when_youtube_blocks(monkeypatch: pytest.MonkeyPatch) -> 
     assert len(calls) == 2
 
 
+def test_captions_go_through_the_proxy_only_when_one_is_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from youtube_transcript_api import YouTubeTranscriptApi
+
+    proxies: list[Any] = []
+    real_init = YouTubeTranscriptApi.__init__
+
+    def init(self: YouTubeTranscriptApi, proxy_config: Any = None, **kwargs: Any) -> None:
+        proxies.append(proxy_config)
+        real_init(self, proxy_config=proxy_config, **kwargs)
+
+    monkeypatch.setattr(YouTubeTranscriptApi, "__init__", init)
+    _fake_transcripts(monkeypatch, [None, None])
+    gather._captions("vid", pause_s=0)
+    gather._captions("vid", proxy_url="http://u:p@proxy.example:80/", pause_s=0)
+    assert proxies[0] is None
+    assert proxies[1].to_requests_dict() == {
+        "http": "http://u:p@proxy.example:80/",
+        "https": "http://u:p@proxy.example:80/",
+    }
+
+
 def test_captions_say_whether_they_were_blocked_or_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     from youtube_transcript_api._errors import RequestBlocked, TranscriptsDisabled
 
@@ -188,6 +213,14 @@ def test_captions_say_whether_they_were_blocked_or_missing(monkeypatch: pytest.M
     with pytest.raises(CaptionsUnavailable) as blocked:
         gather._captions("vid", pause_s=0)
     assert blocked.value.blocked
+
+    # A failing proxy is reported as blocked too, not as a video without captions.
+    from requests.exceptions import ProxyError
+
+    _fake_transcripts(monkeypatch, [ProxyError("proxy refused")] * gather.CAPTION_TRIES)
+    with pytest.raises(CaptionsUnavailable) as proxy_failed:
+        gather._captions("vid", proxy_url="http://u:p@proxy.example:80/", pause_s=0)
+    assert proxy_failed.value.blocked
 
     calls = _fake_transcripts(monkeypatch, [TranscriptsDisabled("vid")])
     with pytest.raises(CaptionsUnavailable) as missing:

@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     youtube_api_key: str = ""
     # YouTube captions via youtube-transcript-api (Isreal's decision, docs/adr/0008).
     feature_yt_captions: bool = True
+    # A proxy for caption requests only (ADR 0008), because YouTube blocks cloud servers.
+    # For example http://USER-rotate:PASS@p.webshare.io:80/. It holds a password: never log it.
+    captions_proxy_url: str = ""
     # Spend guards in tokens (in + out), because Meta hasn't published prices.
     # The demo user gets half the per-user budget (docs/06-models.md#gateway-behaviour).
     model_daily_token_budget: int = 5_000_000

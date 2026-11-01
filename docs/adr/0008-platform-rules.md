@@ -19,5 +19,9 @@ The hackathon disqualifies projects that break platform policies. The current Cr
 - **The decision:** reading captions is a judgement call. Isreal chose it (option 2) for its value: timestamped words for the prep sheet. It's behind a flag, and we'll say so in the README.
 - **Revisit:** ask at office hours. If the organisers say no, set `FEATURE_YT_CAPTIONS=false` and YouTube falls back to chapters.
 
+## Update · 1 Nov: captions from the server
+- **YouTube blocks cloud servers.** From the Paris EC2 server, both the caption library and yt-dlp were refused ("Sign in to confirm you're not a bot"). From Crowscap's AWS server yt-dlp got past that but YouTube returned no captions at all. From a home connection captions work.
+- **Decision:** caption requests may go through a proxy (`CAPTIONS_PROXY_URL`), used by the caption library only. yt-dlp stays out.
+
 ## Consequences
 Some saves can't be read inside, and the product says so plainly. That's a limit we state, not a rule we bend.

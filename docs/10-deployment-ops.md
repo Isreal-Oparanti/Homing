@@ -54,6 +54,7 @@ SPARK_OPEN_BASE=
 SPARK_OPEN_KEY=
 SPARK_OPEN_MODEL=
 VIDEO_MODE=chapters_only
+CAPTIONS_PROXY_URL=            # caption requests only (ADR 0008); YouTube blocks cloud servers. Holds a password.
 SEARCH_PROVIDER=
 SEARCH_API_KEY=
 YOUTUBE_API_KEY=

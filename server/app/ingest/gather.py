@@ -108,18 +108,26 @@ class CaptionsUnavailable(Exception):
         self.blocked = blocked
 
 
-def _captions(video_id: str, *, pause_s: float = 1.5) -> list[dict[str, Any]]:
+def _captions(video_id: str, *, proxy_url: str = "", pause_s: float = 1.5) -> list[dict[str, Any]]:
     """YouTube caption text with timestamps (Isreal's decision, 31 Oct: captions only, no
     downloading; behind FEATURE_YT_CAPTIONS). YouTube refuses some requests at random, so
-    blocked requests are retried a few times with short pauses."""
+    blocked requests are retried a few times with short pauses. YouTube blocks cloud
+    servers outright, so production sends these requests through `proxy_url`; a new client
+    per try means a rotating proxy gives each try a new address."""
+    from requests.exceptions import ProxyError
     from youtube_transcript_api import YouTubeTranscriptApi
     from youtube_transcript_api._errors import IpBlocked, RequestBlocked
+    from youtube_transcript_api.proxies import GenericProxyConfig
 
+    proxy = GenericProxyConfig(http_url=proxy_url, https_url=proxy_url) if proxy_url else None
     for attempt in range(CAPTION_TRIES):
         try:
-            fetched = YouTubeTranscriptApi().fetch(video_id, languages=["en", "en-US", "en-GB"])
+            fetched = YouTubeTranscriptApi(proxy_config=proxy).fetch(
+                video_id, languages=["en", "en-US", "en-GB"]
+            )
             return [{"t": round(s.start, 1), "text": s.text} for s in fetched]
-        except (RequestBlocked, IpBlocked) as exc:
+        # A proxy that fails is as good as blocked: the video may well have captions.
+        except (RequestBlocked, IpBlocked, ProxyError) as exc:
             if attempt == CAPTION_TRIES - 1:
                 raise CaptionsUnavailable(blocked=True) from exc
             time.sleep(pause_s * (attempt + 1))
@@ -165,7 +173,7 @@ def gather_youtube(url: str, fetcher: SafeFetcher, settings: Settings) -> Gather
     out.snapshots.append(SnapshotIn("metadata", summary, watch, meta))
     if settings.feature_yt_captions:
         try:
-            segments = _captions(vid)
+            segments = _captions(vid, proxy_url=settings.captions_proxy_url)
             lines, size = [], 0
             for seg in segments:
                 line = f"[{int(seg['t']) // 60}:{int(seg['t']) % 60:02d}] {seg['text']}"
