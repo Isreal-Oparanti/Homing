@@ -36,8 +36,9 @@ def handle_save_read(ctx: JobContext, payload: SaveReadPayload) -> None: ...
 
 | Kind | Enqueued by | Handler | Priority | Dedupe key |
 |---|---|---|---|---|
-| `import.whatsapp` | API `POST /imports/whatsapp` | `ingest.whatsapp.run_import` | 10 | `import:{import_id}` |
+| `import.whatsapp` | API `POST /imports/whatsapp` | `ingest.whatsapp.importer.import_whatsapp` | 10 | `import:{import_id}` |
 | `save.read` | API on new save; import | `what_is_it.read_one` | 10 user / 90 import | `read:{save_id}` |
+| | **Lanes (1 Nov):** every job carries `lane` (`JOB_LANE`, "main" in production, "dev" on a laptop). Workers take and requeue only their own lane's jobs, because development and production share the database and an upload exists only on the machine that received it. | | | |
 | `save.read_batch` | import (small link saves) | `what_is_it.read_batch` | 90 | `readb:{hash of ids}` |
 | `save.check` | after read, if `is_checkable` | `is_it_true.check` | 20 | `check:{save_id}` |
 | `save.place` | after read | `whats_it_for.place` | 30 | `place:{save_id}` |

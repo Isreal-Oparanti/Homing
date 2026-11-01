@@ -252,6 +252,10 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
   - an agent test checking the import counts.
 - **If late:** media read as "kept, not read yet". Text and links still go through.
 
+- **As built, step 1 (1 Nov):** parser, importer, `POST /imports/whatsapp` (upload ticket, straight to the API), `GET /imports/{id}`, the Import page (upload progress, then live counts, then a summary), and job lanes. Photos and PDFs are read; videos, voice notes and Word docs are kept, not read yet.
+  - **Step 2:** read videos and voice notes with Meta's models.
+  - **Still to do for the done-when:** import Isreal's real export, and check counts, reading time and that a second run is a cache hit.
+
 ### S9 · What's it for? over the whole pile
 - **Day:** Mon · **Estimate:** 3h · **Depends on:** S8 · **Scene:** Past
 - **Builds:**

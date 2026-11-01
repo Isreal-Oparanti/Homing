@@ -30,7 +30,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return (res.status === 204 ? undefined : await res.json()) as T;
 }
 
-async function uploadTicket(): Promise<{ url: string; ticket: string }> {
+async function uploadTicket(): Promise<{ url: string; api: string; ticket: string }> {
   const res = await fetch("/api/upload-ticket", { method: "POST" });
   if (!res.ok) {
     const err = (await res.json().catch(() => null))?.error;
@@ -547,5 +547,94 @@ export const profileApi = {
         body: JSON.stringify({ question_id: questionId, value }),
       }),
     );
+  },
+};
+
+/** A WhatsApp export on its way in (server/app/api/v1/imports.py). */
+export type ImportCounts = {
+  messages?: number;
+  saves?: number;
+  media?: number;
+  private?: number;
+  duplicates?: number;
+  skipped?: number;
+  already?: number;
+  total?: number;
+  done?: number;
+};
+
+export type ImportStatus = {
+  id: string;
+  status: "received" | "importing" | "done" | "failed";
+  counts: ImportCounts;
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+};
+
+type RawImport = {
+  id: string;
+  status: ImportStatus["status"];
+  counts: ImportCounts;
+  error: string | null;
+  created_at: string;
+  finished_at: string | null;
+};
+
+function toImport(raw: RawImport): ImportStatus {
+  return {
+    id: raw.id,
+    status: raw.status,
+    counts: raw.counts ?? {},
+    error: raw.error,
+    createdAt: raw.created_at,
+    finishedAt: raw.finished_at,
+  };
+}
+
+export const importApi = {
+  /**
+   * Sends the export straight to the API with an upload ticket (it can be hundreds of MB, far
+   * over the web server's 4.5 MB limit). XHR, not fetch, because only XHR reports progress.
+   */
+  async upload(file: File, onProgress: (fraction: number) => void): Promise<ImportStatus> {
+    const { api, ticket } = await uploadTicket();
+    const form = new FormData();
+    form.append("file", file);
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${api}/imports/whatsapp`);
+      xhr.setRequestHeader("Authorization", `Bearer ${ticket}`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded / e.total);
+      };
+      xhr.onload = () => {
+        const body = (() => {
+          try {
+            return JSON.parse(xhr.responseText);
+          } catch {
+            return null;
+          }
+        })();
+        if (xhr.status >= 200 && xhr.status < 300 && body) resolve(toImport(body));
+        else
+          reject(
+            new HomingApiError(
+              xhr.status,
+              body?.error?.code ?? "error",
+              body?.error?.message ?? "Couldn't send the export. Try again.",
+            ),
+          );
+      };
+      xhr.onerror = () =>
+        reject(new HomingApiError(503, "unreachable", "The upload stopped. Check your connection and try again."));
+      xhr.send(form);
+    });
+  },
+  async get(id: string): Promise<ImportStatus> {
+    return toImport(await api<RawImport>(`imports/${encodeURIComponent(id)}`));
+  },
+  async recent(): Promise<ImportStatus[]> {
+    return (await api<RawImport[]>("imports")).map(toImport);
   },
 };

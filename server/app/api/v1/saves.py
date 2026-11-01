@@ -6,7 +6,6 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agents import is_it_true
@@ -14,10 +13,11 @@ from app.core.auth import CurrentUser, require_uploader, require_user
 from app.core.errors import AppError
 from app.db.models import Check, Media, Save, Snapshot, User, When
 from app.db.repo import answers as answers_repo
+from app.db.repo import media as media_repo
 from app.db.repo import saves as saves_repo
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
-from app.ingest.files import EXTENSIONS, MAX_FILE_BYTES, UnsupportedFile, sniff
+from app.ingest.files import MAX_FILE_BYTES, UnsupportedFile, sniff
 from app.ingest.urls import canonical_url
 from app.jobs import queue
 from app.storage import Storage, get_storage
@@ -225,25 +225,7 @@ def _store_file(db: Session, storage: Storage, user_id: str, upload: UploadFile)
         mime = sniff(data)
     except UnsupportedFile as exc:
         raise AppError("unsupported_file", str(exc), status=415) from exc
-    sha = hashlib.sha256(data).hexdigest()
-    existing = db.scalar(
-        select(Media).where(Media.user_id == user_id, Media.sha256 == sha).limit(1)
-    )
-    if existing is not None:
-        return existing  # the same file saved again: kept once
-    key = f"u/{user_id}/{sha}.{EXTENSIONS[mime]}"
-    storage.put(key, data, mime)
-    media = Media(
-        user_id=user_id,
-        storage_key=key,
-        mime=mime,
-        bytes=len(data),
-        sha256=sha,
-        original_filename=(upload.filename or "")[:200] or None,
-    )
-    db.add(media)
-    db.flush()
-    return media
+    return media_repo.store(db, storage, user_id, data, mime, upload.filename)[0]
 
 
 @router.post("/file", status_code=202, response_model=SaveOut)

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Import,
   LogOut,
   Plus,
   Search,
@@ -58,6 +59,15 @@ export function AppShell({ name, children }: { name: string; children: React.Rea
           ))}
         </nav>
         <div className="mt-auto">
+          <Link
+            href="/import"
+            className={`mb-2 flex items-center gap-3 rounded-full px-4 py-2 text-sm font-semibold ${
+              isActive("/import") ? "bg-ink text-white" : "text-ink-2 hover:bg-glass-strong"
+            }`}
+          >
+            <Import className="size-[18px]" strokeWidth={1.8} aria-hidden />
+            Import from WhatsApp
+          </Link>
           <p className="truncate px-4 text-sm text-muted">{name}</p>
           <Link
             href="/profile"

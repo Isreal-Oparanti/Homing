@@ -88,6 +88,26 @@ def test_permanent_failure_is_not_retried(db: Session) -> None:
 
 
 @pytest.mark.integration
+def test_a_worker_never_takes_or_requeues_another_lanes_jobs(db: Session) -> None:
+    """Dev and production share the database; a WhatsApp export only exists on the machine
+    that received it."""
+    elsewhere = queue.enqueue(db, "other-machine")
+    db.execute(update(Job).where(Job.id == elsewhere).values(lane="somewhere-else"))
+    db.commit()
+    assert queue.claim(db, "w1") is None
+
+    db.execute(
+        update(Job)
+        .where(Job.id == elsewhere)
+        .values(status="running", locked_at=datetime.now(UTC) - timedelta(hours=1))
+    )
+    assert queue.requeue_stuck(db) == 0
+    mine = queue.enqueue(db, "this-machine")
+    db.commit()
+    job = queue.claim(db, "w1")
+    assert job is not None and job.id == mine
+
+
 def test_stuck_jobs_are_requeued(db: Session) -> None:
     job_id = queue.enqueue(db, "slow")
     queue.claim(db, "w1")

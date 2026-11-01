@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { FileText, ImageIcon, Paperclip, X } from "lucide-react";
+import { FileText, ImageIcon, MessageCircle, Paperclip, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -154,6 +155,14 @@ export function AddSave({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </div>
+        <Link
+          href="/import"
+          onClick={onClose}
+          className="mt-3 flex items-center gap-1.5 px-3 text-sm font-semibold text-ink-2 hover:underline"
+        >
+          <MessageCircle className="size-4" aria-hidden />
+          Or import a whole WhatsApp chat
+        </Link>
       </form>
     </div>
   );

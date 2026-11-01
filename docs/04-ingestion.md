@@ -42,6 +42,15 @@ How things come in, and how **What is it?** gets content to read. Code lives in 
 
 **Import summary** (`imports.counts`): `{messages, saves, media, private, duplicates, skipped}`, shown to the user when the import finishes.
 
+### As built (S8 step 1, 1 Nov)
+- **Code:** `ingest/whatsapp/parser.py` (pure: `parse`, `plan`) and `ingest/whatsapp/importer.py` (job `import.whatsapp`). Tests on made-up Android 24h, Android 12h month-first and iOS exports in `tests/fixtures/whatsapp/`.
+- **Isreal's real export:** 700 messages (28 Jun 2025 to 30 Oct 2026), day-first found from the dates, 6 system lines, 633 planned saves, 63 links labelled by the next message, all 64 attachments found, and each type found from its bytes (3 Word docs and a PDF have no extension).
+- **Running the same export again adds nothing:** a save already imported with the same time and `content_hash` is counted as `already`.
+- **Files:** photos and PDFs are read as in S7. Videos, voice notes and Office documents are stored and marked "kept, not read yet" (step 2 reads them with Meta's models). Videos are stored as they are for now; the 480p copy comes later (Isreal's videos total 185 MB, the largest 15 MB, under the bucket's 50 MB per-file limit).
+- **Skipped and counted:** stickers (`STK-`), contact cards, zips inside the zip, files the export left out, empty and punctuation-only messages.
+- **Zip safety:** paths with `..` or a drive or root are refused before anything is read; 2 GB and 20k entries at most; each file 50 MB at most.
+- **Where the upload waits:** the API writes it to `IMPORT_DIR` on its own disk, and only a worker on the same machine can read it. That's why jobs have lanes ([03](03-agents.md)).
+
 ### Storage rules (approved by Isreal, 31 Oct)
 
 The database holds **text only**: saves, readings, snapshots, captions and transcripts. That's a few MB for the whole pile. Files go to object storage (Supabase free tier: 1 GB). Isreal's export is about 200 MB, 93% of it 31 videos. These rules bring it to about 40–60 MB without losing anything useful.

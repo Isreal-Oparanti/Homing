@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     proxy_secret: str = ""
     admin_token: str = ""
     run_worker_in_api: bool = True
+    # Development and production share the database, not each other's work: each worker
+    # only takes jobs from its own lane. Production is "main"; set JOB_LANE=dev locally.
+    job_lane: str = "main"
 
     meta_api_base: str = "https://api.meta.ai/v1"
     meta_api_key: str = ""
@@ -52,6 +55,10 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_service_key: str = ""
     storage_bucket: str = "saves"
+    # WhatsApp exports wait here between upload and import. The API and the worker share it,
+    # so they must run on the same machine (they do: docs/10). Deleted after each import.
+    import_dir: str = "data/imports"
+    import_max_bytes: int = 1024**3
     # Web search for Is it true? when a save has no link to its official page.
     search_provider: str = "serper"
     search_api_key: str = ""

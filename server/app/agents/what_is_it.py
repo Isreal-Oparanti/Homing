@@ -50,6 +50,8 @@ KIND_WORDS = {
     "web": "a page",
 }
 FILE_WORDS = {"image": "an image", "pdf": "a PDF"}
+# Files from WhatsApp imports that Homing keeps but can't read yet (docs/04, S8).
+KEPT_WORDS = {"video": "a video", "voice": "a voice note", "file": "a document"}
 
 COPY_LABELS = {
     "ocr_text": "Our copy of the words on it",
@@ -241,6 +243,33 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
             agent="what",
             action="kept_private",
             summary=f"Kept a save private: {why}.",
+            save_id=save.id,
+        )
+        return
+
+    if save.kind in KEPT_WORDS:
+        thing = KEPT_WORDS[save.kind]
+        caption = (save.text or "").strip()
+        saves_repo.upsert_reading(
+            ctx.db,
+            save.id,
+            {
+                "title": caption[:80] if caption else f"{thing.capitalize()} you saved",
+                "what": f"{thing.capitalize()}, kept with your words. Homing can't read it yet.",
+                "key_facts": {},
+                "is_checkable": False,
+                "is_opportunity": False,
+                "model": "none",
+                "prompt_version": "none",
+            },
+        )
+        save.status = "ready"
+        emit(
+            ctx.db,
+            user_id=save.user_id,
+            agent="what",
+            action="kept",
+            summary=f"Kept {thing}; Homing can't read it yet.",
             save_id=save.id,
         )
         return

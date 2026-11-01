@@ -5,6 +5,7 @@ PDFs with a text layer are read as text; scanned PDFs and images go to Muse Spar
 """
 
 import io
+import zipfile
 from dataclasses import dataclass
 
 from PIL import Image
@@ -21,6 +22,22 @@ EXTENSIONS = {
     "image/webp": "webp",
     "image/gif": "gif",
     "application/pdf": "pdf",
+    # Only from WhatsApp imports so far (docs/04 · storage rules).
+    "video/mp4": "mp4",
+    "video/quicktime": "mov",
+    "audio/ogg": "opus",
+    "audio/mp4": "m4a",
+    "audio/mpeg": "mp3",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+}
+_OFFICE = {
+    "word/document.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xl/workbook.xml": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "ppt/presentation.xml": (
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ),
 }
 
 
@@ -41,6 +58,33 @@ def sniff(data: bytes) -> str:
     if data.startswith(b"%PDF-"):
         return "application/pdf"
     raise UnsupportedFile("Homing can read images and PDFs for now.")
+
+
+def sniff_any(data: bytes) -> str | None:
+    """Like `sniff`, for everything a WhatsApp export can hold. None when unknown.
+    Zips and contact cards are named so the importer can skip them on purpose."""
+    try:
+        return sniff(data)
+    except UnsupportedFile:
+        pass
+    if data[4:8] == b"ftyp":
+        brand = data[8:12]
+        if brand.startswith(b"M4A"):
+            return "audio/mp4"
+        return "video/quicktime" if brand == b"qt  " else "video/mp4"
+    if data.startswith(b"OggS"):
+        return "audio/ogg"
+    if data.startswith(b"ID3") or data[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
+        return "audio/mpeg"
+    if data.startswith(b"PK\x03\x04"):
+        try:
+            names = set(zipfile.ZipFile(io.BytesIO(data)).namelist())
+        except zipfile.BadZipFile:
+            return None
+        return next((mime for part, mime in _OFFICE.items() if part in names), "application/zip")
+    if data.lstrip()[:11].upper() == b"BEGIN:VCARD":
+        return "text/vcard"
+    return None
 
 
 @dataclass(frozen=True)

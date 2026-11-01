@@ -12,6 +12,7 @@ from sqlalchemy import func, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.models import Job
 
 BACKOFF_BASE_S = 10
@@ -55,6 +56,7 @@ def enqueue(
         .values(
             kind=kind,
             payload=payload or {},
+            lane=get_settings().job_lane,
             user_id=user_id,
             priority=priority,
             dedupe_key=dedupe_key,
@@ -79,7 +81,7 @@ _CLAIM = text(
            attempts = attempts + 1, updated_at = now()
      WHERE id = (
             SELECT id FROM jobs
-             WHERE status = 'queued' AND run_after <= now()
+             WHERE status = 'queued' AND lane = :lane AND run_after <= now()
              ORDER BY priority, run_after, id
              FOR UPDATE SKIP LOCKED
              LIMIT 1)
@@ -89,8 +91,10 @@ _CLAIM = text(
 
 
 def claim(db: Session, worker_id: str) -> ClaimedJob | None:
-    """Take the next ready job. Safe with many workers: each row goes to exactly one."""
-    row = db.execute(_CLAIM, {"worker": worker_id}).mappings().first()
+    """Take the next ready job in this worker's lane. Safe with many workers: each row goes
+    to exactly one."""
+    params = {"worker": worker_id, "lane": get_settings().job_lane}
+    row = db.execute(_CLAIM, params).mappings().first()
     return ClaimedJob(**row) if row else None
 
 
@@ -144,7 +148,8 @@ def requeue_stuck(db: Session, older_than: timedelta = STUCK_AFTER) -> int:
     cutoff = datetime.now(UTC) - older_than
     result = db.execute(
         update(Job)
-        .where(Job.status == "running", Job.locked_at < cutoff)
+        .where(Job.status == "running", Job.lane == get_settings().job_lane)
+        .where(Job.locked_at < cutoff)
         .values(status="queued", locked_by=None, locked_at=None)
     )
     return result.rowcount or 0

@@ -7,6 +7,7 @@ from app.agents.what_is_it import read_one
 from app.agents.whats_it_for import place
 from app.agents.when_needed import set_when
 from app.events.emitter import emit
+from app.ingest.whatsapp.importer import import_whatsapp
 from app.jobs.errors import PermanentError
 from app.jobs.runner import Handler, JobContext
 
@@ -31,4 +32,5 @@ HANDLERS: dict[str, Handler] = {
     "save.check_item": check_item,
     "save.place": place,
     "save.when": set_when,
+    "import.whatsapp": import_whatsapp,
 }

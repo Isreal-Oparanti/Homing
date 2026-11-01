@@ -26,6 +26,7 @@ class Job(Base):
     locked_by: Mapped[str | None] = mapped_column(Text)
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     dedupe_key: Mapped[str | None] = mapped_column(Text)
+    lane: Mapped[str] = mapped_column(Text, default="main", server_default="main")
     last_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(

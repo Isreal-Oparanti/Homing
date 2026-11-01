@@ -18,5 +18,6 @@ export async function POST() {
       "Homing isn't set up to reach its server.",
     );
   }
-  return NextResponse.json({ url: `${BACKEND_URL}/api/v1/saves/file`, ticket });
+  // `api` is for the other upload, a WhatsApp export (POST /imports/whatsapp).
+  return NextResponse.json({ url: `${BACKEND_URL}/api/v1/saves/file`, api: `${BACKEND_URL}/api/v1`, ticket });
 }
