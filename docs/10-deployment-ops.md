@@ -5,14 +5,14 @@
 | Env | Web | API + worker | Database and storage | Notes |
 |---|---|---|---|---|
 | `local` | `npm run dev` on :3000 | `uvicorn` on :8000, worker inside the API (`RUN_WORKER_IN_API=true`) | Postgres (Docker or a Supabase dev database); storage on the local disk (`STORAGE_BACKEND=local`) | see [12-dev-workflow.md](12-dev-workflow.md#local-setup) |
-| `prod` | Vercel (functions in Paris) | AWS `eu-west-3` (Paris): one container with the worker inside (`RUN_WORKER_IN_API=true`); split into `api` and `worker` later if needed | Supabase (Postgres + Storage) | See [ADR 0007](adr/0007-hosting.md) |
+| `prod` | Vercel (functions in Paris) | One EC2 instance in `eu-west-3` (Paris), no Docker: two systemd services, `homing-api` and `homing-worker`, behind Caddy at `https://homing-api.crowscap.xyz` | Supabase (Postgres + Storage) | See [ADR 0007](adr/0007-hosting.md) |
 
 There's no staging environment, because there's no time. Use feature flags and the demo user instead.
 
 ## Hosting (from ADR 0007)
 
 - **Web:** Vercel, linked to the GitHub repo, root `web/`.
-- **API and worker:** AWS in `eu-west-3` (Paris, next to Supabase), one container from `server/Dockerfile`, worker inside the API. Two containers (`api`, and `worker` started with `python -m app.worker`) remain an option.
+- **API and worker:** one EC2 instance (Ubuntu 24.04) in `eu-west-3` (Paris, next to Supabase). No Docker (Isreal, 1 Nov): Python and `uv`, `ffmpeg`, two systemd services (`homing-api`, `homing-worker`) and Caddy for HTTPS. Everything is in `deploy/ec2/`.
   - **Fallback:** a VM with Docker Compose and Caddy (for example the existing Crowscap server, if it's still running and has room).
 - **Postgres and Storage:** Supabase project `crowscap-hack` (free tier). Bucket `saves`, private.
 - **Muse Spark Open:** a Baseten (or Modal) deployment of `meta-models/muse-spark-open-1026`, using partner credits **(confirm)**.
@@ -82,6 +82,9 @@ FEATURE_AUDIT=true
 
 ## Docker image (`server/Dockerfile`)
 
+Not used in production since 1 Nov (plain EC2, below). Kept for anyone who wants to run the server in Docker.
+
+
 - Base `python:3.12-slim`, plus `ffmpeg` (voice notes) and `libmagic` (type sniffing).
 - Dependencies installed with `uv` from a lock file. Runs as a non-root user.
 - The embedding model (`EMBED_MODEL`, ONNX) is downloaded **at build time** into `/models`, adding about 200 MB. Both `api` (query embeddings for search) and `worker` (save embeddings) load it once at startup.
@@ -91,16 +94,20 @@ FEATURE_AUDIT=true
 - Healthcheck: `GET /health`.
 
 ## First deploy, as done (1 Nov)
-- **Settings files:** `server/.env.production` and `web/.env.vercel` (git-ignored) hold every production variable, with production's own `PROXY_SECRET`, `ADMIN_TOKEN` and `NEXTAUTH_SECRET`. The first goes to the AWS container, the second into Vercel's variable editor.
+- **Settings files:** `server/.env.production` and `web/.env.vercel` (git-ignored) hold every production variable, with production's own `PROXY_SECRET`, `ADMIN_TOKEN` and `NEXTAUTH_SECRET`. The first becomes `/etc/homing/homing.env` on the instance; the second goes into Vercel's variable editor.
+- **Database connection:** production uses Supabase's transaction pooler (port 6543), which allows far more connections than the session pooler; the app keeps no per-connection state and turns off prepared statements, and each migration is one transaction. Development keeps the session pooler.
+- **Per-process settings** (`RUN_WORKER_IN_API=false`, `WORKER_THREADS`, `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`) are in the service files, not in `homing.env`, because systemd lets the settings file override a service's own `Environment=`.
 - **One database:** development and production share the Supabase database, so the demo pile is already there. Files must therefore live in the bucket in both: run `python -m app.scripts.setup_storage` once (creates the private `saves` bucket, copies local files in, reads each back), then set `STORAGE_BACKEND=supabase` locally too.
 - **While the local server runs,** its worker also takes jobs from production's queue. Stop it once judging starts.
 - **Uploads** skip Vercel with an upload ticket ([07](07-api.md#conventions)), so Vercel's 4.5 MB limit doesn't apply.
 
 ## Deploy steps
 
-1. Push to `main`. Vercel builds `web/`; the API image is built from `server/` and deployed to AWS. **Only when Isreal says push.**
-2. The `api` service runs `alembic upgrade head` before starting. Migrations must be backwards-compatible with the running worker: add columns first, use them later.
-3. `worker` restarts. Running jobs are picked up again after 15 minutes if they were cut off ([03](03-agents.md#job-catalogue)).
+1. Push to `main` (**only when Isreal says push**). Vercel builds `web/` on its own.
+2. On the instance: `sudo bash /opt/homing/app/deploy/ec2/update.sh`. It pulls `main`, runs `uv sync --frozen --no-dev`, and restarts the services.
+3. `homing-api` runs `alembic upgrade head` before it starts (`ExecStartPre`). Migrations must work with the worker still on the old code: add columns first, use them later.
+4. `homing-worker` restarts. Jobs cut off by the restart are picked up again after 15 minutes ([03](03-agents.md#job-catalogue)).
+5. Logs: `journalctl -u homing-api -f` and `journalctl -u homing-worker -f`.
 4. Smoke test after deploy:
    - `GET /health/deep`;
    - sign in as the demo user;
@@ -118,7 +125,12 @@ FEATURE_AUDIT=true
   - **Storage:** create the private `saves` bucket (S7).
   - **Data API:** turn it off in project settings, or at least make sure every table has RLS on. Every migration enables RLS ([02](02-data-model.md)), because we never use Supabase's REST API.
 - Google OAuth: add the redirect URL `https://<web>/api/auth/callback/google`.
-- AWS: one container in `eu-west-3` (Paris) from `server/Dockerfile`, with HTTPS.
+- **AWS EC2** (`deploy/ec2/`):
+  1. Launch Ubuntu 24.04 in `eu-west-3` (Paris): `t3.small` (2 GB), 20 GB gp3 disk. Security group: SSH (22) from your own IP only, HTTP (80) and HTTPS (443) from anywhere. Attach an Elastic IP.
+  2. DNS for `crowscap.xyz`: an A record `homing-api` pointing at the Elastic IP.
+  3. Copy `server/.env.production` to the instance as `/etc/homing/homing.env` (`sudo mkdir -p /etc/homing` first).
+  4. `curl -fsSLO https://raw.githubusercontent.com/Isreal-Oparanti/Homing/main/deploy/ec2/setup.sh && sudo bash setup.sh homing-api.crowscap.xyz`. It installs git, ffmpeg, Caddy and uv, adds 2 GB of swap, creates the `homing` user, clones the repo to `/opt/homing/app`, installs both services and the Caddyfile, then runs `update.sh`.
+  5. Check: `curl https://homing-api.crowscap.xyz/api/v1/health` gives `{"status":"ok"}`. The API itself listens on 127.0.0.1:8000 only; Caddy gets and renews the certificate.
 - Vercel: create the project and set the env vars.
 - Seed the demo data with `python -m app.scripts.seed_demo --from <export.zip>`.
 

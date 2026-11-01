@@ -1,0 +1,20 @@
+# The Homing API (docs/10-deployment-ops.md). Installed by setup.sh.
+[Unit]
+Description=Homing API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=homing
+WorkingDirectory=/opt/homing/app/server
+EnvironmentFile=/etc/homing/homing.env
+# Set here, not in homing.env, which would override them: the worker has its own service.
+Environment=RUN_WORKER_IN_API=false DB_POOL_SIZE=5 DB_MAX_OVERFLOW=2
+# Migrations run before the API starts; they must work with the worker still running.
+ExecStartPre=/opt/homing/app/server/.venv/bin/alembic upgrade head
+ExecStart=/opt/homing/app/server/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --timeout-graceful-shutdown 10
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

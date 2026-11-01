@@ -1,0 +1,8 @@
+# HTTPS in front of the Homing API. setup.sh puts the real name in place of API_DOMAIN,
+# and Caddy gets and renews the certificate itself.
+API_DOMAIN {
+	reverse_proxy 127.0.0.1:8000 {
+		# The live feed is a stream: pass each event on at once.
+		flush_interval -1
+	}
+}

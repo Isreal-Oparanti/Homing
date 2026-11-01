@@ -168,7 +168,7 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **Day:** Sat evening · **Estimate:** 2h · **Depends on:** S1–S4 and the accounts (Isreal)
 - **Builds:**
   - **Supabase:** the project, with the `vector` and `pg_trgm` extensions and a private `saves` bucket.
-  - **Server host:** AWS in `eu-west-3` (Paris), one container from `server/Dockerfile` (Isreal, 1 Nov; [ADR 0007](adr/0007-hosting.md)).
+  - **Server host:** one EC2 instance in `eu-west-3` (Paris), no Docker: systemd services `homing-api` and `homing-worker`, Caddy for HTTPS (Isreal, 1 Nov; [ADR 0007](adr/0007-hosting.md), `deploy/ec2/`).
   - **Vercel:** the `web/` project.
   - **Config:** every env var from [10](10-deployment-ops.md#environment-variables), and the Google redirect URL.
   - **Rate limits** from [09](09-security-privacy.md#rate-limits) (per user, fixed window in Postgres, 429 with `Retry-After`). The demo login is public once deployed, so these ship with the first deploy.

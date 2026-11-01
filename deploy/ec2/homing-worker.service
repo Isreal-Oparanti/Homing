@@ -1,0 +1,20 @@
+# The Homing worker: runs the agents' jobs (docs/10-deployment-ops.md). Installed by setup.sh.
+[Unit]
+Description=Homing worker
+Wants=network-online.target
+After=network-online.target homing-api.service
+
+[Service]
+User=homing
+WorkingDirectory=/opt/homing/app/server
+EnvironmentFile=/etc/homing/homing.env
+# Each thread holds a database connection while it works, so the pool stays bigger.
+Environment=WORKER_THREADS=3 DB_POOL_SIZE=4 DB_MAX_OVERFLOW=2
+ExecStart=/opt/homing/app/server/.venv/bin/python -m app.worker
+# A job cut off by a restart is picked up again after 15 minutes (docs/03).
+TimeoutStopSec=30
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
