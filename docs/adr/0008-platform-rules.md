@@ -11,7 +11,7 @@ The hackathon disqualifies projects that break platform policies. The current Cr
 - **WhatsApp:** the user's own chat export only. No bot, no Business API.
 - **X:** official oEmbed (first post only), plus the user's screenshots.
 - **Web pages:** respect robots.txt, one fetch per check, with an identified user agent.
-- **Enforcement:** CI fails if `yt-dlp`, `instaloader` or similar downloaders appear in `uv.lock`.
+- **Enforcement:** CI fails if `yt-dlp`, `instaloader` or similar downloaders appear in `uv.lock`. Built 1 Nov: `.github/workflows/platform-rules.yml` checks `server/uv.lock` and `web/package-lock.json` on every push to `main` and every pull request.
 
 ## Update · 31 Oct: YouTube captions
 
