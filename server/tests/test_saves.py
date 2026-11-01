@@ -275,6 +275,7 @@ def test_an_imported_opportunity_that_closed_waits_for_check_it_now(
         mine = select(Job).where(Job.payload["save_id"].astext == old)
         jobs = {j.kind: j for j in db.scalars(mine)}
         assert "save.check" not in jobs and jobs["save.when"].priority == 90
+        assert "save.place" not in jobs  # placed later, with the whole pile (S9)
         held = db.scalars(
             select(AgentEvent).where(AgentEvent.save_id == old, AgentEvent.agent == "true")
         ).one()

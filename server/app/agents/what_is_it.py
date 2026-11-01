@@ -213,7 +213,9 @@ def _hand_over(ctx: JobContext, save: Save, reading: Reading) -> None:
     if to_check and save.import_id and not _still_open(ctx, save, reading):
         to_check = False
     nxt = ["save.check"] if to_check else ["save.when"]
-    nxt += ["save.place", "save.embed"]
+    # An import's saves are placed together, seeing the whole pile (What's it for?, S9), not
+    # one at a time: better threads, a quarter of the tokens.
+    nxt += ["save.embed"] if save.import_id else ["save.place", "save.embed"]
     # An import's saves wait behind anything the person saves by hand.
     priority = queue.PRIORITY_BACKLOG if save.import_id else queue.PRIORITY_USER
     for kind in nxt:
