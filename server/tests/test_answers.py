@@ -52,7 +52,7 @@ OFFICIAL = (
     "Internship Opportunities\nLocation: Cairo, Cairo Governorate, Egypt\nWorkplace: on-site\n"
     "Candidates must be aged between 20 and 32 in the year in which they apply.\n"
     "Fluency in English or French and a working knowledge of the other.\n"
-    f"Applications close on {_day(3)}."
+    f"Applications close on {_day(1)}."
 )
 LANGUAGE_RULE = ProposedRule(
     rule="language",
@@ -136,7 +136,7 @@ def fakes(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeModels.calls = []
     FakeModels.dates = [DateFact(text=f"Deadline: {_day(5)}.", role="deadline")]
     FakeModels.checkable = True
-    FakeModels.deadline_quote = f"Applications close on {_day(3)}."
+    FakeModels.deadline_quote = f"Applications close on {_day(1)}."
     FakeModels.rules = []
     for agent in (what_is_it, is_it_true, whats_it_for):
         monkeypatch.setattr(agent, "gateway_factory", FakeModels)
@@ -166,7 +166,7 @@ def test_all_four_answers_fill_in(client: TestClient, sessions: sessionmaker[Ses
     assert true["verdict"] == "fits_you"  # the page opened and no rule excludes you
     assert true["official_url"] == OFFICIAL_URL
     assert [f["point"] for f in true["findings"]] == ["It's on-site in Cairo."]  # Swahili dropped
-    assert true["deadline"]["source_text"] == f"Applications close on {_day(3)}."
+    assert true["deadline"]["source_text"] == f"Applications close on {_day(1)}."
 
     assert card["for"]["threads"][0]["title"] == "Funding and opportunities"
     assert card["for"]["threads"][0]["position"] == 1
@@ -190,6 +190,8 @@ def test_the_posts_date_is_used_when_the_official_page_has_none(
     client: TestClient, sessions: sessionmaker[Session]
 ) -> None:
     FakeModels.deadline_quote = None
+    # Due tomorrow, so it's back on Today now (2-7 days out would come back 2 days before).
+    FakeModels.dates = [DateFact(text=f"Deadline: {_day(1)}.", role="deadline")]
     save_id = _save_and_run(client, sessions, POST)
     when = client.get(f"/api/v1/saves/{save_id}", headers=HEADERS).json()["when"]
     assert (when["kind"], when["source"]) == ("date", "reading")

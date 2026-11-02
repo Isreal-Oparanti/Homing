@@ -30,9 +30,13 @@ async function proxy(req: NextRequest, ctx: RouteContext<"/api/backend/[...path]
       body: hasBody ? await req.arrayBuffer() : undefined,
       cache: "no-store",
     });
+    const disposition = res.headers.get("content-disposition"); // e.g. a calendar file
     return new NextResponse(res.body, {
       status: res.status,
-      headers: { "Content-Type": res.headers.get("content-type") ?? "application/json" },
+      headers: {
+        "Content-Type": res.headers.get("content-type") ?? "application/json",
+        ...(disposition ? { "Content-Disposition": disposition } : {}),
+      },
     });
   } catch {
     return errorResponse(503, "unreachable", "Homing's server isn't reachable right now. Try again.");

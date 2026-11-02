@@ -256,14 +256,26 @@ export type SaveCard = {
 };
 
 export type TodayCard = {
-  saveId: string;
-  kind: string;
+  id: string;
+  /** deadline: a save due back; prep: a moment you typed is coming. */
+  kind: "deadline" | "prep";
+  saveId: string | null;
+  threadIds: string[];
   title: string;
   whyNow: string;
   nextStep: string;
-  dueAt: string;
+  dueAt: string | null;
   tzStated: boolean;
   unconfirmed: boolean;
+};
+
+/** Something coming up, in your words; When will you need it? finds the goals it needs. */
+export type Moment = {
+  id: string;
+  text: string;
+  at: string;
+  display: string;
+  threads: { id: string; title: string }[];
 };
 
 /** A row in the saves list: the save plus its reading's title, when there is one. */
@@ -488,34 +500,51 @@ export const savesApi = {
   },
 };
 
+type RawCard = {
+  id: string;
+  kind: TodayCard["kind"];
+  save_id: string | null;
+  thread_ids: string[];
+  title: string;
+  why_now: string;
+  next_step: string;
+  due_at: string | null;
+  tz_stated: boolean;
+  unconfirmed: boolean;
+};
+
+function toCard(c: RawCard): TodayCard {
+  return {
+    id: c.id,
+    kind: c.kind,
+    saveId: c.save_id,
+    threadIds: c.thread_ids,
+    title: c.title,
+    whyNow: c.why_now,
+    nextStep: c.next_step,
+    dueAt: c.due_at,
+    tzStated: c.tz_stated,
+    unconfirmed: c.unconfirmed,
+  };
+}
+
 export const todayApi = {
-  async get(): Promise<{ date: string; cards: TodayCard[] }> {
-    const raw = await api<{
-      date: string;
-      cards: {
-        save_id: string;
-        kind: string;
-        title: string;
-        why_now: string;
-        next_step: string;
-        due_at: string;
-        tz_stated: boolean;
-        unconfirmed: boolean;
-      }[];
-    }>("today");
-    return {
-      date: raw.date,
-      cards: raw.cards.map((c) => ({
-        saveId: c.save_id,
-        kind: c.kind,
-        title: c.title,
-        whyNow: c.why_now,
-        nextStep: c.next_step,
-        dueAt: c.due_at,
-        tzStated: c.tz_stated,
-        unconfirmed: c.unconfirmed,
-      })),
-    };
+  async get(): Promise<{ date: string; cards: TodayCard[]; moments: Moment[] }> {
+    const raw = await api<{ date: string; cards: RawCard[]; moments: Moment[] }>("today");
+    return { date: raw.date, cards: raw.cards.map(toCard), moments: raw.moments };
+  },
+  /** use: done with it; dismiss: never again; later: back tomorrow morning. */
+  async act(cardId: string, action: "use" | "dismiss" | "later"): Promise<void> {
+    await api(`cards/${encodeURIComponent(cardId)}/act`, {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    });
+  },
+  async addMoment(text: string): Promise<Moment> {
+    return api<Moment>("moments", { method: "POST", body: JSON.stringify({ text }) });
+  },
+  async removeMoment(id: string): Promise<void> {
+    await api(`moments/${encodeURIComponent(id)}`, { method: "DELETE" });
   },
 };
 

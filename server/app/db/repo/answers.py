@@ -1,12 +1,9 @@
 """Reads for the four answers on a save card, and for Today. Always scoped to one user."""
 
-from collections.abc import Sequence
-from datetime import datetime, timedelta
-
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Check, Job, Reading, Save, Thread, ThreadSave, When
+from app.db.models import Check, Job, Save, Thread, ThreadSave, When
 
 ANSWER_JOBS = {"check": "true", "place": "for", "when": "when"}
 
@@ -52,27 +49,3 @@ def threads_of(db: Session, save: Save) -> list[tuple[Thread, int, int]]:
         )
         out.append((thread, before or 0, total))
     return out
-
-
-def due_soon(
-    db: Session, user_id: str, *, now: datetime, within: timedelta, limit: int
-) -> Sequence[tuple[Save, Reading, When, Check | None]]:
-    """Dated saves due within `within`, soonest first. Today's plain query until the tick (S11)."""
-    rows = db.execute(
-        select(Save, Reading, When, Check)
-        .join(Reading, Reading.save_id == Save.id)
-        .join(When, When.save_id == Save.id)
-        .outerjoin(Check, Check.save_id == Save.id)
-        .where(
-            Save.user_id == user_id,
-            Save.visibility == "normal",
-            When.kind == "date",
-            When.due_at > now,
-            When.due_at <= now + within,
-            # Never bring back what's closed or not for you.
-            or_(Check.verdict.is_(None), Check.verdict.notin_(("not_for_you", "closed"))),
-        )
-        .order_by(When.due_at)
-        .limit(limit)
-    ).all()
-    return [tuple(r) for r in rows]  # type: ignore[misc]

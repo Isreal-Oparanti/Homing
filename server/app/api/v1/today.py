@@ -1,100 +1,223 @@
-"""Today: at most three things that need you now (docs/07-api.md#today-and-cards).
+"""Today, moments and card actions (docs/07-api.md#today-and-cards).
 
-Rough version (S4): dated saves due within a week, soonest first. Cards, the tick and
-dismissals arrive in S11.
+Today is composed when it's opened (app/agents/today.py): at most three new cards a day,
+chosen by code.
 """
 
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Response
+from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agents import is_it_true
+from app.agents.today import act, compose
 from app.core.auth import CurrentUser, require_user
-from app.db.models import Check, Reading, User, When
-from app.db.repo import answers as answers_repo
+from app.core.errors import AppError
+from app.db.models import Card, Moment, Reading, Save, Thread, ThreadSave, User, When
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
-from app.verify.dates import display
-from app.verify.eligibility import assess
+from app.jobs import queue
+from app.verify.dates import display, parse_moment
 
 router = APIRouter(tags=["today"])
 
-MAX_CARDS = 3
-WINDOW = timedelta(days=7)
 
-
-class TodayCard(BaseModel):
-    save_id: str
-    kind: str  # deadline
+class CardOut(BaseModel):
+    id: str
+    kind: str  # deadline · prep
     title: str
     why_now: str
     next_step: str
-    due_at: datetime
+    save_id: str | None
+    thread_ids: list[str]
+    due_at: datetime | None
     tz_stated: bool
     unconfirmed: bool  # the date comes from the post, not the official page
+
+    @classmethod
+    def of(cls, card: Card) -> "CardOut":
+        return cls(
+            id=card.id,
+            kind=card.kind,
+            title=card.title,
+            why_now=card.why_now,
+            next_step=card.next_step,
+            save_id=card.save_id,
+            thread_ids=list(card.thread_ids or []),
+            due_at=card.due_at,
+            tz_stated=bool(card.payload.get("tz_stated", True)),
+            unconfirmed=bool(card.payload.get("unconfirmed", False)),
+        )
+
+
+class GoalOut(BaseModel):
+    id: str
+    title: str
+
+
+class MomentOut(BaseModel):
+    id: str
+    text: str
+    at: datetime
+    display: str
+    threads: list[GoalOut]  # empty until When will you need it? has matched them
 
 
 class TodayOut(BaseModel):
     date: str
-    cards: list[TodayCard]
+    cards: list[CardOut]
+    moments: list[MomentOut]
 
 
-def next_step(reading: Reading, check: Check | None, questions: int = 0) -> str:
-    """What to do now, decided by code from what the agents found."""
-    if check is not None and check.verdict == "needs_your_answer" and questions:
-        asks = "question" if questions == 1 else f"{questions} questions"
-        return f"Answer {'a ' if questions == 1 else ''}{asks} to see if it fits you."
-    if check is not None and check.verdict == "fits_you":
-        return "It fits you. Apply before it closes."
-    findings = check.findings if check else []
-    gaps = [f for f in findings if f.get("kind") in ("left_out", "differs")]
-    if gaps:
-        things = "thing" if len(gaps) == 1 else "things"
-        return f"Read the {len(gaps)} {things} the post left out, then decide."
-    if reading.is_opportunity:
-        return "Decide whether to apply before it closes."
-    return "Open it before then."
+class MomentIn(BaseModel):
+    text: str = Field(min_length=3, max_length=200)
 
 
-def _why_now(when: When, user_tz: str) -> str:
-    assert when.due_at is not None
-    verb = "Closes" if when.source == "check" or "Closes" in when.explanation else "On"
-    return f"{verb} {display(when.due_at, user_tz)}"
+class ActIn(BaseModel):
+    action: str = Field(pattern="^(use|dismiss|later)$")
 
 
-def _open_questions(db: Session, user_id: str, check: Check | None) -> int:
-    if check is None or check.verdict != "needs_your_answer":
-        return 0
-    facts = is_it_true.facts_for(db, user_id, check)
-    ref_year = (check.deadline_at or datetime.now(UTC)).year
-    return len(assess(check.eligibility or [], facts, ref_year=ref_year).questions)
+def _owner(db: Session, user: CurrentUser) -> User:
+    ensure_user(db, user)
+    owner = db.get(User, user.id)
+    assert owner is not None
+    return owner
+
+
+def _moment_out(db: Session, moment: Moment, tz: str) -> MomentOut:
+    goals = db.execute(
+        select(Thread.id, Thread.title).where(Thread.id.in_(moment.thread_ids or []))
+    ).all()
+    return MomentOut(
+        id=moment.id,
+        text=moment.text,
+        at=moment.at,
+        display=display(moment.at, tz),
+        threads=[GoalOut(id=i, title=t) for i, t in goals],
+    )
 
 
 @router.get("/today", response_model=TodayOut)
-def today(
+def today(user: CurrentUser = Depends(require_user), db: Session = Depends(get_db)) -> TodayOut:
+    owner = _owner(db, user)
+    now = datetime.now(UTC)
+    cards = compose(db, owner, now)
+    moments = db.scalars(
+        select(Moment).where(Moment.user_id == user.id, Moment.at > now).order_by(Moment.at)
+    ).all()
+    db.commit()
+    return TodayOut(
+        date=now.astimezone(ZoneInfo(owner.tz)).date().isoformat(),
+        cards=[CardOut.of(c) for c in cards],
+        moments=[_moment_out(db, m, owner.tz) for m in moments],
+    )
+
+
+@router.post("/moments", status_code=202, response_model=MomentOut)
+def add_moment(
+    body: MomentIn, user: CurrentUser = Depends(require_user), db: Session = Depends(get_db)
+) -> MomentOut:
+    """Something coming up, in the person's words. Code reads the day and time; When will you
+    need it? then finds the goals whose saves would help."""
+    owner = _owner(db, user)
+    now = datetime.now(UTC)
+    when = parse_moment(body.text, now=now, user_tz=owner.tz)
+    if when is None or when.at <= now:
+        raise AppError(
+            "no_day",
+            "Say when, e.g. 'recording my demo on Tuesday evening' or 'pitch on 9 November'.",
+            status=422,
+        )
+    moment = Moment(user_id=user.id, text=" ".join(body.text.split()), at=when.at)
+    db.add(moment)
+    db.flush()
+    queue.enqueue(
+        db,
+        "moment.match",
+        {"moment_id": moment.id},
+        user_id=user.id,
+        priority=queue.PRIORITY_USER,
+        dedupe_key=f"moment:{moment.id}",
+    )
+    db.commit()
+    return _moment_out(db, moment, owner.tz)
+
+
+@router.delete("/moments/{moment_id}", status_code=204)
+def remove_moment(
+    moment_id: str, user: CurrentUser = Depends(require_user), db: Session = Depends(get_db)
+) -> Response:
+    moment = db.scalar(select(Moment).where(Moment.id == moment_id, Moment.user_id == user.id))
+    if moment is None:
+        raise AppError("moment_not_found", "That moment doesn't exist.", status=404)
+    db.delete(moment)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/cards/{card_id}/act", response_model=CardOut)
+def act_on_card(
+    card_id: str,
+    body: ActIn,
     user: CurrentUser = Depends(require_user),
     db: Session = Depends(get_db),
-) -> TodayOut:
-    ensure_user(db, user)
-    owner = db.get(User, user.id)
-    user_tz = owner.tz if owner else "Africa/Lagos"
-    now = datetime.now(UTC)
-    rows = answers_repo.due_soon(db, user.id, now=now, within=WINDOW, limit=MAX_CARDS)
-    cards = [
-        TodayCard(
-            save_id=save.id,
-            kind="deadline",
-            title=reading.title,
-            why_now=_why_now(when, user_tz),
-            next_step=next_step(reading, check, _open_questions(db, user.id, check)),
-            due_at=when.due_at,  # type: ignore[arg-type]
-            tz_stated=when.tz_stated,
-            unconfirmed=when.source != "check",
-        )
-        for save, reading, when, check in rows
+) -> CardOut:
+    card = db.scalar(select(Card).where(Card.id == card_id, Card.user_id == user.id))
+    if card is None:
+        raise AppError("card_not_found", "That card doesn't exist.", status=404)
+    act(db, _owner(db, user), card, body.action, datetime.now(UTC))
+    db.commit()
+    return CardOut.of(card)
+
+
+def _ics_text(value: str) -> str:
+    return value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+
+
+@router.get("/saves/{save_id}/calendar.ics")
+def calendar_file(
+    save_id: str, user: CurrentUser = Depends(require_user), db: Session = Depends(get_db)
+) -> Response:
+    """The save's date as a calendar event, with a reminder a day before."""
+    row = db.execute(
+        select(Save, Reading, When)
+        .join(Reading, Reading.save_id == Save.id)
+        .join(When, When.save_id == Save.id)
+        .where(Save.id == save_id, Save.user_id == user.id, Save.visibility == "normal")
+    ).first()
+    if row is None or row[2].due_at is None:
+        raise AppError("no_date", "This save has no date to put in a calendar.", status=404)
+    save, reading, when = row
+    assert when.due_at is not None
+    stamp = "%Y%m%dT%H%M%SZ"
+    start = when.due_at.astimezone(UTC)
+    goals = db.scalars(
+        select(Thread.title).join(ThreadSave).where(ThreadSave.save_id == save.id)
+    ).all()
+    about = when.explanation + (f" Goal: {', '.join(goals)}." if goals else "")
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Homing//Homing//EN",
+        "BEGIN:VEVENT",
+        f"UID:{save.id}@homing",
+        f"DTSTAMP:{datetime.now(UTC):{stamp}}",
+        f"DTSTART:{start:{stamp}}",
+        f"DTEND:{start + timedelta(minutes=30):{stamp}}",
+        f"SUMMARY:{_ics_text(reading.title)}",
+        f"DESCRIPTION:{_ics_text(about)}",
+        "BEGIN:VALARM",
+        "ACTION:DISPLAY",
+        f"DESCRIPTION:{_ics_text(reading.title)}",
+        "TRIGGER:-P1D",
+        "END:VALARM",
+        "END:VEVENT",
+        "END:VCALENDAR",
     ]
-    local = now.astimezone(ZoneInfo(user_tz))
-    return TodayOut(date=local.date().isoformat(), cards=cards)
+    return Response(
+        "\r\n".join(lines) + "\r\n",
+        media_type="text/calendar",
+        headers={"Content-Disposition": 'attachment; filename="homing.ics"'},
+    )

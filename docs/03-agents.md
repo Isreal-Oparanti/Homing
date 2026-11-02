@@ -44,12 +44,13 @@ def handle_save_read(ctx: JobContext, payload: SaveReadPayload) -> None: ...
 | `save.check` | after read, if `is_checkable` | `is_it_true.check` | 20 | `check:{save_id}` |
 | `save.place` | after read | `whats_it_for.place` | 30 | `place:{save_id}` |
 | `save.when` | after check (or after read if not checkable) | `when_needed.set_when` | 30 | `when:{save_id}` |
-| `moment.match` | API `POST /moments` | `when_needed.match_moment` | 10 | `moment:{moment_id}` |
+| `moment.match` | API `POST /moments` | `today.match_moment` | 10 | `moment:{moment_id}` |
 | `card.prep` | `tick.when` when a prep card is needed | `when_needed.build_prep` | 20 | `prep:{card_id}` |
 | `user.rebuild_threads` | after import; daily 03:00 user time | `whats_it_for.rebuild` | 60 | `rebuild:{user_id}:{date}` |
 | `user.recheck_open` | daily 06:00 user time | `is_it_true.recheck_open` | 60 | `recheck:{user_id}:{date}` |
 | `user.today` | daily 07:00 user time; after each tick | `when_needed.compose_today` | 40 | `today:{user_id}:{date}:{hour}` |
 | `tick.when` | scheduler every 10 min | `when_needed.tick` | 40 | `tick:{yyyymmddhhmm}` |
+| | **As built (S11, 2 Nov):** neither `user.today` nor `tick.when` runs. Today is composed by code when it's opened ([below](#when-will-you-need-it)). | | | |
 | `system.echo` | `POST /dev/echo` (local only), tests | `jobs.handlers.system_echo` | 10 | none |
 | `save.embed` | after read (non-private only) | `search.embed.embed_save` | 30 | `embed:{save_id}:{text_hash}` |
 | `ask.answer` | API `POST /asks` | `ask.answer` | 10 | `ask:{ask_id}` |
@@ -262,6 +263,18 @@ fatigue    = 15 × dismissals in this thread over the last 14 days
 - At most **3** cards with `state = new` and `surfaced_on = today`.
 - `later` cards come back when `later_until` passes.
 - Each new card emits `surfaced`.
+
+**As built (S11, 2 Nov)** (`server/app/agents/today.py`):
+- **Today is composed when it's opened** (`GET /today`), not by `tick.when` and `user.today`. There's no push, so a timer would add nothing the person sees, and composing on open means Today is never stale. The tick comes back if push notifications do.
+- **Candidates:** `deadline` (a dated save whose `bring_back_at` has passed and that isn't closed or not for you; saves never checked count too) and `prep` (a moment ≤ 36h away whose goals hold ≥ 3 saves). `related`, `went_bad` and `answer_needed` aren't built.
+- **Cards are rows** (`cards`, migration 0008) with a `dedupe_key` (`deadline:{save_id}:{due date}`, `prep:{moment_id}`), so opening Today twice makes no new card. States: `new`, `used`, `dismissed`, `later`, `gone`. A `new` card whose save no longer qualifies (closed, not for you, date passed) becomes `gone`.
+- **Three a day means three surfaced a day:** the cap counts cards with `surfaced_on = today`, so dismissing one doesn't open a slot. Yesterday's unused cards stay yesterday's.
+- **Dismissed never comes back:** by its save or its moment, read from `cards` (not `agent_memory`). Each dismissal also adds fatigue to that card's goals for 14 days.
+- **Later** brings a card back at 09:00 the next morning, user time.
+- **The next step is decided by code** from the check: "Answer 4 questions to see if it fits you.", "It fits you. Apply before it closes.", "Read the 2 things the post left out, then decide.", or "Decide whether to apply before it closes."
+- **Moments:** code reads the day and time from the person's words (`verify/dates.parse_moment`): a date, a weekday (the next one), "tomorrow", "today" or "tonight", and a clock time or a part of the day (morning 09:00, evening 18:00, night 20:00). Nothing said → 09:00. No day, or an unclear one like "11/12" → the API asks them to say when. `moment.match` then gives Spark the person's goal titles (the 60 largest, as `T1…`) and code keeps only real ones, 3 at most. The team gets, e.g., "Noted: recording my demo, Tue 3 Nov, 18:00 Lagos time. 16 saves in 'Making a demo video' can help."
+- **Calendar:** `GET /saves/{id}/calendar.ics`, the date with a reminder a day before.
+- The prep sheet (`card.prep`) is S12: until then a prep card names the goals and how many saves can help.
 
 **Build a prep sheet** (`card.prep`):
 1. **Collect** the thread's saves. Videos come first, then notes and PDFs.

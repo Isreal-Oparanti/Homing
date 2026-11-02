@@ -4,7 +4,7 @@ Pure functions. The model may propose a date; only this module turns words into 
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -158,3 +158,71 @@ def bring_back_at(due: datetime, *, now: datetime, user_tz: str) -> datetime | N
     local = back.astimezone(ZoneInfo(user_tz))
     nine = local.replace(hour=9, minute=0, second=0, microsecond=0).astimezone(UTC)
     return max(nine, now)
+
+
+# Moments: things the person says are coming up ("recording my demo on Tuesday evening").
+# Unlike a deadline in a post, a weekday here is the person's own next one, so it's allowed.
+_WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+_WEEKDAY = re.compile(r"\b(?:on |this |next |coming )?(" + "|".join(_WEEKDAYS) + r")\b", re.I)
+_PART_OF_DAY = {
+    "morning": time(9, 0),
+    "afternoon": time(14, 0),
+    "evening": time(18, 0),
+    "night": time(20, 0),
+    "tonight": time(20, 0),
+}
+_PART = re.compile(r"\b(" + "|".join(_PART_OF_DAY) + r")\b", re.I)
+_CLOCK = re.compile(
+    r"\b(\d{1,2})(?:[:.h](\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)|\b(\d{1,2})[:h](\d{2})\b", re.I
+)
+MOMENT_TIME = time(9, 0)  # no time said: the morning
+
+
+def _clock(text: str) -> time | None:
+    m = _CLOCK.search(text)
+    if m is None:
+        return None
+    if m.group(1):
+        hour, minute = int(m.group(1)) % 12, int(m.group(2) or 0)
+        if m.group(3).lower().startswith("p"):
+            hour += 12
+    else:
+        hour, minute = int(m.group(4)), int(m.group(5))
+    return time(hour, minute) if hour < 24 and minute < 60 else None
+
+
+def parse_moment(text: str, *, now: datetime, user_tz: str) -> Deadline | None:
+    """When something the person typed happens: a date (as parse_deadline reads it), or a
+    weekday, meaning the next one to come. The time is a clock time if given, else a part of
+    the day ("evening" is 18:00), else 09:00. None when it names no day."""
+    part = _PART.search(text)
+    said = _clock(text)
+    if said is None and part is not None:
+        said = _PART_OF_DAY[part.group(1).lower()]
+    found = parse_deadline(text, base=now, user_tz=user_tz)
+    if found is not None:
+        if found.time_stated:
+            return found
+        tz = ZoneInfo(found.tz)
+        day = found.at.astimezone(tz).date()
+        at = datetime.combine(day, said or MOMENT_TIME, tzinfo=tz).astimezone(UTC)
+        return replace(found, at=at, time_stated=said is not None)
+    tz = ZoneInfo(user_tz)
+    today = now.astimezone(tz).date()
+    m = _WEEKDAY.search(text)
+    if m is not None:
+        ahead = (_WEEKDAYS.index(m.group(1).lower()) - today.weekday()) % 7 or 7
+        day, source_text = today + timedelta(days=ahead), m.group(0).strip()
+    elif part is not None and part.group(1).lower() == "tonight":  # the day is today
+        day, source_text = today, part.group(0)
+    else:
+        return None
+    at = datetime.combine(day, said or MOMENT_TIME, tzinfo=tz).astimezone(UTC)
+    return Deadline(
+        at=at,
+        source_text=source_text,
+        tz=user_tz,
+        tz_stated=False,
+        time_stated=said is not None,
+        relative=True,
+    )

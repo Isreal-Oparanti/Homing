@@ -30,6 +30,7 @@ from app.schemas.agents import (
     AskPick,
     BatchReadings,
     FileReading,
+    MomentMatch,
     Placement,
     PrepSheet,
     ProposedCheck,
@@ -92,6 +93,8 @@ PURPOSES: dict[str, Purpose] = {
     # Comparing with a source is the hardest call, so it keeps the default reasoning effort.
     "check.compare": Purpose("check.compare", "check_compare.v2.md", ProposedCheck, 120),
     "place.assign": Purpose("place.assign", "place_assign.v1.md", Placement, 45, "low"),
+    # When will you need it? (S11): which goals a moment the person typed needs.
+    "when.match_moment": Purpose("when.match_moment", "match_moment.v1.md", MomentMatch, 45, "low"),
     # Ask (S10): pick the saves that help, then answer from them with quotes code verifies.
     "ask.select": Purpose("ask.select", "ask_select.v1.md", AskPick, 60, "low"),
     "ask.answer": Purpose("ask.answer", "ask_answer.v1.md", AskAnswer, 120),

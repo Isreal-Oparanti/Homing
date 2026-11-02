@@ -301,6 +301,7 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **Done when:** saving the **Meta hackathon page** gives "when = Thu 5 Nov, 03:00 Lagos time", and a **prep** card for the demo video appears on Today, because the related threads hold 16 saves. The actions work, a dismissed card never comes back, and there are never more than 3 new cards a day.
 - **Proved by:** unit tests for the priority formula, the 3-a-day cap, and the `bring_back_at` rules; an API test that Today never returns more than 3 new cards.
 - **If late:** no calendar file. Moments are typed only, with no date picker.
+- **As built (2 Nov):** cards (migration 0008) composed by code when Today opens, with no tick ([03](03-agents.md#when-will-you-need-it) says why); the priority formula; 3 new a day; dismissed never return; Later is 09:00 tomorrow; moments typed in plain words, read by code, matched to goals by Spark (code keeps only real goals); the calendar file; the Today screen (moment box, cards with Open, Later, Dismiss, Add to calendar). Tested in the browser on the demo account: a deadline card with "Answer 4 questions to see if it fits you.", a moment matched to the two funding goals, Later took the card off Today. Moments are typed only (no date picker). Still to do on the live site: the done-when (the Meta hackathon page and the demo-video prep card).
 
 ### S12 · Prep sheet + reel
 - **Day:** Tue · **Estimate:** 3.5h · **Depends on:** S11, S0 (`VIDEO_MODE`) · **Scene:** Later

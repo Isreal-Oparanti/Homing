@@ -3,6 +3,7 @@
 from typing import Any
 
 from app.agents.is_it_true import check, check_item
+from app.agents.today import match_moment
 from app.agents.what_is_it import read_batch, read_one
 from app.agents.whats_it_for import place, rebuild
 from app.agents.when_needed import set_when
@@ -37,6 +38,7 @@ HANDLERS: dict[str, Handler] = {
     "threads.rebuild": rebuild,
     "save.embed": embed_one,
     "ask.answer": answer_ask,
+    "moment.match": match_moment,
     "save.when": set_when,
     "import.whatsapp": import_whatsapp,
 }

@@ -113,15 +113,17 @@ As built in S4, the three answers differ slightly from the example above:
 ### Today and cards
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| GET | `/today` | — | `{cards: Card[], date}` (≤ 3 new, plus `later` cards that are due). **Until S11:** dated saves due within 7 days, soonest first, as `{save_id, kind: "deadline", title, why_now, next_step, due_at, tz_stated, unconfirmed}`. `unconfirmed` means the date came from the post, not the official page. |
-| GET | `/cards/{id}` | — | `Card` (with `payload`, e.g. `PrepSheet`) |
-| POST | `/cards/{id}/act` | `{action: "use" \| "dismiss" \| "later", later_until?}` | `Card` |
+| GET | `/today` | — | `{date, cards: Card[], moments: Moment[]}`. Composed when opened: at most 3 new cards a day. **As built (S11):** `Card = {id, kind: "deadline" \| "prep", save_id, thread_ids, title, why_now, next_step, due_at, tz_stated, unconfirmed}`. `unconfirmed` means the date came from the post, not the official page. |
+| GET | `/cards/{id}` | — | `Card` (with `payload`, e.g. `PrepSheet`). **Not built yet (S12).** |
+| POST | `/cards/{id}/act` | `{action: "use" \| "dismiss" \| "later"}` | `Card`. `later` always means 09:00 tomorrow, user time; 422 for any other action. |
+| GET | `/saves/{id}/calendar.ics` | — | `text/calendar` attachment: the save's date, reminder a day before. 404 `no_date` when it has none. |
 
 ### Moments
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| POST | `/moments` | `{text, at}` | `202 Moment` (matched by **When will you need it?**) |
-| GET | `/moments` | — | upcoming moments |
+| POST | `/moments` | `{text}` | `202 Moment = {id, text, at, display, threads[{id, title}]}`. Code reads the day and time from `text`; `threads` fills in once **When will you need it?** has matched them. 422 `no_day` when no day is said. |
+| DELETE | `/moments/{id}` | — | `204` |
+| | | | **As built (S11):** upcoming moments come with `GET /today`; there's no `GET /moments`. |
 
 ### The team (feed)
 | Method | Path | Query | Returns |

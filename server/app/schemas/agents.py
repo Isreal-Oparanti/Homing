@@ -240,3 +240,11 @@ class AskAnswer(BaseModel):
         max_length=5,
         description="Parts of the question the sources don't answer, in plain words.",
     )
+
+
+class MomentMatch(BaseModel):
+    """Which of the person's goals a coming moment needs."""
+
+    threads: list[str] = Field(
+        max_length=3, description="Ids from THREADS whose saves would help prepare, best first."
+    )
