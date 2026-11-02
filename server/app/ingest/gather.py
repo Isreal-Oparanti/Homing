@@ -47,6 +47,35 @@ def _strip_tags(markup: str) -> str:
     return re.sub(r"\s+", " ", html_lib.unescape(re.sub(r"<[^>]+>", " ", markup))).strip()
 
 
+THIN_PAGE_CHARS = 500
+# Pages built in the browser (Next.js and the like) send their words inside script data.
+_NEXT_PUSH = re.compile(r'self\.__next_f\.push\(\[1,\s*("(?:[^"\\]|\\.)*")\]\)', re.S)
+_NEXT_DATA = re.compile(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', re.S)
+_TEXT_FIELD = re.compile(r'"(?:text|description)":"((?:[^"\\]|\\.)*)"')
+_NOT_WORDS = re.compile(r"\$[\w@:]*|https?://\S+")  # React references ("$L1") and bare links
+
+
+def _app_text(page: str) -> str:
+    """The words in a page's script data: rich-text and description fields, in order, once."""
+    data = [json.loads(m.group(1)) for m in _NEXT_PUSH.finditer(page)]
+    data += _NEXT_DATA.findall(page)
+    seen: dict[str, None] = {}
+    for chunk in data:
+        for m in _TEXT_FIELD.finditer(chunk):
+            try:
+                value = " ".join(json.loads(f'"{m.group(1)}"').split())
+            except ValueError:
+                continue
+            if re.search(r"[^\W\d_]{2}", value) and not _NOT_WORDS.fullmatch(value):
+                seen.setdefault(value, None)
+    # A field that repeats part of a longer one (a paragraph of the full description) goes.
+    kept: list[str] = []
+    for value in sorted(seen, key=len, reverse=True)[:2000]:
+        if not any(value in longer for longer in kept):
+            kept.append(value)
+    return "\n".join(v for v in seen if v in set(kept))
+
+
 def gather_web(url: str, fetcher: SafeFetcher) -> Gathered:
     got = fetcher.get(url, accept="text/html,application/xhtml+xml,*/*;q=0.8")
     if got.status >= 400:
@@ -63,6 +92,10 @@ def gather_web(url: str, fetcher: SafeFetcher) -> Gathered:
         "description": meta.description if meta else None,
         "date": meta.date if meta else None,
     }
+    if len(text) < THIN_PAGE_CHARS:
+        inside = _app_text(page)
+        if len(inside) > len(text):
+            text = inside
     if not text and info["description"]:
         text = info["description"]
     return Gathered(snapshots=[SnapshotIn("page_text", text[:MAX_SNAPSHOT_CHARS], got.url, info)])

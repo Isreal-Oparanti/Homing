@@ -125,6 +125,11 @@ def parse_deadline(
         return None
     words, parsed = hit
     time_stated = bool(_TIME.search(words))
+    # "Nov 4: Project submissions due by 9:00 PM ET": the time is a few words after the date.
+    # Taken only when the text gives exactly one time; two would be a guess.
+    clocks = list(_CLOCK.finditer(text))
+    if not time_stated and len(clocks) == 1 and (said := _clock(text)) is not None:
+        parsed, time_stated = datetime.combine(parsed.date(), said), True
     if not time_stated:
         parsed = datetime.combine(parsed.date(), END_OF_DAY)
     return Deadline(

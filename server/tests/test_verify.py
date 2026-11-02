@@ -127,6 +127,14 @@ def test_pasting_is_not_quoting() -> None:
             True,
             True,
         ),
+        # The Meta hackathon page, 2 Nov: the time comes a few words after the date.
+        (
+            "Nov 4: Project submissions due by 9:00 PM ET",
+            datetime(2026, 11, 2, 10, tzinfo=UTC),
+            "Thu 5 Nov, 03:00",
+            True,
+            True,
+        ),
     ],
 )
 def test_deadlines(

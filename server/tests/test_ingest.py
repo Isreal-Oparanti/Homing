@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import httpx
@@ -95,6 +96,28 @@ def test_fetcher_rechecks_every_redirect() -> None:
     with pytest.raises(FetchError) as err:
         fetcher.get("https://public.example/", respect_robots=False)
     assert err.value.code == "not_allowed"
+
+
+def test_a_page_built_in_the_browser_is_read_from_its_script_data() -> None:
+    # Cerebral Valley's event pages: the words arrive inside Next.js flight data, not the HTML.
+    flight = (
+        '0:["$","div",null,{"children":"$L1"}]\n'
+        '1:{"type":"paragraph","content":[{"type":"text","text":"Key Dates"},'
+        '{"type":"text","text":"Nov 4: Project submissions due by 9:00 PM ET"},'
+        '{"type":"text","text":"$1,000,000 in total prizes."}]}\n'
+        '2:{"description":"Key Dates Nov 4: Project submissions due by 9:00 PM ET"}'
+    )
+    page = (
+        "<html><head><title>Meta Hackathon</title></head><body><div id=app></div>"
+        f"<script>self.__next_f.push([1,{json.dumps(flight)}])</script></body></html>"
+    )
+    routes = {"https://cv.example/e": httpx.Response(200, html=page)}
+    fetcher = _fetcher(routes, {"cv.example": "93.184.216.34"})
+    got = gather.gather_web("https://cv.example/e", fetcher)
+    assert got.snapshots[0].text.splitlines() == [
+        "$1,000,000 in total prizes.",
+        "Key Dates Nov 4: Project submissions due by 9:00 PM ET",
+    ]
 
 
 def test_fetcher_caps_body_size() -> None:
