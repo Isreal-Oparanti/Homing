@@ -4,7 +4,9 @@ Types are sniffed from the bytes, never trusted from the name (approved storage 
 PDFs with a text layer are read as text; scanned PDFs and images go to Muse Spark.
 """
 
+import html
 import io
+import re
 import zipfile
 from dataclasses import dataclass
 
@@ -118,3 +120,29 @@ def image_for_model(data: bytes, mime: str) -> tuple[bytes, str]:
     out = io.BytesIO()
     img.convert("RGB").save(out, format="JPEG", quality=88)
     return out.getvalue(), "image/jpeg"
+
+
+_OFFICE_PARTS = re.compile(r"^(word/document|ppt/slides/slide\d+|xl/sharedStrings)\.xml$")
+_OFFICE_TEXT = re.compile(r"<(?:w|a):t(?:\s[^>]*)?>([^<]*)</(?:w|a):t>|<t(?:\s[^>]*)?>([^<]*)</t>")
+_OFFICE_BREAK = re.compile(r"</(?:w|a):p>|</si>")
+
+
+def office_text(data: bytes) -> str:
+    """The words in a Word, PowerPoint or Excel file, paragraph by paragraph. Empty if none."""
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile:
+        return ""
+    with archive:
+        parts = sorted(
+            (n for n in archive.namelist() if _OFFICE_PARTS.match(n)),
+            key=lambda n: [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", n)],
+        )
+        out = []
+        for name in parts:
+            xml = archive.read(name).decode("utf-8", errors="replace")
+            for paragraph in _OFFICE_BREAK.split(xml):
+                words = "".join(a or b for a, b in _OFFICE_TEXT.findall(paragraph))
+                if words.strip():
+                    out.append(html.unescape(words.strip()))
+    return "\n".join(out)

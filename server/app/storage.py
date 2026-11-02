@@ -16,6 +16,7 @@ from app.core.config import Settings, get_settings
 class Storage(Protocol):
     def put(self, key: str, data: bytes, mime: str) -> None: ...
     def get(self, key: str) -> bytes: ...
+    def signed_url(self, key: str, seconds: int) -> str | None: ...
 
 
 class LocalStorage:
@@ -35,6 +36,9 @@ class LocalStorage:
 
     def get(self, key: str) -> bytes:
         return self._path(key).read_bytes()
+
+    def signed_url(self, key: str, seconds: int) -> str | None:
+        return None  # nothing outside this machine can reach the local disk
 
 
 class SupabaseStorage:
@@ -81,6 +85,17 @@ class SupabaseStorage:
         res = httpx.get(f"{self.base}/{key}", headers=self.headers, timeout=60)
         res.raise_for_status()
         return res.content
+
+    def signed_url(self, key: str, seconds: int) -> str | None:
+        """A link anyone holding it can read until it expires: how Spark fetches a video."""
+        res = httpx.post(
+            f"{self.root}/object/sign/{self.bucket}/{key}",
+            json={"expiresIn": seconds},
+            headers=self.headers,
+            timeout=30,
+        )
+        res.raise_for_status()
+        return f"{self.root}{res.json()['signedURL']}"
 
 
 def build(settings: Settings) -> Storage:

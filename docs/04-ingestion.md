@@ -55,6 +55,13 @@ How things come in, and how **What is it?** gets content to read. Code lives in 
   - **Read together:** small saves are read 20 per call (`read.batch`). Measured on 20 of Isreal's saves with the real model: 40,703 tokens one at a time, 9,322 together (77% fewer), all 20 returned, the same opportunity call on 20 of 20, titles equivalent.
   - **Only open opportunities are checked:** an imported opportunity is checked when a date it names is still ahead, or when it names none and was saved in the last six months. Otherwise Is it true? says in The team why it held off ("Didn't check …: its date passed on …"), and the card offers **Check it now**.
   - **Low priority:** an import's checks, placements and dates wait behind anything saved by hand.
+- **Videos, voice notes and documents (S8 step 2, 2 Nov):** read by What is it? (`_read_media`), never guessed:
+  - **Voice notes:** PyAV turns the sound into 16 kHz mono WAV (`ingest/media.py`, first 10 minutes), Muse Voice Transcribe returns the words (`ModelGateway.transcribe`, cached by the sound, recorded in `model_calls` as `transcribe.voice`), and the reader reads them like text (snapshot `speech`). No words heard: kept, and the card says so.
+  - **Videos:** the sound is transcribed first. With 40 words or more, the video is read from what's said: cheaper, and every fact can be checked against the words. With less, Spark watches it from a 15-minute signed link to the private bucket (`read.video`); what it sees goes in `what`, but facts must be words said or written by the person. On the local disk (no link), a quiet video is kept.
+  - **Documents:** the words come out of the Word, PowerPoint or Excel file (`office_text`, no extra library) and are read like text (snapshot `doc_text`).
+  - **A secret heard or written** keeps the save private before any reading.
+  - **Measured on two of Isreal's videos:** a silent 0.5 MB clip, watched by Spark: 3,038 tokens, "A close-up of colorful notebooks personalized with names". A 5.2 MB clip with 91 words: transcribed (36s, no tokens) then read: 1,911 tokens, "A short comedy clip showing a demo of an app that tells hot dogs from not hot dogs." Spark watching that same clip cost 15,530 tokens.
+  - **Muse Voice Transcribe's `turns` come back empty in PUSH_TO_TALK mode:** we get the words without timestamps.
 - **Where the upload waits:** the API writes it to `IMPORT_DIR` on its own disk, and only a worker on the same machine can read it. That's why jobs have lanes ([03](03-agents.md)).
 
 ### Storage rules (approved by Isreal, 31 Oct)

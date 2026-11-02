@@ -16,6 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, TypeVar
 
+import httpx
 import openai
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
@@ -32,6 +33,7 @@ from app.schemas.agents import (
     ProposedCheck,
     Reading,
     Rebuild,
+    Transcript,
     VideoPoints,
 )
 from app.verify.secrets import mask_phones
@@ -56,6 +58,17 @@ class Attachment:
 
 
 @dataclass(frozen=True)
+class VideoLink:
+    """A video Spark fetches itself, from a short-lived link to our private bucket (docs/06)."""
+
+    url: str
+    sha256: str  # the file's own, so the cache doesn't depend on the link
+
+    def part(self) -> dict[str, Any]:
+        return {"type": "video_url", "video_url": {"url": self.url}}
+
+
+@dataclass(frozen=True)
 class Purpose:
     name: str
     prompt: str  # file in llm/prompts, versioned in its name
@@ -64,11 +77,16 @@ class Purpose:
     reasoning_effort: str | None = None
 
 
+# Not a chat purpose: Muse Voice Transcribe has its own endpoint (ModelGateway.transcribe).
+TRANSCRIBE = Purpose("transcribe.voice", "none", Transcript, 180)
+
 PURPOSES: dict[str, Purpose] = {
     "read.text": Purpose("read.text", "read_text.v3.md", Reading, 90, "low"),
     # Up to 20 small saves from an import at once: the instructions are sent once, not 20 times.
     "read.batch": Purpose("read.batch", "read_batch.v1.md", BatchReadings, 150, "low"),
     "read.file": Purpose("read.file", "read_file.v1.md", FileReading, 120, "low"),
+    # A video with little or no speech: Spark watches it from a short-lived private link.
+    "read.video": Purpose("read.video", "read_video.v1.md", Reading, 180, "low"),
     # Comparing with a source is the hardest call, so it keeps the default reasoning effort.
     "check.compare": Purpose("check.compare", "check_compare.v2.md", ProposedCheck, 120),
     "place.assign": Purpose("place.assign", "place_assign.v1.md", Placement, 45, "low"),
@@ -80,6 +98,8 @@ PURPOSES: dict[str, Purpose] = {
 
 
 OUTPUT_TOKENS_ESTIMATE = 1500
+VIDEO_TOKENS_ESTIMATE = 20_000  # a 5 MB video was 15,530 tokens in (1 Nov)
+TRANSCRIBE_MAX_CONCURRENCY = 2
 
 
 class BudgetExceeded(DeferredError):
@@ -174,7 +194,7 @@ class ModelGateway:
         user_id: str | None,
         inputs: dict[str, Any],
         save_ids: list[str],
-        attachments: list[Attachment] | None = None,
+        attachments: list[Attachment | VideoLink] | None = None,
     ) -> Any:
         p = PURPOSES[purpose]
         self._refuse_private(save_ids)
@@ -182,7 +202,10 @@ class ModelGateway:
         instructions = (PROMPTS / p.prompt).read_text(encoding="utf-8")
         version = p.prompt.removesuffix(".md")
         user_text = render_blocks(inputs)
-        files = "".join(hashlib.sha256(a.data).hexdigest() for a in attachments or [])
+        files = "".join(
+            a.sha256 if isinstance(a, VideoLink) else hashlib.sha256(a.data).hexdigest()
+            for a in attachments or []
+        )
         key = f"{model}\n{version}\n{user_text}\n{files}"
         input_hash = hashlib.sha256(key.encode()).hexdigest()
 
@@ -196,7 +219,10 @@ class ModelGateway:
 
         # Characters / 4 is a rough token count; good enough for a daily guard. Files are counted
         # as one token per 3 bytes, capped per file (images cost far less than that).
-        file_tokens = sum(min(len(a.data) // 3, 20_000) for a in attachments or [])
+        file_tokens = sum(
+            VIDEO_TOKENS_ESTIMATE if isinstance(a, VideoLink) else min(len(a.data) // 3, 20_000)
+            for a in attachments or []
+        )
         self._check_budget(user_id, (len(instructions) + len(user_text)) // 4 + file_tokens)
 
         schema = inline_schema(p.output)
@@ -274,6 +300,83 @@ class ModelGateway:
             model,
             user_id,
             input_hash,
+            "ok",
+            usage,
+            started,
+            output=result.model_dump(mode="json"),
+        )
+        return result
+
+    def transcribe(self, wav: bytes, *, user_id: str | None, save_ids: list[str]) -> Transcript:
+        """Muse Voice Transcribe: 16 kHz mono WAV in (10 minutes at most), the words out. Cached
+        by the sound itself and recorded in model_calls like every other call."""
+        self._refuse_private(save_ids)
+        model = self._settings.meta_transcribe_model
+        input_hash = hashlib.sha256(f"{model}\nasr\n".encode() + hashlib.sha256(wav).digest())
+        input_hash_hex = input_hash.hexdigest()
+        cached = self._db.scalar(
+            select(ModelCall.output)
+            .where(ModelCall.input_hash == input_hash_hex, ModelCall.status == "ok")
+            .limit(1)
+        )
+        if cached is not None:
+            return Transcript.model_validate(cached)
+        started = time.perf_counter()
+        usage = {"in": 0, "out": 0}  # billed by sound, not tokens
+        request = {"model": model, "audioEncoding": "WAV", "mode": "PUSH_TO_TALK"}
+        try:
+            with _semaphore(TRANSCRIBE_MAX_CONCURRENCY):
+                res = httpx.post(
+                    f"{self._settings.meta_api_base}/asr/transcribe",
+                    headers={
+                        "Authorization": f"Bearer {self._settings.meta_api_key}",
+                        "Accept": "application/json",
+                    },
+                    files={
+                        "request": (None, json.dumps(request), "application/json"),
+                        "audio": ("sound.wav", wav, "audio/wav"),
+                    },
+                    timeout=TRANSCRIBE.timeout_s,
+                )
+        except httpx.HTTPError as err:
+            self._record(
+                TRANSCRIBE,
+                "asr",
+                model,
+                user_id,
+                input_hash_hex,
+                "error",
+                usage,
+                started,
+                error=type(err).__name__,
+            )
+            raise RetryableError("transcribe: couldn't reach the model") from err
+        if res.status_code >= 400:
+            self._record(
+                TRANSCRIBE,
+                "asr",
+                model,
+                user_id,
+                input_hash_hex,
+                "error",
+                usage,
+                started,
+                error=f"{res.status_code}: {res.text[:500]}",
+            )
+            if res.status_code in (400, 401, 403, 404, 413, 415, 422):
+                raise PermanentError(f"The model rejected this sound ({res.status_code}).")
+            raise RetryableError(f"transcribe: model error {res.status_code}")
+        body = res.json()
+        result = Transcript(
+            text=" ".join(str(body.get("transcript") or "").split()),
+            duration_ms=int(body.get("audioDurationMs") or 0),
+        )
+        self._record(
+            TRANSCRIBE,
+            "asr",
+            model,
+            user_id,
+            input_hash_hex,
             "ok",
             usage,
             started,

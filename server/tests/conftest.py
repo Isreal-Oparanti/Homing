@@ -81,3 +81,18 @@ def no_web_search(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.agents import is_it_true
 
     monkeypatch.setattr(is_it_true, "search_factory", lambda: None)
+
+
+@pytest.fixture(autouse=True)
+def no_real_storage(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Tests never touch the real bucket, whatever STORAGE_BACKEND says; tests that need files
+    swap in their own LocalStorage."""
+    from app.agents import what_is_it
+    from app.ingest.whatsapp import importer
+    from app.storage import LocalStorage
+
+    local = LocalStorage(tmp_path_factory.mktemp("files"))
+    monkeypatch.setattr(what_is_it, "storage_factory", lambda: local)
+    monkeypatch.setattr(importer, "storage_factory", lambda: local)

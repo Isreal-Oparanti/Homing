@@ -14,14 +14,15 @@ from app.db.models import AgentEvent, Media, Save, Snapshot, User
 from app.db.repo import saves as saves_repo
 from app.events.emitter import emit
 from app.ingest.fetch import SafeFetcher
-from app.ingest.files import image_for_model, pdf_text
+from app.ingest.files import image_for_model, office_text, pdf_text
 from app.ingest.gather import Gathered, SnapshotIn, gather_link
+from app.ingest.media import NoSound, to_wav
 from app.ingest.urls import find_urls
 from app.jobs import queue
 from app.jobs.errors import DeferredError, PermanentError
 from app.jobs.runner import JobContext
-from app.llm.gateway import PURPOSES, Attachment, ModelGateway
-from app.schemas.agents import BatchItem, FileReading, KeyFacts, ListItem, Reading
+from app.llm.gateway import PURPOSES, Attachment, ModelGateway, VideoLink
+from app.schemas.agents import FileReading, KeyFacts, ListItem, Reading
 from app.storage import get_storage
 from app.verify.dates import display, parse_deadline
 from app.verify.quotes import appears_in
@@ -61,11 +62,16 @@ KIND_WORDS = {
     "web": "a page",
 }
 FILE_WORDS = {"image": "an image", "pdf": "a PDF"}
-# Files from WhatsApp imports that Homing keeps but can't read yet (docs/04, S8).
+# Files from WhatsApp imports (docs/04, S8). Speech is transcribed by Muse Voice Transcribe
+# and read like text; a video with little speech is watched by Spark; documents give their text.
 KEPT_WORDS = {"video": "a video", "voice": "a voice note", "file": "a document"}
+SPOKEN_WORDS = 40  # a video saying at least this much is read from its words, not watched
+VIDEO_LINK_SECONDS = 900  # how long Spark's private link to a video lasts
 
 COPY_LABELS = {
     "ocr_text": "Our copy of the words on it",
+    "speech": "Our copy of what's said",
+    "doc_text": "Our copy of the document's text",
     "pdf_text": "Our copy of the PDF's text",
     "page_text": "Our copy of the page",
     "post_text": "Our copy of the post",
@@ -305,43 +311,31 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
         )
         return
 
-    if save.kind in KEPT_WORDS:
-        thing = KEPT_WORDS[save.kind]
-        caption = (save.text or "").strip()
-        saves_repo.upsert_reading(
-            ctx.db,
-            save.id,
-            {
-                "title": caption[:80] if caption else f"{thing.capitalize()} you saved",
-                "what": f"{thing.capitalize()}, kept with your words. Homing can't read it yet.",
-                "key_facts": {},
-                "is_checkable": False,
-                "is_opportunity": False,
-                "model": "none",
-                "prompt_version": "none",
-            },
-        )
-        save.status = "ready"
-        emit(
-            ctx.db,
-            user_id=save.user_id,
-            agent="what",
-            action="kept",
-            summary=f"Kept {thing}; Homing can't read it yet.",
-            save_id=save.id,
-        )
-        return
-
     save.status = "reading"
     ctx.db.commit()
 
     try:
-        file_reading = None
+        file_reading: Reading | None = None
+        purpose = "read.text"
         if save.kind in FILE_KINDS:
-            gathered, file_reading = _read_file(ctx, save)
-            if file_reading is not None and screen(file_reading.text).private:
-                _keep_file_private(ctx, save, screen(file_reading.text).reason)
+            gathered, ocr = _read_file(ctx, save)
+            if ocr is not None:
+                purpose, file_reading = "read.file", ocr
+                if (secret := screen(ocr.text)).private:
+                    _keep_file_private(ctx, save, secret.reason)
+                    return
+        elif save.kind in KEPT_WORDS:
+            media_read, file_reading, why = _read_media(ctx, save)
+            if media_read is None:
+                _kept(ctx, save, why)
                 return
+            gathered = media_read
+            heard = screen(" ".join(x.text for x in gathered.snapshots))
+            if heard.private:
+                _keep_file_private(ctx, save, heard.reason)
+                return
+            if file_reading is not None:
+                purpose = "read.video"
         else:
             gathered = _gather(save)
         snapshots = [
@@ -352,6 +346,9 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
         ]
         ctx.db.add_all(snapshots)
         ctx.db.flush()
+        if purpose == "read.video" and file_reading is not None:
+            # What Spark saw stays in `what`; facts must be words the person or the video said.
+            file_reading = _own_facts_only(file_reading, save, snapshots)
         if file_reading is None and save.kind == "link" and not snapshots and not _own_words(save):
             # Nothing came back and the person wrote nothing: a model could only guess.
             _nothing_to_read(ctx, save, gathered)
@@ -390,7 +387,7 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
                 ctx.db.commit()
         raise
 
-    _finish(ctx, save, reading, snapshots, "read.file" if file_reading else "read.text")
+    _finish(ctx, save, reading, snapshots, purpose)
 
 
 def _finish(
@@ -418,6 +415,8 @@ def _finish(
     elif save.kind in FILE_KINDS:
         many = len(save.media_ids or []) > 1
         thing = f"{len(save.media_ids)} screenshots" if many else FILE_WORDS[save.kind]
+    elif save.kind in KEPT_WORDS:
+        thing = KEPT_WORDS[save.kind]
     else:
         thing = KIND_WORDS.get(save.platform or "", "a list of links")
     evidence = [
@@ -478,12 +477,13 @@ def _enqueue_read(ctx: JobContext, save: Save) -> None:
     )
 
 
-def _own_facts_only(item: BatchItem, save: Save, snapshots: list[Snapshot]) -> Reading:
-    """A batch reading keeps only facts found in its own save's words, so saves read together
-    can never borrow from each other."""
+def _own_facts_only(
+    item: Reading, save: Save, snapshots: list[Snapshot], chars: int = BATCH_ITEM_CHARS
+) -> Reading:
+    """A reading keeps only facts found in its own save's words: saves read together can never
+    borrow from each other, and a watched video's facts must have been said or written."""
     own = "\n".join(
-        [save.text or "", save.label or "", save.url or ""]
-        + [s.text[:BATCH_ITEM_CHARS] for s in snapshots]
+        [save.text or "", save.label or "", save.url or ""] + [s.text[:chars] for s in snapshots]
     )
     facts = item.key_facts
     kept = KeyFacts(
@@ -596,3 +596,86 @@ def read_batch(ctx: JobContext, payload: dict[str, Any]) -> None:
                     _enqueue_read(ctx, fresh)
             ctx.db.commit()
         raise
+
+
+def _kept(ctx: JobContext, save: Save, why: str) -> None:
+    """A file with nothing Homing can read: kept with the person's own words, and said so."""
+    thing = KEPT_WORDS[save.kind]
+    caption = (save.text or "").strip()
+    saves_repo.upsert_reading(
+        ctx.db,
+        save.id,
+        {
+            "title": caption[:80] if caption else f"{thing.capitalize()} you saved",
+            "what": f"{thing.capitalize()}, kept with your words. {why}",
+            "key_facts": {},
+            "is_checkable": False,
+            "is_opportunity": False,
+            "model": "none",
+            "prompt_version": "none",
+        },
+    )
+    save.status = "ready"
+    save.error = None
+    emit(
+        ctx.db,
+        user_id=save.user_id,
+        agent="what",
+        action="kept",
+        summary=f"Kept {thing}: {why}",
+        save_id=save.id,
+    )
+
+
+def _read_media(ctx: JobContext, save: Save) -> tuple[Gathered | None, Reading | None, str]:
+    """A video, voice note or document. Speech is transcribed by Muse Voice Transcribe and read
+    like text, so every fact can be checked against the words; a video that says little is
+    watched by Spark from a short-lived link to the private bucket. Returns (None, None, why)
+    when there's nothing Homing can read."""
+    media = ctx.db.get(Media, save.media_id) if save.media_id else None
+    if media is None:
+        raise PermanentError("The file for this save is missing.")
+    storage = storage_factory()
+    data = storage.get(media.storage_key)
+    if save.kind == "file":
+        text = office_text(data)
+        if not text.strip():
+            return None, None, "Homing couldn't find any words in it."
+        copy = SnapshotIn(
+            "doc_text", text[:FILE_TEXT_CHARS], None, {"name": media.original_filename}
+        )
+        return Gathered(snapshots=[copy]), None, ""
+
+    gateway = gateway_factory(ctx.db)
+    speech: SnapshotIn | None = None
+    try:
+        wav, seconds = to_wav(data)
+        heard = gateway.transcribe(wav, user_id=save.user_id, save_ids=[save.id])
+        if heard.text.strip():
+            speech = SnapshotIn("speech", heard.text, None, {"seconds": round(seconds)})
+    except NoSound:
+        pass  # a silent video, or a sound we can't decode
+    if save.kind == "voice":
+        if speech is None:
+            return None, None, "Homing couldn't hear any words in it."
+        return Gathered(snapshots=[speech]), None, ""
+
+    said = [speech] if speech is not None else []
+    if speech is not None and len(speech.text.split()) >= SPOKEN_WORDS:
+        return Gathered(snapshots=said), None, ""  # read from what's said: cheaper, checkable
+    url = storage.signed_url(media.storage_key, VIDEO_LINK_SECONDS)
+    if url is None:
+        if said:
+            return Gathered(snapshots=said), None, ""
+        return None, None, "Homing can't watch videos kept on this machine."
+    inputs: dict[str, Any] = {"save": {"note": save.text, "label": save.label}}
+    if speech is not None:
+        inputs["transcript"] = speech.text
+    watched: Reading = gateway.run(
+        "read.video",
+        user_id=save.user_id,
+        inputs=inputs,
+        save_ids=[save.id],
+        attachments=[VideoLink(url, media.sha256)],
+    )
+    return Gathered(snapshots=said), watched, ""

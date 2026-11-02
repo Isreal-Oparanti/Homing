@@ -10,6 +10,7 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.agents import what_is_it
 from app.agents.what_is_it import read_one
 from app.core.auth import TICKET_SECONDS, sign_ticket
 from app.core.config import Settings, get_settings
@@ -155,7 +156,9 @@ def client(
 
     folder = tmp_path / "imports"
     monkeypatch.setattr(importer, "folder_factory", lambda: folder)
-    monkeypatch.setattr(importer, "storage_factory", lambda: LocalStorage(tmp_path / "files"))
+    files = LocalStorage(tmp_path / "files")
+    monkeypatch.setattr(importer, "storage_factory", lambda: files)
+    monkeypatch.setattr(what_is_it, "storage_factory", lambda: files)
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: Settings(
         proxy_secret="s", import_dir=str(folder)

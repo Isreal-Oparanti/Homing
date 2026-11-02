@@ -208,3 +208,10 @@ class FileReading(Reading):
     """A reading of an image or scanned PDF, with every word on it as our copy of the content."""
 
     text: str = Field(description="All readable text, word for word, in reading order.")
+
+
+class Transcript(BaseModel):
+    """What Muse Voice Transcribe heard in a voice note or a video's sound."""
+
+    text: str
+    duration_ms: int = 0
