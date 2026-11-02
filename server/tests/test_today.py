@@ -136,10 +136,11 @@ def test_never_more_than_three_new_cards_a_day_and_dismissed_never_return(
         tomorrow = NOW + timedelta(days=1)
         titles = [c.title for c in compose(db, user, tomorrow)]
         db.commit()
-        assert "Grant 0" not in titles  # never comes back
-        assert set(titles) <= {"Grant 3", "Grant 4"}  # yesterday's cards stay yesterday's
+        # Grant 0 never comes back; Grant 1's date has passed; Grant 2 stays until acted on;
+        # two new ones fill the room.
+        assert titles == ["Grant 2", "Grant 3", "Grant 4"]
         surfaced = db.scalars(select(AgentEvent).where(AgentEvent.action == "surfaced")).all()
-        assert len(surfaced) == 3 + len(titles)
+        assert len(surfaced) == 3 + 2
 
 
 @pytest.mark.integration

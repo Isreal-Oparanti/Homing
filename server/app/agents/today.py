@@ -27,6 +27,7 @@ from app.verify.dates import display
 from app.verify.eligibility import assess
 
 MAX_NEW_A_DAY = 3
+MAX_SHOWN = 3  # Today never shows more than this at once
 PREP_WITHIN = timedelta(hours=36)
 PREP_MIN_SAVES = 3
 FATIGUE_DAYS = 14
@@ -245,7 +246,11 @@ def compose(db: Session, user: User, now: datetime) -> list[Card]:
         .where(Card.user_id == user.id, Card.state == "new", Card.dedupe_key.notin_(live or {""}))
         .values(state="gone")
     )
-    room = MAX_NEW_A_DAY - (
+    # A card stays on Today until it's acted on or no longer needed; new ones come in while
+    # there's room, three a day at most.
+    on_today = (Card.user_id == user.id, Card.state == "new", Card.surfaced_on.is_not(None))
+    shown_now = db.scalar(select(func.count()).select_from(Card).where(*on_today)) or 0
+    came_today = (
         db.scalar(
             select(func.count())
             .select_from(Card)
@@ -253,6 +258,7 @@ def compose(db: Session, user: User, now: datetime) -> list[Card]:
         )
         or 0
     )
+    room = min(MAX_NEW_A_DAY - came_today, MAX_SHOWN - shown_now)
     if room > 0:
         waiting = db.scalars(
             select(Card)
@@ -275,8 +281,9 @@ def compose(db: Session, user: User, now: datetime) -> list[Card]:
     shown = list(
         db.scalars(
             select(Card)
-            .where(Card.user_id == user.id, Card.state == "new", Card.surfaced_on == today)
+            .where(*on_today)
             .order_by(Card.priority.desc(), Card.due_at)
+            .limit(MAX_SHOWN)
         ).all()
     )
     for card in shown:
