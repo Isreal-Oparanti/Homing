@@ -103,7 +103,7 @@ function Card({ card }: { card: TodayCard }) {
     onSuccess: (_, action) => {
       void queryClient.invalidateQueries({ queryKey: ["today"] });
       if (action === "use") {
-        router.push(card.saveId ? `/saves/${card.saveId}` : `/threads/${card.threadIds[0] ?? ""}`);
+        router.push(card.saveId ? `/saves/${card.saveId}` : `/cards/${card.id}`);
       }
     },
   });
@@ -126,7 +126,8 @@ function Card({ card }: { card: TodayCard }) {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => act.mutate("use")}
+          // A prep card stays on Today until the moment: opening it isn't being done with it.
+          onClick={() => (prep ? router.push(`/cards/${card.id}`) : act.mutate("use"))}
           disabled={act.isPending}
           className="rounded-full bg-red px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
         >

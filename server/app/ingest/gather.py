@@ -169,6 +169,18 @@ def _captions(video_id: str, *, proxy_url: str = "", pause_s: float = 1.5) -> li
     raise CaptionsUnavailable(blocked=True)
 
 
+def transcript_text(segments: list[dict[str, Any]]) -> str:
+    """Captions as our copy of the video: "[m:ss] words", one line each."""
+    lines, size = [], 0
+    for seg in segments:
+        line = f"[{int(seg['t']) // 60}:{int(seg['t']) % 60:02d}] {seg['text']}"
+        size += len(line) + 1
+        if size > MAX_TRANSCRIPT_CHARS:
+            break
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def gather_youtube(url: str, fetcher: SafeFetcher, settings: Settings) -> Gathered:
     vid = youtube_id(url)
     if not vid:
@@ -207,17 +219,10 @@ def gather_youtube(url: str, fetcher: SafeFetcher, settings: Settings) -> Gather
     if settings.feature_yt_captions:
         try:
             segments = _captions(vid, proxy_url=settings.captions_proxy_url)
-            lines, size = [], 0
-            for seg in segments:
-                line = f"[{int(seg['t']) // 60}:{int(seg['t']) % 60:02d}] {seg['text']}"
-                size += len(line) + 1
-                if size > MAX_TRANSCRIPT_CHARS:
-                    break
-                lines.append(line)
             out.snapshots.append(
                 SnapshotIn(
                     "transcript",
-                    "\n".join(lines),
+                    transcript_text(segments),
                     watch,
                     {"segments": segments, "source": "captions"},
                 )

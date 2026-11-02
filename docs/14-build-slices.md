@@ -320,6 +320,7 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
     - the card and the trigger;
     - the 2 Instagram demo examples, which need the export's MP4s;
     - the reel player in the app.
+- **As built (2 Nov):** the `card.prep` job (from Today, or on opening the card), the card page (`/cards/{id}`: "Play the best moments", steps, "Your videos agree", "Where they differ", a chip per citation that plays the video from that second) and `scripts/fetch_captions.py` (YouTube refuses the server; 25 of the 29 videos in Isreal's two goals got captions from the laptop, 4 have none). Open on a prep card no longer marks it used. Done-when on Isreal's card: every point cites the second it's said in his speaking and video-making saves; a chip plays from that second and the reel plays its 8 clips one after another (tested in the browser). `llm/video.py` isn't needed: captions are the words.
 - **If late:**
   - the reel goes first (PLAN cut order);
   - YouTube videos are read through their **captions** (Isreal's decision, 31 Oct); if captions are off or blocked, the sheet is built from chapters, titles and descriptions, and labelled "from chapters".

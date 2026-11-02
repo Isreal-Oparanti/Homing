@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.agents import is_it_true
 from app.db.models import Card, Check, Moment, Reading, Save, Thread, ThreadSave, User, When
 from app.events.emitter import emit
+from app.jobs import queue
 from app.jobs.errors import PermanentError
 from app.jobs.runner import JobContext
 from app.llm.gateway import ModelGateway
@@ -228,9 +229,11 @@ def compose(db: Session, user: User, now: datetime) -> list[Card]:
     live = {c["dedupe_key"] for c in candidates}
     for c in candidates:
         stmt = insert(Card).values(user_id=user.id, state="new", **c)
-        fresh = {
-            k: stmt.excluded[k] for k in ("title", "why_now", "next_step", "payload", "priority")
+        fresh: dict[str, Any] = {
+            k: stmt.excluded[k] for k in ("title", "why_now", "next_step", "priority")
         }
+        # Merged, so what a job added (a prep card's sheet) stays.
+        fresh["payload"] = Card.__table__.c.payload.op("||")(stmt.excluded.payload)
         db.execute(
             stmt.on_conflict_do_update(
                 index_elements=[Card.dedupe_key], set_=fresh, where=Card.state == "new"
@@ -269,12 +272,29 @@ def compose(db: Session, user: User, now: datetime) -> list[Card]:
                 card_id=card.id,
             )
     db.flush()
-    return list(
+    shown = list(
         db.scalars(
             select(Card)
             .where(Card.user_id == user.id, Card.state == "new", Card.surfaced_on == today)
             .order_by(Card.priority.desc(), Card.due_at)
         ).all()
+    )
+    for card in shown:
+        if card.kind == "prep" and "sheet" not in card.payload:
+            ask_for_sheet(db, card)
+    return shown
+
+
+def ask_for_sheet(db: Session, card: Card) -> None:
+    """Queue the prep sheet once; the card says it's being made until the job is done."""
+    card.payload = {**card.payload, "sheet": {"status": "queued"}}
+    queue.enqueue(
+        db,
+        "card.prep",
+        {"card_id": card.id},
+        user_id=card.user_id,
+        priority=queue.PRIORITY_USER,
+        dedupe_key=f"prep:{card.id}",
     )
 
 

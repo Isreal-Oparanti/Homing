@@ -5,6 +5,7 @@ chosen by code.
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Response
@@ -12,7 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agents.today import act, compose
+from app.agents.today import act, ask_for_sheet, compose
 from app.core.auth import CurrentUser, require_user
 from app.core.errors import AppError
 from app.db.models import Card, Moment, Reading, Save, Thread, ThreadSave, User, When
@@ -50,6 +51,17 @@ class CardOut(BaseModel):
             tz_stated=bool(card.payload.get("tz_stated", True)),
             unconfirmed=bool(card.payload.get("unconfirmed", False)),
         )
+
+
+class CardDetail(CardOut):
+    """A card with what a job made for it: a prep card's sheet (agree, disagree, checklist,
+    the videos each point is from, and the reel)."""
+
+    sheet: dict[str, Any] | None
+
+    @classmethod
+    def detail(cls, card: Card) -> "CardDetail":
+        return cls(**CardOut.of(card).model_dump(), sheet=card.payload.get("sheet"))
 
 
 class GoalOut(BaseModel):
@@ -155,6 +167,19 @@ def remove_moment(
     db.delete(moment)
     db.commit()
     return Response(status_code=204)
+
+
+@router.get("/cards/{card_id}", response_model=CardDetail)
+def get_card(
+    card_id: str, user: CurrentUser = Depends(require_user), db: Session = Depends(get_db)
+) -> CardDetail:
+    card = db.scalar(select(Card).where(Card.id == card_id, Card.user_id == user.id))
+    if card is None:
+        raise AppError("card_not_found", "That card doesn't exist.", status=404)
+    if card.kind == "prep" and "sheet" not in card.payload:
+        ask_for_sheet(db, card)
+        db.commit()
+    return CardDetail.detail(card)
 
 
 @router.post("/cards/{card_id}/act", response_model=CardOut)

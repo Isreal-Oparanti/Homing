@@ -114,7 +114,7 @@ As built in S4, the three answers differ slightly from the example above:
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | GET | `/today` | — | `{date, cards: Card[], moments: Moment[]}`. Composed when opened: at most 3 new cards a day. **As built (S11):** `Card = {id, kind: "deadline" \| "prep", save_id, thread_ids, title, why_now, next_step, due_at, tz_stated, unconfirmed}`. `unconfirmed` means the date came from the post, not the official page. |
-| GET | `/cards/{id}` | — | `Card` (with `payload`, e.g. `PrepSheet`). **Not built yet (S12).** |
+| GET | `/cards/{id}` | — | `Card` plus `sheet`: for a prep card `{status, agree, disagree, checklist, videos{V1: {save_id, title, url, thread, points[{t_start, t_end, point, quote}]}}, reel[{video, start, end}], watched, dropped_points, skipped{no_captions, reels, others}}`. Opening a prep card with no sheet queues `card.prep`. |
 | POST | `/cards/{id}/act` | `{action: "use" \| "dismiss" \| "later"}` | `Card`. `later` always means 09:00 tomorrow, user time; 422 for any other action. |
 | GET | `/saves/{id}/calendar.ics` | — | `text/calendar` attachment: the save's date, reminder a day before. 404 `no_date` when it has none. |
 

@@ -286,6 +286,15 @@ fatigue    = 15 × dismissals in this thread over the last 14 days
 4. **Reel:** take the top segments, padded −3s/+12s, merged when they overlap, total ≤ 180s.
 5. **Store** it as `card.payload` (`PrepSheet`).
 
+**As built (S12, 2 Nov)** (`agents/prep.py`, `prepare`):
+- **Queued** when a prep card enters Today, or when its page is opened without a sheet. The sheet's status (`queued`, `working`, `ready`, `failed`) lives in `card.payload.sheet`; Today merges payloads, so a refresh never wipes it.
+- **Which videos:** saves in the moment's goals with timed captions, ranked by meaning against the moment (code, the saved embeddings), each goal taking its turn so one big goal can't crowd out the others; 8 at most.
+- **Captions come from the save,** never fetched at prep time: the server can't reach YouTube. `scripts/fetch_captions.py` stores them for a pile imported on the server, from a home connection, with no model.
+- Each video's points and the sheet are checked as above. The team gets one line per video ("Went through '3-2-1 speaking trick video' for recording my demo video…: 6 points, each found in the captions at its second.") and one when it's ready.
+- **Reel:** cited points, checklist first, −3s/+12s, merged where they touch, ≤ 180s; it plays in the app one clip after another.
+- Reels (Instagram, TikTok, Facebook) and videos without captions are counted and named on the sheet, not guessed at.
+- On Isreal's demo moment: 8 videos from both goals, all used, 1 point dropped, 5 steps, 6 agreements, 1 disagreement (generate the voice or record it live), a 2:59 reel; about 120s and two model steps.
+
 **Never:**
 - shows more than 3 new cards a day;
 - brings back what the user dismissed (`agent_memory: dismissed:{save_id}`);

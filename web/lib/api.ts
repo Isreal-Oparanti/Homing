@@ -528,6 +528,82 @@ function toCard(c: RawCard): TodayCard {
   };
 }
 
+/** A line on a prep sheet, with the video seconds that back it. */
+export type SheetItem = { text: string; cites: { video: string; t: number }[] };
+export type SheetVideo = {
+  saveId: string;
+  title: string;
+  url: string;
+  thread: string | null;
+  points: { tStart: number; tEnd: number; point: string; quote: string }[];
+};
+export type PrepSheet = {
+  status: "queued" | "working" | "ready" | "failed";
+  agree: SheetItem[];
+  disagree: { topic: string; sides: SheetItem[] }[];
+  checklist: SheetItem[];
+  videos: Record<string, SheetVideo>;
+  reel: { video: string; start: number; end: number }[];
+  watched: number;
+  droppedPoints: number;
+  skipped: { noCaptions: number; reels: number; others: number };
+};
+
+type RawSheet = {
+  status: PrepSheet["status"];
+  agree?: SheetItem[];
+  disagree?: PrepSheet["disagree"];
+  checklist?: SheetItem[];
+  videos?: Record<
+    string,
+    {
+      save_id: string;
+      title: string;
+      url: string;
+      thread: string | null;
+      points: { t_start: number; t_end: number; point: string; quote: string }[];
+    }
+  >;
+  reel?: PrepSheet["reel"];
+  watched?: number;
+  dropped_points?: number;
+  skipped?: { no_captions: number; reels: number; others: number };
+};
+
+function toSheet(s: RawSheet): PrepSheet {
+  return {
+    status: s.status,
+    agree: s.agree ?? [],
+    disagree: s.disagree ?? [],
+    checklist: s.checklist ?? [],
+    videos: Object.fromEntries(
+      Object.entries(s.videos ?? {}).map(([id, v]) => [
+        id,
+        {
+          saveId: v.save_id,
+          title: v.title,
+          url: v.url,
+          thread: v.thread,
+          points: v.points.map((p) => ({
+            tStart: p.t_start,
+            tEnd: p.t_end,
+            point: p.point,
+            quote: p.quote,
+          })),
+        },
+      ]),
+    ),
+    reel: s.reel ?? [],
+    watched: s.watched ?? 0,
+    droppedPoints: s.dropped_points ?? 0,
+    skipped: {
+      noCaptions: s.skipped?.no_captions ?? 0,
+      reels: s.skipped?.reels ?? 0,
+      others: s.skipped?.others ?? 0,
+    },
+  };
+}
+
 export const todayApi = {
   async get(): Promise<{ date: string; cards: TodayCard[]; moments: Moment[] }> {
     const raw = await api<{ date: string; cards: RawCard[]; moments: Moment[] }>("today");
@@ -539,6 +615,13 @@ export const todayApi = {
       method: "POST",
       body: JSON.stringify({ action }),
     });
+  },
+  /** One card; a prep card comes with its sheet (made by a job, so it may still be working). */
+  async card(cardId: string): Promise<TodayCard & { sheet: PrepSheet | null }> {
+    const raw = await api<RawCard & { sheet: RawSheet | null }>(
+      `cards/${encodeURIComponent(cardId)}`,
+    );
+    return { ...toCard(raw), sheet: raw.sheet ? toSheet(raw.sheet) : null };
   },
   async addMoment(text: string): Promise<Moment> {
     return api<Moment>("moments", { method: "POST", body: JSON.stringify({ text }) });
