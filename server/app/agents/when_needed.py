@@ -13,7 +13,7 @@ from app.db.repo import saves as saves_repo
 from app.events.emitter import emit
 from app.jobs.errors import PermanentError
 from app.jobs.runner import JobContext
-from app.verify.dates import Deadline, bring_back_at, display, parse_deadline
+from app.verify.dates import Deadline, bring_back_at, city_of, display, parse_deadline
 
 NO_DATE = "No date. It'll come back when you save something related or search for it."
 
@@ -23,6 +23,7 @@ class Dated:
     deadline: Deadline
     role: str  # deadline · event
     source: str  # check · reading
+    closed_at: datetime | None = None  # the official date, passed, when a later one is used
 
 
 def _from_check(check: Check | None, user_tz: str) -> Dated | None:
@@ -53,6 +54,9 @@ def _from_reading(save: Save, reading: Reading, user_tz: str, now: datetime) -> 
 def _explain(dated: Dated, user_tz: str, now: datetime) -> str:
     shown = display(dated.deadline.at, user_tz)
     past = dated.deadline.at <= now
+    if dated.closed_at is not None:
+        closed = display(dated.closed_at, user_tz).removesuffix(f" {city_of(user_tz)} time")
+        return f"Applications closed on {closed}. Next on the page: {shown}."
     if dated.source == "check":
         return (
             f"Closed on {shown}, per the official page."
@@ -81,9 +85,13 @@ def set_when(ctx: JobContext, payload: dict[str, Any]) -> None:
     user_tz = user.tz if user else "Africa/Lagos"
     now = datetime.now(UTC)
 
-    dated = _from_check(ctx.db.get(Check, save.id), user_tz) or _from_reading(
-        save, reading, user_tz, now
-    )
+    checked = _from_check(ctx.db.get(Check, save.id), user_tz)
+    read = _from_reading(save, reading, user_tz, now)
+    dated = checked or read
+    # The official date has passed but the page has one still ahead ("Applications closed
+    # 25 Oct" and "submissions due 4 Nov"): the one ahead is when you'll need it.
+    if checked and checked.deadline.at <= now and read and read.deadline.at > now:
+        dated = Dated(read.deadline, read.role, "reading", closed_at=checked.deadline.at)
     when = ctx.db.get(When, save.id) or When(save_id=save.id)
     if dated is None:
         when.kind, when.source, when.explanation = "none", "reading", NO_DATE

@@ -146,6 +146,20 @@ def test_deadlines(
     assert (d.tz_stated, d.time_stated) == (tz_stated, time_stated)
 
 
+@pytest.mark.parametrize(
+    ("text", "year"),
+    [
+        ("Oct 25, 11:59 PM ET: Applications Deadline", 2026),  # just passed: this year's
+        ("Closes 30 Aug", 2027),  # passed long ago: the next one
+        ("Applications close Jan 15", 2027),
+        ("Oct 25 2027 deadline", 2027),  # a stated year is kept
+    ],
+)
+def test_a_date_with_no_year_that_just_passed_means_this_year(text: str, year: int) -> None:
+    d = parse_deadline(text, base=datetime(2026, 11, 2, 13, tzinfo=UTC), user_tz=LAGOS)
+    assert d is not None and d.at.year == year
+
+
 @pytest.mark.parametrize("text", ["mid-September to early December", "Aged 20-32", "in 2016", ""])
 def test_vague_or_non_dates_give_nothing(text: str) -> None:
     assert parse_deadline(text, base=datetime(2026, 10, 1, tzinfo=UTC), user_tz=LAGOS) is None

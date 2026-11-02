@@ -201,6 +201,33 @@ def test_the_posts_date_is_used_when_the_official_page_has_none(
 
 
 @pytest.mark.integration
+def test_a_closed_call_with_a_date_ahead_keeps_that_date(
+    client: TestClient, sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The Meta hackathon page, 2 Nov: applications closed 25 Oct, submissions due 4 Nov.
+    page = f"Applications close on {_day(-3)}. Project submissions due {_day(1)}."
+    monkeypatch.setattr(
+        is_it_true,
+        "_find_official",
+        lambda save, reading: (OFFICIAL_URL, SnapshotIn("page_text", page, OFFICIAL_URL)),
+    )
+    FakeModels.deadline_quote = f"Applications close on {_day(-3)}."
+    FakeModels.dates = [
+        DateFact(text=f"Applications close on {_day(-3)}.", role="deadline"),
+        DateFact(text=f"Project submissions due {_day(1)}.", role="deadline"),
+    ]
+    save_id = _save_and_run(client, sessions, POST)
+    card = client.get(f"/api/v1/saves/{save_id}", headers=HEADERS).json()
+    assert card["true"]["verdict"] == "closed"
+    assert card["when"]["source_text"] == f"Project submissions due {_day(1)}."
+    assert card["when"]["explanation"].startswith("Applications closed on ")
+    today = client.get("/api/v1/today", headers=HEADERS).json()["cards"]
+    assert [c["save_id"] for c in today] == [save_id]
+    assert today[0]["next_step"] == "Applications are closed. If you're in, this is your next date."
+    assert today[0]["unconfirmed"] is False
+
+
+@pytest.mark.integration
 def test_nothing_to_check_and_no_date(client: TestClient, sessions: sessionmaker[Session]) -> None:
     FakeModels.checkable = False
     FakeModels.dates = []

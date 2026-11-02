@@ -107,6 +107,23 @@ def _find(text: str, local_base: datetime) -> tuple[str, datetime] | None:
     return None
 
 
+_YEAR = re.compile(r"\b(?:19|20)\d{2}\b|\b\d{1,2}[/.]\d{1,2}[/.]\d{2,4}\b")
+JUST_PAST = timedelta(days=60)
+
+
+def _this_year_if_just_past(words: str, parsed: datetime, local_base: datetime) -> datetime:
+    """A date with no year is read as the next one to come, so "Oct 25" seen on 2 Nov became
+    next October. If the same day this year passed less than two months ago, it means that day:
+    a page that just closed, not one opening in eleven months."""
+    if _YEAR.search(words) or _RELATIVE.search(words):
+        return parsed
+    try:
+        earlier = parsed.replace(year=parsed.year - 1)
+    except ValueError:  # 29 February
+        return parsed
+    return earlier if local_base - JUST_PAST <= earlier < local_base else parsed
+
+
 def parse_deadline(
     source_text: str,
     *,
@@ -124,6 +141,7 @@ def parse_deadline(
     if hit is None:
         return None
     words, parsed = hit
+    parsed = _this_year_if_just_past(words, parsed, base.astimezone(tz).replace(tzinfo=None))
     time_stated = bool(_TIME.search(words))
     # "Nov 4: Project submissions due by 9:00 PM ET": the time is a few words after the date.
     # Taken only when the text gives exactly one time; two would be a guess.

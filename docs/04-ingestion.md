@@ -128,6 +128,7 @@ Each connector returns `Gathered(snapshots: list[Snapshot], media_urls: list[str
   - **Redirects:** at most 5, each one re-checked.
   - **Robots:** robots.txt is respected.
 - `trafilatura` extracts the main text and metadata. If it fails, fall back to the `<title>` and meta description.
+- **Pages built in the browser** (2 Nov): when the main text is under 500 characters, the words inside the page's script data (Next.js `self.__next_f` and `__NEXT_DATA__`: rich-text and description fields) are used instead, each once. The Meta hackathon page on Cerebral Valley gave 75 characters before, 28,062 after.
 - If the content type is PDF, hand over to the PDF connector.
 
 ### Files (`files.py`), as built in S7

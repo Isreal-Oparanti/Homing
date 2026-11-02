@@ -273,6 +273,7 @@ fatigue    = 15 × dismissals in this thread over the last 14 days
 - **Later** brings a card back at 09:00 the next morning, user time.
 - **The next step is decided by code** from the check: "Answer 4 questions to see if it fits you.", "It fits you. Apply before it closes.", "Read the 2 things the post left out, then decide.", or "Decide whether to apply before it closes."
 - **Moments:** code reads the day and time from the person's words (`verify/dates.parse_moment`): a date, a weekday (the next one), "tomorrow", "today" or "tonight", and a clock time or a part of the day (morning 09:00, evening 18:00, night 20:00). Nothing said → 09:00. No day, or an unclear one like "11/12" → the API asks them to say when. `moment.match` then gives Spark the person's goal titles (the 60 largest, as `T1…`) and code keeps only real ones, 3 at most. The team gets, e.g., "Noted: recording my demo, Tue 3 Nov, 18:00 Lagos time. 16 saves in 'Making a demo video' can help."
+- **A closed call with a date ahead** (2 Nov, the Meta hackathon page: applications closed 25 Oct, submissions due 4 Nov): the "when" is the next date on the page, explained as "Applications closed on Mon 26 Oct, 04:59. Next on the page: Thu 5 Nov, 03:00 Lagos time." Today keeps a closed save only while it has a date ahead, with the next step "Applications are closed. If you're in, this is your next date."
 - **Calendar:** `GET /saves/{id}/calendar.ics`, the date with a reminder a day before.
 - The prep sheet (`card.prep`) is S12: until then a prep card names the goals and how many saves can help.
 

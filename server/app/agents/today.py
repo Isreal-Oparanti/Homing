@@ -60,6 +60,8 @@ def priority(
 
 def next_step(reading: Reading, check: Check | None, questions: int = 0) -> str:
     """What to do now, decided by code from what the agents found."""
+    if check is not None and check.verdict == "closed":
+        return "Applications are closed. If you're in, this is your next date."
     if check is not None and check.verdict == "needs_your_answer" and questions:
         asks = "question" if questions == 1 else f"{questions} questions"
         return f"Answer {'a ' if questions == 1 else ''}{asks} to see if it fits you."
@@ -80,6 +82,18 @@ def _why_now(when: When, tz: str) -> str:
     assert when.due_at is not None
     verb = "Closes" if when.source == "check" or "Closes" in when.explanation else "On"
     return f"{verb} {display(when.due_at, tz)}"
+
+
+def _unconfirmed(when: When, check: Check | None) -> bool:
+    """The date comes from the post, not the official page. A closed save's next date was
+    read on the page the check opened."""
+    if when.source == "check":
+        return False
+    return not (
+        check is not None
+        and check.verdict == "closed"
+        and when.explanation.startswith("Applications closed")
+    )
 
 
 def _open_questions(db: Session, user_id: str, check: Check | None) -> int:
@@ -134,7 +148,8 @@ def _candidates(db: Session, user: User, now: datetime) -> list[dict[str, Any]]:
             When.kind == "date",
             When.bring_back_at <= now,
             When.due_at > now,
-            or_(Check.verdict.is_(None), Check.verdict.notin_(("not_for_you", "closed"))),
+            # A closed save stays only while its page has a date ahead (the "when" moved on).
+            or_(Check.verdict.is_(None), Check.verdict != "not_for_you"),
         )
     ).all()
     for save, reading, when, check in rows:
@@ -152,7 +167,7 @@ def _candidates(db: Session, user: User, now: datetime) -> list[dict[str, Any]]:
                 "why_now": _why_now(when, tz),
                 "next_step": next_step(reading, check, _open_questions(db, user.id, check)),
                 "due_at": when.due_at,
-                "payload": {"tz_stated": when.tz_stated, "unconfirmed": when.source != "check"},
+                "payload": {"tz_stated": when.tz_stated, "unconfirmed": _unconfirmed(when, check)},
                 "priority": priority(
                     when.due_at,
                     now,
