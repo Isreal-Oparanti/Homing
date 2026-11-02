@@ -10,6 +10,8 @@ from app.events.emitter import emit
 from app.ingest.whatsapp.importer import import_whatsapp
 from app.jobs.errors import PermanentError
 from app.jobs.runner import Handler, JobContext
+from app.search.ask import answer as answer_ask
+from app.search.hybrid import embed_one
 
 
 def system_echo(ctx: JobContext, payload: dict[str, Any]) -> None:
@@ -33,6 +35,8 @@ HANDLERS: dict[str, Handler] = {
     "save.check_item": check_item,
     "save.place": place,
     "threads.rebuild": rebuild,
+    "save.embed": embed_one,
+    "ask.answer": answer_ask,
     "save.when": set_when,
     "import.whatsapp": import_whatsapp,
 }

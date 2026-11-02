@@ -1,0 +1,100 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { BadgeCheck } from "lucide-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+
+import { askApi } from "@/lib/api";
+
+function savedOn(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getDate()} ${d.toLocaleString("en-GB", { month: "short" })} ${d.getFullYear()}`;
+}
+
+/** One answer page: points from your own saves, each quote checked against the save. */
+export function AskView() {
+  const { id } = useParams<{ id: string }>();
+  const { data, isPending, isError, error } = useQuery({
+    queryKey: ["ask", id],
+    queryFn: () => askApi.get(id),
+    refetchInterval: (q) => (q.state.data?.status === "working" ? 1500 : false),
+    // Keep checking while the person looks at another tab or app: the answer is short-lived work.
+    refetchIntervalInBackground: true,
+  });
+
+  if (isPending) return <p className="text-ink-2">Opening your question…</p>;
+  if (isError) return <p className="text-ink-2">{error.message}</p>;
+
+  return (
+    <article>
+      <Link href="/search" className="text-sm text-ink-2 hover:underline">
+        ← Search and ask
+      </Link>
+      <h1 className="mt-2 font-display text-2xl font-bold tracking-[-0.02em]">{data.question}</h1>
+
+      {data.status === "working" && (
+        <p className="mt-3 text-ink-2">
+          Finding the saves that answer this, reading them, and checking every quote…
+        </p>
+      )}
+      {data.status === "failed" && <p className="mt-3 text-red">{data.error}</p>}
+
+      {data.status === "done" && (
+        <>
+          <p className="mt-1 text-sm text-muted">
+            From your own saves: looked at {data.considered}, read {data.read}. Every quote below was found word for
+            word in the save it cites.
+          </p>
+
+          {data.points.length > 0 && (
+            <ol className="mt-4 space-y-3">
+              {data.points.map((p, i) => (
+                <li key={i} className="glass rounded-[var(--radius-card)] px-4 py-3">
+                  <p className="font-semibold">{p.point}</p>
+                  <blockquote className="mt-1.5 border-l-2 border-red pl-3 text-sm text-ink-2">
+                    &ldquo;{p.quote}&rdquo;
+                  </blockquote>
+                  <p className="mt-1.5 flex items-center gap-1 text-xs text-muted">
+                    <BadgeCheck className="size-3.5 text-green" aria-label="Quote checked" />
+                    <Link href={`/saves/${p.saveId}`} className="font-semibold hover:underline">
+                      {p.title}
+                    </Link>
+                    <span>· saved {savedOn(p.savedAt)}</span>
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {data.also.length > 0 && (
+            <section className="mt-5">
+              <h2 className="font-semibold">Also in your saves</h2>
+              <p className="text-sm text-ink-2">These look relevant, but Homing could only see their titles. Open them.</p>
+              <ul className="mt-1.5 space-y-1">
+                {data.also.map((x) => (
+                  <li key={x.saveId}>
+                    <Link href={`/saves/${x.saveId}`} className="text-sm font-semibold hover:underline">
+                      {x.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {data.notCovered.length > 0 && (
+            <section className="mt-5">
+              <h2 className="font-semibold">Not in your saves</h2>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-ink-2">
+                {data.notCovered.map((n, i) => (
+                  <li key={i}>{n}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
+    </article>
+  );
+}

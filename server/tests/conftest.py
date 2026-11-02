@@ -96,3 +96,16 @@ def no_real_storage(
     local = LocalStorage(tmp_path_factory.mktemp("files"))
     monkeypatch.setattr(what_is_it, "storage_factory", lambda: local)
     monkeypatch.setattr(importer, "storage_factory", lambda: local)
+
+
+class _QuietEmbedder:
+    def embed(self, texts: list[str], kind: str) -> list[list[float]]:
+        return [[1.0] + [0.0] * 383 for _ in texts]
+
+
+@pytest.fixture(autouse=True)
+def no_real_embedder(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never load the 120 MB model; tests that need search pass their own fake."""
+    from app.search import hybrid
+
+    monkeypatch.setattr(hybrid, "embedder_factory", _QuietEmbedder)

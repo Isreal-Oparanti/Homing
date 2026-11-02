@@ -61,6 +61,7 @@ How things come in, and how **What is it?** gets content to read. Code lives in 
   - **Documents:** the words come out of the Word, PowerPoint or Excel file (`office_text`, no extra library) and are read like text (snapshot `doc_text`).
   - **A secret heard or written** keeps the save private before any reading.
   - **Measured on two of Isreal's videos:** a silent 0.5 MB clip, watched by Spark: 3,038 tokens, "A close-up of colorful notebooks personalized with names". A 5.2 MB clip with 91 words: transcribed (36s, no tokens) then read: 1,911 tokens, "A short comedy clip showing a demo of an app that tells hot dogs from not hot dogs." Spark watching that same clip cost 15,530 tokens.
+  - **All of Isreal's kept files, read on the server (2 Nov):** 36 files, no errors. 17 videos read from their speech, 14 watched by Spark, 5 Word documents, 2 voice notes; 30 transcriptions. 231,854 tokens in all: Spark watching 13 videos 123,277 (about 9,500 each, more than the small clip measured), reading 53,966, and two rebuild calls 54,611. The rebuild then placed 356 saves into 24 goals.
   - **Muse Voice Transcribe's `turns` come back empty in PUSH_TO_TALK mode:** we get the words without timestamps.
 - **Where the upload waits:** the API writes it to `IMPORT_DIR` on its own disk, and only a worker on the same machine can read it. That's why jobs have lanes ([03](03-agents.md)).
 

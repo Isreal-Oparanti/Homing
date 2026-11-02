@@ -6,6 +6,8 @@ set -euo pipefail
 APP=/opt/homing/app
 sudo -u homing git -C "$APP" pull --ff-only
 sudo -u homing bash -c "cd $APP/server && UV_CACHE_DIR=/opt/homing/.cache/uv uv sync --frozen --no-dev"
+# The search model (about 120 MB) is downloaded once, now, not on someone's first search.
+sudo -u homing bash -c "cd $APP/server && .venv/bin/python -c 'from app.search.embed import get_embedder; get_embedder()'"
 install -m 644 "$APP/deploy/ec2/homing-api.service" "$APP/deploy/ec2/homing-worker.service"   /etc/systemd/system/
 systemctl daemon-reload
 

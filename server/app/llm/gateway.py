@@ -26,6 +26,8 @@ from app.core.config import Settings, get_settings
 from app.db.models import ModelCall, Save, User
 from app.jobs.errors import DeferredError, PermanentError, RetryableError
 from app.schemas.agents import (
+    AskAnswer,
+    AskPick,
     BatchReadings,
     FileReading,
     Placement,
@@ -90,6 +92,9 @@ PURPOSES: dict[str, Purpose] = {
     # Comparing with a source is the hardest call, so it keeps the default reasoning effort.
     "check.compare": Purpose("check.compare", "check_compare.v2.md", ProposedCheck, 120),
     "place.assign": Purpose("place.assign", "place_assign.v1.md", Placement, 45, "low"),
+    # Ask (S10): pick the saves that help, then answer from them with quotes code verifies.
+    "ask.select": Purpose("ask.select", "ask_select.v1.md", AskPick, 60, "low"),
+    "ask.answer": Purpose("ask.answer", "ask_answer.v1.md", AskAnswer, 120),
     # The whole pile in one long-context call: it sees every save, so it groups them well.
     "place.rebuild": Purpose("place.rebuild", "place_rebuild.v1.md", Rebuild, 300),
     "video.points": Purpose("video.points", "video_points.v1.md", VideoPoints, 120, "low"),

@@ -215,3 +215,28 @@ class Transcript(BaseModel):
 
     text: str
     duration_ms: int = 0
+
+
+class AskPick(BaseModel):
+    """Which candidate saves actually help answer the question."""
+
+    saves: list[int] = Field(
+        max_length=12, description="Line numbers from SAVES that help answer QUESTION, best first."
+    )
+
+
+class AskPoint(BaseModel):
+    point: str = Field(description="One plain sentence that answers part of the question.")
+    save: int = Field(description="The `n` of the source in SOURCES this point comes from.")
+    quote: str = Field(description="Copied word for word from that source's text, 3 to 40 words.")
+
+
+class AskAnswer(BaseModel):
+    """An answer page: points from the person's own saves, and what they don't cover."""
+
+    points: list[AskPoint] = Field(max_length=12)
+    not_covered: list[str] = Field(
+        default_factory=list,
+        max_length=5,
+        description="Parts of the question the sources don't answer, in plain words.",
+    )

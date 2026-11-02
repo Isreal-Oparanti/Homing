@@ -84,6 +84,7 @@ export function ImportView() {
     queryFn: () => importApi.get(id!),
     enabled: id !== null,
     refetchInterval: (q) => (q.state.data && !LIVE.includes(q.state.data.status) ? false : 2000),
+    refetchIntervalInBackground: true,
   });
 
   const pick = (files: FileList | null) => {

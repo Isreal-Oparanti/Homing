@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     # so they must run on the same machine (they do: docs/10). Deleted after each import.
     import_dir: str = "data/imports"
     import_max_bytes: int = 1024**3
+    # The embedding model for search by meaning (app/search/embed.py), downloaded on first use.
+    embed_dir: str = "data/models/multilingual-e5-small"
     # Web search for Is it true? when a save has no link to its official page.
     search_provider: str = "serper"
     search_api_key: str = ""

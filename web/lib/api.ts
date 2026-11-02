@@ -706,3 +706,76 @@ export const threadsApi = {
     await api("threads/rebuild", { method: "POST" });
   },
 };
+
+export const searchApi = {
+  /** By words and by meaning at once; no model call, so it runs as you type. */
+  async search(q: string): Promise<SaveListItem[]> {
+    const page = await api<{ items: (RawSave & { title: string | null; what: string | null })[] }>(
+      `search?q=${encodeURIComponent(q)}&limit=12`,
+    );
+    return page.items.map((raw) => ({ ...toSave(raw), title: raw.title, what: raw.what }));
+  },
+};
+
+/** One verified point on an answer page: its quote was found in the save it cites. */
+export type AskPoint = { point: string; quote: string; saveId: string; title: string; savedAt: string };
+
+export type AskStatus = {
+  id: string;
+  question: string;
+  status: "working" | "done" | "failed";
+  points: AskPoint[];
+  /** Saves that may help, but Homing only knows their titles. */
+  also: { saveId: string; title: string }[];
+  notCovered: string[];
+  considered: number;
+  read: number;
+  error: string | null;
+};
+
+type RawAsk = {
+  id: string;
+  question: string;
+  status: AskStatus["status"];
+  error: string | null;
+  answer: {
+    points: { point: string; quote: string; save_id: string; title: string; saved_at: string }[];
+    also?: { save_id: string; title: string }[];
+    not_covered: string[];
+    considered: number;
+    read: number;
+  } | null;
+};
+
+function toAsk(raw: RawAsk): AskStatus {
+  const a = raw.answer;
+  return {
+    id: raw.id,
+    question: raw.question,
+    status: raw.status,
+    error: raw.error,
+    points: (a?.points ?? []).map((p) => ({
+      point: p.point,
+      quote: p.quote,
+      saveId: p.save_id,
+      title: p.title,
+      savedAt: p.saved_at,
+    })),
+    also: (a?.also ?? []).map((x) => ({ saveId: x.save_id, title: x.title })),
+    notCovered: a?.not_covered ?? [],
+    considered: a?.considered ?? 0,
+    read: a?.read ?? 0,
+  };
+}
+
+export const askApi = {
+  async ask(question: string): Promise<AskStatus> {
+    return toAsk(await api<RawAsk>("asks", { method: "POST", body: JSON.stringify({ question }) }));
+  },
+  async get(id: string): Promise<AskStatus> {
+    return toAsk(await api<RawAsk>(`asks/${encodeURIComponent(id)}`));
+  },
+  async recent(): Promise<AskStatus[]> {
+    return (await api<RawAsk[]>("asks")).map(toAsk);
+  },
+};

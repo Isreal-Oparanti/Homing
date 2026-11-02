@@ -54,6 +54,8 @@ Every call declares a purpose. Each purpose fixes the model, prompt file, output
 | `read.batch` (as built, 1 Nov) | Spark, low effort | `prompts/read_batch.v1.md` | `BatchReadings` (one `Reading` per id) | 150s |
 | `place.rebuild` (as built, 1 Nov) | Spark, default effort | `prompts/place_rebuild.v1.md` | `Rebuild` (goals with line numbers) | 300s |
 | `read.video` (as built, 2 Nov) | Spark, low effort, `video_url` from a signed link | `prompts/read_video.v1.md` | `Reading` | 180s |
+| `ask.select` (as built, 2 Nov) | Spark, low effort | `prompts/ask_select.v1.md` | `AskPick` (up to 12 line numbers) | 60s |
+| `ask.answer` (as built, 2 Nov) | Spark, default effort | `prompts/ask_answer.v1.md` | `AskAnswer` (points with a save and a quote; not covered) | 120s |
 | `transcribe.voice` (as built, 2 Nov) | Muse Voice Transcribe, `POST /asr/transcribe`, `{model, audioEncoding: WAV, mode: PUSH_TO_TALK}` | — | `Transcript` (text, duration) | 180s |
 | `read.text` | Spark | `read_text.v3.md` (v2 since 31 Oct: only facts someone could act on, a narrower `is_checkable`; v3 adds `items` for saves that list several things) | `Reading` | 90s |
 | `read.file` | Spark | `read_file.v1.md`, with the images or the PDF attached | `FileReading` (`Reading` plus every word on the file as `text`) | 120s |

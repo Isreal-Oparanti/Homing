@@ -287,6 +287,8 @@ About 60 hours of building in total. Friday night and Saturday are the heaviest,
 - **Then:** **Isreal's grading hour.** Grade 40 save cards, and write 15 search and Ask questions with the saves he expects to see.
 - **If late:** Ask keeps only "points" and "not in your saves".
 
+- **As built (2 Nov):** embeddings (`save.embed` after every read; `scripts/embed_pile.py` to catch up; migration 0007 with the HNSW, word and trigram indexes), hybrid search, Ask with verified quotes, the Search and Ask page (results as you type, Ask button, recent questions) and the answer page (fills in as the agents work; points with quotes and links; "Also in your saves"; "Not in your saves"). Done-when: "YC" returns the YC saves; "How do I prepare for YC?" cites only verified quotes and says what isn't covered. Numbers in [ADR 0003](adr/0003-search-ask-audit.md#as-built-s10-2-nov-2026). Still to do: Isreal's grading hour.
+
 ### S11 · When will you need it? + Today
 - **Day:** Tue morning · **Estimate:** 4h · **Depends on:** S6, S9 · **Scene:** Later
 - **Builds:**
