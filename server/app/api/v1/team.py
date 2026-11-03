@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.auth import CurrentUser, require_user
-from app.db.models import AgentEvent, Save, Thread, ThreadSave, User
+from app.db.models import AgentEvent, Check, Job, Reading, Save, Thread, ThreadSave, User
 from app.db.repo import events as events_repo
 from app.db.session import get_db, session_factory
 
@@ -66,6 +66,78 @@ MAP_GOALS = 8
 AGENT_ROWS = ("what", "true", "for", "when")
 
 
+# Which agent each job belongs to, so "working" comes from the real queue.
+JOB_AGENT = {
+    "save.read": "what",
+    "save.read_batch": "what",
+    "import.whatsapp": "what",
+    "save.check": "true",
+    "save.check_item": "true",
+    "save.place": "for",
+    "threads.rebuild": "for",
+    "save.when": "when",
+    "moment.match": "when",
+    "card.prep": "when",
+}
+NEEDS_YOU_SHOWN = 5
+
+
+class NeedsYou(BaseModel):
+    save_id: str
+    title: str
+
+
+class Attention(BaseModel):
+    """What's happening now: each agent's jobs in hand, and the saves waiting on the person."""
+
+    working: dict[str, int]
+    needs_you: int
+    needs_you_items: list[NeedsYou]
+
+
+def attention(db: Session, user_id: str) -> Attention:
+    now = datetime.now(UTC)
+    working = dict.fromkeys(AGENT_ROWS, 0)
+    for kind, n in db.execute(
+        select(Job.kind, func.count())
+        .where(
+            Job.user_id == user_id,
+            Job.status.in_(("queued", "running")),
+            Job.run_after <= now,
+        )
+        .group_by(Job.kind)
+    ):
+        if agent := JOB_AGENT.get(kind):
+            working[agent] += n
+    waiting = (
+        select(Save.id, Reading.title)
+        .join(Check, Check.save_id == Save.id)
+        .join(Reading, Reading.save_id == Save.id)
+        .where(
+            Save.user_id == user_id,
+            Save.visibility == "normal",
+            Check.verdict == "needs_your_answer",
+            (Check.deadline_at.is_(None)) | (Check.deadline_at > now),
+        )
+        .order_by(Check.deadline_at.asc().nulls_last(), Save.saved_at.desc())
+    )
+    items = db.execute(waiting.limit(NEEDS_YOU_SHOWN)).all()
+    total = db.scalar(select(func.count()).select_from(waiting.subquery())) or 0
+    return Attention(
+        working=working,
+        needs_you=total,
+        needs_you_items=[NeedsYou(save_id=i, title=t) for i, t in items],
+    )
+
+
+@router.get("/team/attention", response_model=Attention)
+def team_attention(
+    user: CurrentUser = Depends(require_user), db: Session = Depends(get_db)
+) -> Attention:
+    """Small and cheap: the menu asks this to show a badge when something needs you."""
+    return attention(db, user.id)
+
+
 class GoalDot(BaseModel):
     id: str
     title: str
@@ -81,6 +153,7 @@ class Overview(BaseModel):
     date: str
     hours: dict[str, list[int]]  # agent -> events in each hour of today, the person's time
     hour_now: int
+    now: Attention
 
 
 @router.get("/team/overview", response_model=Overview)
@@ -125,6 +198,7 @@ def overview(user: CurrentUser = Depends(require_user), db: Session = Depends(ge
         date=now.date().isoformat(),
         hours=hours,
         hour_now=now.hour,
+        now=attention(db, user.id),
     )
 
 

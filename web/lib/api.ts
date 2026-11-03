@@ -95,7 +95,29 @@ export function toAgentEvent(raw: RawAgentEvent): AgentEvent {
 
 export type TeamPage = { items: AgentEvent[]; nextCursor: string | null };
 
+/** What's happening now: each agent's jobs in hand, and the saves waiting on you. */
+export type Attention = {
+  working: Record<string, number>;
+  needsYou: number;
+  needsYouItems: { saveId: string; title: string }[];
+};
+
+type RawAttention = {
+  working: Record<string, number>;
+  needs_you: number;
+  needs_you_items: { save_id: string; title: string }[];
+};
+
+function toAttention(a: RawAttention): Attention {
+  return {
+    working: a.working,
+    needsYou: a.needs_you,
+    needsYouItems: a.needs_you_items.map((i) => ({ saveId: i.save_id, title: i.title })),
+  };
+}
+
 export type TeamOverview = {
+  now: Attention;
   saves: number;
   goals: { id: string; title: string; saves: number }[];
   goalOf: Record<string, string>;
@@ -112,6 +134,10 @@ export const teamApi = {
     );
     return { items: page.items.map(toAgentEvent), nextCursor: page.next_cursor };
   },
+  /** For the menu's badge: what's waiting on you, and whether agents are at work. */
+  async attention(): Promise<Attention> {
+    return toAttention(await api<RawAttention>("team/attention"));
+  },
   /** What the agents map and today's clock draw: real counts only. */
   async overview(): Promise<TeamOverview> {
     const raw = await api<{
@@ -121,8 +147,10 @@ export const teamApi = {
       date: string;
       hours: Record<string, number[]>;
       hour_now: number;
+      now: RawAttention;
     }>("team/overview");
     return {
+      now: toAttention(raw.now),
       saves: raw.saves,
       goals: raw.goals,
       goalOf: raw.goal_of,

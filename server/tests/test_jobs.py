@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.auth import CurrentUser
 from app.core.config import Settings, get_settings
-from app.db.models import AgentEvent, Job, Save, Thread, ThreadSave, User
+from app.db.models import AgentEvent, Check, Job, Reading, Save, Thread, ThreadSave, User
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
 from app.events.emitter import emit
@@ -211,8 +211,25 @@ def test_the_agents_overview_counts_only_real_steps(sessions: sessionmaker[Sessi
         emit(db, user_id=ALICE.id, agent="what", action="read", summary="b")
         emit(db, user_id=ALICE.id, agent="for", action="placed", summary="c")
         emit(db, user_id=BOB.id, agent="when", action="when_set", summary="not alice's")
+        queue.enqueue(db, "save.read", {"save_id": saves[0].id}, user_id=ALICE.id)
+        queue.enqueue(db, "save.read", {"save_id": "x"}, user_id=BOB.id)
+        db.add(
+            Reading(
+                save_id=saves[2].id,
+                title="Grant call",
+                what="A grant.",
+                key_facts={},
+                model="spark",
+                prompt_version="v",
+            )
+        )
+        db.add(
+            Check(
+                save_id=saves[2].id, verdict="needs_your_answer", model="spark", prompt_version="v"
+            )
+        )
         db.commit()
-        goal_id, placed = goal.id, {s.id for s in saves[:2]}
+        goal_id, placed, needing = goal.id, {s.id for s in saves[:2]}, saves[2].id
 
     def override_db():  # type: ignore[no-untyped-def]
         with sessions() as session:
@@ -233,6 +250,9 @@ def test_the_agents_overview_counts_only_real_steps(sessions: sessionmaker[Sessi
     assert sum(o["hours"]["what"]) == 2 and sum(o["hours"]["for"]) == 1
     assert sum(o["hours"]["when"]) == 0  # Bob's step isn't Alice's
     assert o["hours"]["what"][o["hour_now"]] == 2
+    assert o["now"]["working"] == {"what": 1, "true": 0, "for": 0, "when": 0}  # not Bob's
+    assert o["now"]["needs_you"] == 1
+    assert o["now"]["needs_you_items"] == [{"save_id": needing, "title": "Grant call"}]
 
 
 @pytest.mark.integration

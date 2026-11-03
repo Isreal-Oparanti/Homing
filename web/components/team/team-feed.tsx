@@ -84,7 +84,13 @@ export function TeamFeed({ showDevTools }: { showDevTools: boolean }) {
   const overview = useQuery({
     queryKey: ["team-overview"],
     queryFn: () => teamApi.overview(),
+    // While agents have work in hand, check often so "Working on 3" counts down for real.
+    refetchInterval: (q) =>
+      Object.values(q.state.data?.now.working ?? {}).some((n) => n > 0)
+        ? 4000
+        : 30000,
   });
+  const needsList = useRef<HTMLElement>(null);
 
   const onEvent = useCallback(
     (event: AgentEvent) => {
@@ -101,13 +107,13 @@ export function TeamFeed({ showDevTools }: { showDevTools: boolean }) {
         return { ...o, hours: { ...o.hours, [event.agent]: row } };
       });
       setIncoming(event);
-      // New saves and goals: refresh the map's counts once things settle.
+      // A step changes who's working, what needs you, and the goals: look again, at most
+      // once a second during a burst.
       clearTimeout(settle.current);
-      settle.current = setTimeout(
-        () =>
-          void queryClient.invalidateQueries({ queryKey: ["team-overview"] }),
-        5000,
-      );
+      settle.current = setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: ["team-overview"] });
+        void queryClient.invalidateQueries({ queryKey: ["attention"] });
+      }, 1000);
     },
     [queryClient],
   );
@@ -167,7 +173,54 @@ export function TeamFeed({ showDevTools }: { showDevTools: boolean }) {
             incoming={incoming}
             selected={selected}
             onSelect={setSelected}
+            onNeedsYou={() =>
+              needsList.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              })
+            }
           />
+          {overview.data.now.needsYou > 0 && (
+            <section
+              ref={needsList}
+              className="glass rounded-[var(--radius-card)] p-4 sm:p-5"
+            >
+              <h2 className="flex items-center gap-2 font-display text-lg font-bold tracking-[-0.02em]">
+                <span className="grid size-6 place-items-center rounded-full bg-amber text-xs text-white">
+                  {overview.data.now.needsYou}
+                </span>
+                Needs your answer
+              </h2>
+              <p className="mt-0.5 text-sm text-ink-2">
+                Is it true? needs a fact only you know before it can say whether
+                these fit you.
+              </p>
+              <ul className="mt-2 divide-y divide-line">
+                {overview.data.now.needsYouItems.map((item) => (
+                  <li key={item.saveId}>
+                    <Link
+                      href={`/saves/${item.saveId}`}
+                      className="flex items-center justify-between gap-3 py-2.5 hover:underline"
+                    >
+                      <span className="min-w-0 truncate">{item.title}</span>
+                      <span className="shrink-0 rounded-full bg-amber-soft px-3 py-1 text-xs font-semibold text-amber">
+                        Answer
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {overview.data.now.needsYou >
+                overview.data.now.needsYouItems.length && (
+                <p className="mt-1 text-xs text-muted">
+                  And{" "}
+                  {overview.data.now.needsYou -
+                    overview.data.now.needsYouItems.length}{" "}
+                  more.
+                </p>
+              )}
+            </section>
+          )}
           <ClockStrip overview={overview.data} />
         </>
       )}

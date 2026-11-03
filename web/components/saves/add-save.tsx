@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FileText, ImageIcon, MessageCircle, Paperclip, X } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { savesApi } from "@/lib/api";
@@ -14,9 +14,12 @@ const ACCEPT = "image/png,image/jpeg,image/webp,image/gif,application/pdf";
 
 /** Why these files can't be saved together, or null if they can. */
 function problem(files: File[]): string | null {
-  if (files.length > MAX_FILES) return `Add up to ${MAX_FILES} files at a time.`;
-  if (files.some((f) => f.size > MAX_BYTES)) return "Files must be 10 MB or smaller.";
-  if (files.some((f) => f.type === "application/pdf") && files.length > 1) return "Add a PDF on its own.";
+  if (files.length > MAX_FILES)
+    return `Add up to ${MAX_FILES} files at a time.`;
+  if (files.some((f) => f.size > MAX_BYTES))
+    return "Files must be 10 MB or smaller.";
+  if (files.some((f) => f.type === "application/pdf") && files.length > 1)
+    return "Add a PDF on its own.";
   // Some phones send no type at all; the server checks the real type from the bytes.
   if (files.some((f) => f.type && !ACCEPT.split(",").includes(f.type))) {
     return "Homing can read images and PDFs for now.";
@@ -27,6 +30,7 @@ function problem(files: File[]): string | null {
 /** Paste anything: a link, a post, a note, screenshots, a flyer or a PDF. */
 export function AddSave({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const picker = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
@@ -35,19 +39,26 @@ export function AddSave({ onClose }: { onClose: () => void }) {
   const issue = problem(files);
 
   const save = useMutation({
-    mutationFn: () => (files.length ? savesApi.upload(files, text) : savesApi.create(text)),
+    mutationFn: () =>
+      files.length ? savesApi.upload(files, text) : savesApi.create(text),
     onSuccess: (created) => {
       void queryClient.invalidateQueries({ queryKey: ["saves"] });
+      // The agents start on it now: let the map and the menu see the work.
+      void queryClient.invalidateQueries({ queryKey: ["team-overview"] });
+      void queryClient.invalidateQueries({ queryKey: ["attention"] });
       onClose();
-      router.push(`/saves/${created.id}`);
+      // On Your agents, stay and watch them work; anywhere else, open the new save's card.
+      if (pathname !== "/agents") router.push(`/saves/${created.id}`);
     },
   });
 
   function add(list: FileList | File[] | null) {
-    if (list && list.length) setFiles((current) => [...current, ...Array.from(list)]);
+    if (list && list.length)
+      setFiles((current) => [...current, ...Array.from(list)]);
   }
 
-  const ready = (files.length > 0 && !issue) || (!files.length && text.trim().length > 0);
+  const ready =
+    (files.length > 0 && !issue) || (!files.length && text.trim().length > 0);
 
   return (
     <div
@@ -76,10 +87,15 @@ export function AddSave({ onClose }: { onClose: () => void }) {
           if (ready) save.mutate();
         }}
       >
-        <h2 id="add-save-title" className="font-display text-lg font-bold tracking-[-0.02em]">
+        <h2
+          id="add-save-title"
+          className="font-display text-lg font-bold tracking-[-0.02em]"
+        >
           Save something
         </h2>
-        <p className="mt-1 text-sm text-ink-2">Paste a link, a post or a note, or add screenshots, a flyer or a PDF.</p>
+        <p className="mt-1 text-sm text-ink-2">
+          Paste a link, a post or a note, or add screenshots, a flyer or a PDF.
+        </p>
         <textarea
           autoFocus
           value={text}
@@ -92,25 +108,44 @@ export function AddSave({ onClose }: { onClose: () => void }) {
           }}
           rows={files.length ? 2 : 5}
           maxLength={20000}
-          placeholder={files.length ? "Add a note (optional)" : "https://… or anything you want to keep"}
+          placeholder={
+            files.length
+              ? "Add a note (optional)"
+              : "https://… or anything you want to keep"
+          }
           className="mt-3 w-full resize-y rounded-xl border border-line bg-white/80 p-3 text-[15px] outline-none focus:border-ink/30"
         />
 
         {files.length > 0 && (
           <ul className="mt-2 space-y-1.5">
             {files.map((f, i) => (
-              <li key={`${f.name}-${i}`} className="flex items-center gap-2 rounded-xl bg-white/70 px-3 py-1.5 text-sm">
+              <li
+                key={`${f.name}-${i}`}
+                className="flex items-center gap-2 rounded-xl bg-white/70 px-3 py-1.5 text-sm"
+              >
                 {f.type === "application/pdf" ? (
-                  <FileText className="size-4 shrink-0 text-ink-2" aria-hidden />
+                  <FileText
+                    className="size-4 shrink-0 text-ink-2"
+                    aria-hidden
+                  />
                 ) : (
-                  <ImageIcon className="size-4 shrink-0 text-ink-2" aria-hidden />
+                  <ImageIcon
+                    className="size-4 shrink-0 text-ink-2"
+                    aria-hidden
+                  />
                 )}
-                <span className="min-w-0 flex-1 truncate">{f.name || "Pasted image"}</span>
-                <span className="text-xs text-muted">{Math.max(1, Math.round(f.size / 1024))} KB</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {f.name || "Pasted image"}
+                </span>
+                <span className="text-xs text-muted">
+                  {Math.max(1, Math.round(f.size / 1024))} KB
+                </span>
                 <button
                   type="button"
                   aria-label={`Remove ${f.name || "this file"}`}
-                  onClick={() => setFiles((current) => current.filter((_, j) => j !== i))}
+                  onClick={() =>
+                    setFiles((current) => current.filter((_, j) => j !== i))
+                  }
                   className="rounded-full p-0.5 text-ink-2 hover:bg-grey-soft"
                 >
                   <X className="size-4" aria-hidden />
@@ -120,7 +155,9 @@ export function AddSave({ onClose }: { onClose: () => void }) {
           </ul>
         )}
         {issue && <p className="mt-2 text-sm text-amber">{issue}</p>}
-        {save.isError && <p className="mt-2 text-sm text-amber">{save.error.message}</p>}
+        {save.isError && (
+          <p className="mt-2 text-sm text-amber">{save.error.message}</p>
+        )}
 
         <div className="mt-3 flex items-center justify-between gap-2">
           <button
@@ -143,7 +180,11 @@ export function AddSave({ onClose }: { onClose: () => void }) {
             }}
           />
           <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="glass rounded-full px-4 py-2 text-sm font-semibold">
+            <button
+              type="button"
+              onClick={onClose}
+              className="glass rounded-full px-4 py-2 text-sm font-semibold"
+            >
               Cancel
             </button>
             <button

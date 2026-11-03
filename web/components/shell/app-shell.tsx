@@ -11,6 +11,7 @@ import {
   Waypoints,
   type LucideIcon,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -18,6 +19,7 @@ import { useState } from "react";
 
 import { Logo } from "@/components/brand/logo";
 import { AddSave } from "@/components/saves/add-save";
+import { type Attention, teamApi } from "@/lib/api";
 
 const NAV: { href: string; label: string; Icon: LucideIcon }[] = [
   { href: "/today", label: "Today", Icon: Sun },
@@ -25,6 +27,43 @@ const NAV: { href: string; label: string; Icon: LucideIcon }[] = [
   { href: "/search", label: "Ask", Icon: Search },
   { href: "/agents", label: "Agents", Icon: Bot },
 ];
+
+/** On the Agents link: amber with a count when something needs your answer, a green dot
+ * while agents have work in hand. Both come from the real queue. */
+function AgentsSignal({
+  attention,
+  compact,
+}: {
+  attention?: Attention;
+  compact?: boolean;
+}) {
+  if (!attention) return null;
+  const working = Object.values(attention.working).some((n) => n > 0);
+  if (attention.needsYou > 0) {
+    return compact ? (
+      <span className="absolute -right-0.5 -top-0.5 grid size-4 place-items-center rounded-full bg-amber text-[9px] font-bold text-white">
+        {attention.needsYou > 9 ? "9+" : attention.needsYou}
+      </span>
+    ) : (
+      <span
+        className="ml-auto rounded-full bg-amber px-2 py-0.5 text-[11px] font-bold text-white"
+        title={`${attention.needsYou} need your answer`}
+      >
+        {attention.needsYou}
+      </span>
+    );
+  }
+  if (!working) return null;
+  return (
+    <span
+      className={`${compact ? "absolute -right-0.5 -top-0.5" : "relative ml-auto"} flex size-2.5`}
+      title="Your agents are working"
+    >
+      <span className="absolute inline-flex size-full animate-ping rounded-full bg-green opacity-60" />
+      <span className="relative inline-flex size-2.5 rounded-full bg-green" />
+    </span>
+  );
+}
 
 export function AppShell({
   name,
@@ -37,6 +76,14 @@ export function AppShell({
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`);
   const [adding, setAdding] = useState(false);
+  const attention = useQuery({
+    queryKey: ["attention"],
+    queryFn: () => teamApi.attention(),
+    refetchInterval: (q) =>
+      Object.values(q.state.data?.working ?? {}).some((n) => n > 0)
+        ? 5000
+        : 30000,
+  }).data;
 
   return (
     <div className="min-h-dvh md:flex">
@@ -64,6 +111,7 @@ export function AppShell({
             >
               <Icon className="size-[18px]" strokeWidth={1.8} aria-hidden />
               {label}
+              {href === "/agents" && <AgentsSignal attention={attention} />}
             </Link>
           ))}
         </nav>
@@ -148,7 +196,12 @@ export function AppShell({
               isActive(href) ? "bg-ink text-white" : "text-ink-2"
             }`}
           >
-            <Icon className="size-[18px]" strokeWidth={1.8} aria-hidden />
+            <span className="relative">
+              <Icon className="size-[18px]" strokeWidth={1.8} aria-hidden />
+              {href === "/agents" && (
+                <AgentsSignal attention={attention} compact />
+              )}
+            </span>
             {label}
           </Link>
         ))}
