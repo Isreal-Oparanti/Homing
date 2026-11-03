@@ -8,13 +8,17 @@ goals and placements, checks, dates, what agents remember) plus the time it was 
 deletes what visitors added after that time (saves, imports, moments, questions, steps), clears
 Today's cards so they're chosen afresh, and puts the recorded rows back exactly.
 Model calls are kept: they're the record of what was spent.
+
+A reset also adds one moment coming up tomorrow evening ("recording my demo video", tied to the
+demo's speaking goal), so every visitor finds a prep card on Today with its sheet.
 """
 
 import pickle
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import Table, delete, insert, select
 
@@ -36,6 +40,9 @@ from app.db.models import (
 from app.db.session import session_factory
 
 BASELINE = Path("data/demo_baseline.pkl")
+MOMENT_TEXT = "recording my demo video"
+MOMENT_GOAL = "Speaking better"
+MOMENT_AT = time(18, 0)  # tomorrow evening, Lagos time
 
 
 def _rows(db: Any, table: Table, where: Any) -> list[dict[str, Any]]:
@@ -90,6 +97,12 @@ def reset() -> None:
         for name in ("profiles", "threads", "thread_saves", "checks", "whens", "agent_memory"):
             if state[name]:
                 db.execute(insert(scopes[name][0]), state[name])
+        goal = next((t["id"] for t in state["threads"] if t["title"] == MOMENT_GOAL), None)
+        if goal:
+            lagos = ZoneInfo("Africa/Lagos")
+            tomorrow = datetime.now(lagos).date() + timedelta(days=1)
+            when = datetime.combine(tomorrow, MOMENT_AT, tzinfo=lagos).astimezone(UTC)
+            db.add(Moment(user_id=demo, text=MOMENT_TEXT, at=when, thread_ids=[goal]))
         db.commit()
     print("Removed:", {k: v.rowcount for k, v in gone.items()})
     print("Restored:", {k: len(v) for k, v in state.items()}, "as of", f"{at:%d %b %H:%M} UTC")

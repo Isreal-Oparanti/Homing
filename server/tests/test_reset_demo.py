@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -32,6 +33,7 @@ def test_reset_puts_the_demo_back_and_touches_no_one_else(
         db.flush()
         seeded = _save(db, DEMO, "seeded grant")
         goal = Thread(user_id=DEMO.id, title="Finding funding")
+        db.add(Thread(user_id=DEMO.id, title="Speaking better"))
         db.add(goal)
         db.flush()
         db.add(ThreadSave(thread_id=goal.id, save_id=seeded.id, added_by="agent"))
@@ -58,6 +60,9 @@ def test_reset_puts_the_demo_back_and_touches_no_one_else(
         thread = db.get(Thread, goal_id)
         assert (thread.title, thread.locked_by_user) == ("Finding funding", False)
         assert db.scalar(select(func.count()).select_from(ThreadSave)) == 1
-        assert db.scalar(select(func.count()).select_from(Moment)) == 0
+        # The visitor's moment is gone; one fresh moment for tomorrow evening is there instead.
+        moments = db.scalars(select(Moment)).all()
+        assert [m.text for m in moments] == ["recording my demo video"]
+        assert moments[0].at > datetime.now(UTC)
         alice = db.scalars(select(Save.text).where(Save.user_id == ALICE.id)).all()
         assert sorted(alice) == ["alice saves more", "alice's own"]  # never touched

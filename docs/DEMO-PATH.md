@@ -41,4 +41,4 @@ Walked as a stranger on https://homing-rho.vercel.app on Tue 3 Nov 2026, signed 
 
 - A YouTube video without captions shows its description and offers **Paste its transcript**; YouTube shares captions officially only with a video's owner.
 - Instagram, Facebook and TikTok links are kept as links: they can't be read from the link.
-- The demo is shared: you may see what another visitor saved. It is reset to its clean state between judging days.
+- The demo is shared: you may see what another visitor saved. It is reset to its clean state between judging days, and each reset adds a moment for the next evening, so a **Get ready** card is always waiting on Today.
