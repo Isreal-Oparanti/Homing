@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.auth import CurrentUser
 from app.core.config import Settings, get_settings
-from app.db.models import AgentEvent, Check, Job, Reading, Save, Thread, ThreadSave, User
+from app.db.models import AgentEvent, Check, Job, Reading, Save, Thread, ThreadSave, User, When
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
 from app.events.emitter import emit
@@ -198,7 +198,7 @@ def test_the_agents_overview_counts_only_real_steps(sessions: sessionmaker[Sessi
         db.flush()
         saves = [
             Save(user_id=ALICE.id, kind="note", origin="paste", text=f"n{i}", content_hash=f"h{i}")
-            for i in range(3)
+            for i in range(4)
         ]
         db.add_all(saves)
         goal = Thread(user_id=ALICE.id, title="Speaking better")
@@ -213,19 +213,28 @@ def test_the_agents_overview_counts_only_real_steps(sessions: sessionmaker[Sessi
         emit(db, user_id=BOB.id, agent="when", action="when_set", summary="not alice's")
         queue.enqueue(db, "save.read", {"save_id": saves[0].id}, user_id=ALICE.id)
         queue.enqueue(db, "save.read", {"save_id": "x"}, user_id=BOB.id)
-        db.add(
-            Reading(
-                save_id=saves[2].id,
-                title="Grant call",
-                what="A grant.",
-                key_facts={},
-                model="spark",
-                prompt_version="v",
+        for s in saves[2:]:
+            db.add(
+                Reading(
+                    save_id=s.id,
+                    title="Grant call" if s is saves[2] else "Closed call",
+                    what="A grant.",
+                    key_facts={},
+                    model="spark",
+                    prompt_version="v",
+                )
             )
-        )
+            db.add(
+                Check(save_id=s.id, verdict="needs_your_answer", model="spark", prompt_version="v")
+            )
+        # Its date has passed: a question about it is noise, not a need.
         db.add(
-            Check(
-                save_id=saves[2].id, verdict="needs_your_answer", model="spark", prompt_version="v"
+            When(
+                save_id=saves[3].id,
+                kind="date",
+                due_at=datetime.now(UTC) - timedelta(days=1),
+                source="reading",
+                explanation="Closed.",
             )
         )
         db.commit()
@@ -244,7 +253,7 @@ def test_the_agents_overview_counts_only_real_steps(sessions: sessionmaker[Sessi
         "X-Homing-User-Email": ALICE.email,
     }
     o = TestClient(app).get("/api/v1/team/overview", headers=headers).json()
-    assert o["saves"] == 3
+    assert o["saves"] == 4
     assert o["goals"] == [{"id": goal_id, "title": "Speaking better", "saves": 2}]
     assert set(o["goal_of"]) == placed
     assert sum(o["hours"]["what"]) == 2 and sum(o["hours"]["for"]) == 1

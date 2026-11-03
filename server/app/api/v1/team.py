@@ -14,7 +14,17 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.auth import CurrentUser, require_user
-from app.db.models import AgentEvent, Check, Job, Reading, Save, Thread, ThreadSave, User
+from app.db.models import (
+    AgentEvent,
+    Check,
+    Job,
+    Reading,
+    Save,
+    Thread,
+    ThreadSave,
+    User,
+    When,
+)
 from app.db.repo import events as events_repo
 from app.db.session import get_db, session_factory
 
@@ -113,11 +123,14 @@ def attention(db: Session, user_id: str) -> Attention:
         select(Save.id, Reading.title)
         .join(Check, Check.save_id == Save.id)
         .join(Reading, Reading.save_id == Save.id)
+        .outerjoin(When, When.save_id == Save.id)
         .where(
             Save.user_id == user_id,
             Save.visibility == "normal",
             Check.verdict == "needs_your_answer",
             (Check.deadline_at.is_(None)) | (Check.deadline_at > now),
+            # A question about something whose date has passed is noise, not a need.
+            (When.due_at.is_(None)) | (When.due_at > now),
         )
         .order_by(Check.deadline_at.asc().nulls_last(), Save.saved_at.desc())
     )
