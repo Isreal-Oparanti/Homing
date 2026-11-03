@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { askApi } from "@/lib/api";
+import { Loading } from "@/components/shell/loading";
 
 function savedOn(iso: string): string {
   const d = new Date(iso);
@@ -23,7 +24,7 @@ export function AskView() {
     refetchIntervalInBackground: true,
   });
 
-  if (isPending) return <p className="text-ink-2">Opening your question…</p>;
+  if (isPending) return <Loading label="Opening your question…" />;
   if (isError) return <p className="text-ink-2">{error.message}</p>;
 
   return (

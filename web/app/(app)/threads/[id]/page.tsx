@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 
 import { ThreadView } from "@/components/threads/thread-view";
+import { Loading } from "@/components/shell/loading";
 
 export default function ThreadPage() {
   return (
-    <Suspense fallback={<p className="text-ink-2">Opening this goal…</p>}>
+    <Suspense fallback={<Loading label="Opening this goal…" />}>
       <ThreadView />
     </Suspense>
   );

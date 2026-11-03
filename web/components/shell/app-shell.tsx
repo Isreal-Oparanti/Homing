@@ -93,7 +93,7 @@ export function AppShell({
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="mt-8 flex items-center justify-center gap-2 rounded-full bg-red px-4 py-2.5 text-sm font-semibold text-white shadow-[0_6px_20px_rgb(210_64_47/0.35)] hover:bg-red-600"
+          className="mt-8 flex items-center justify-center gap-2 rounded-full bg-red px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600"
         >
           <Plus className="size-[18px]" strokeWidth={2.2} aria-hidden />
           Add
@@ -181,7 +181,7 @@ export function AppShell({
         type="button"
         onClick={() => setAdding(true)}
         aria-label="Add a save"
-        className="fixed bottom-24 right-5 z-10 rounded-full bg-red p-4 text-white shadow-[0_8px_24px_rgb(210_64_47/0.4)] md:hidden"
+        className="fixed bottom-24 right-5 z-10 rounded-full bg-red p-4 text-white shadow-[0_2px_8px_rgb(22_24_27/0.14)] md:hidden"
       >
         <Plus className="size-6" strokeWidth={2.2} />
       </button>

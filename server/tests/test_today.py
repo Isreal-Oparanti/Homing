@@ -80,7 +80,9 @@ def test_a_passed_date_is_told_in_the_past() -> None:
 # Composing Today -----------------------------------------------------------------------------
 
 
-def _due(db: Session, title: str, hours: float, *, thread: Thread | None = None) -> Save:
+def _due(
+    db: Session, title: str, hours: float, *, thread: Thread | None = None, base: datetime = NOW
+) -> Save:
     save = Save(
         user_id=ALICE.id,
         kind="note",
@@ -107,8 +109,8 @@ def _due(db: Session, title: str, hours: float, *, thread: Thread | None = None)
         When(
             save_id=save.id,
             kind="date",
-            due_at=NOW + timedelta(hours=hours),
-            bring_back_at=NOW - timedelta(minutes=1),
+            due_at=base + timedelta(hours=hours),
+            bring_back_at=base - timedelta(minutes=1),
             source="reading",
             explanation="Closes soon, if the post is right.",
         )
@@ -270,12 +272,18 @@ def test_moments_cards_and_calendar_over_the_api(
     assert vague.status_code == 422
     with sessions() as db:
         assert db.scalars(select(Job).where(Job.kind == "moment.match")).one()
-        save = _due(db, "Grant & fund; apply", 12)
+        # The API reads the real clock, so these dates do too.
+        save = _due(db, "Grant & fund; apply", 12, base=datetime.now(UTC))
         db.commit()
         save_id = save.id
 
+    with sessions() as db:
+        later = _due(db, "Fellowship far off", 24 * 20, base=datetime.now(UTC))
+        db.get(When, later.id).bring_back_at = datetime.now(UTC) + timedelta(days=13)
+        db.commit()
     page = client.get("/api/v1/today", headers=HEADERS).json()
     assert [m["text"] for m in page["moments"]] == ["demo day on Friday at 3pm"]
+    assert [c["title"] for c in page["coming_back"]] == ["Fellowship far off"]
     card = page["cards"][0]
     assert card["save_id"] == save_id and card["kind"] == "deadline"
     done = client.post(f"/api/v1/cards/{card['id']}/act", json={"action": "use"}, headers=HEADERS)

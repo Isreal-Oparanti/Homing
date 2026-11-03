@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { SaveRows } from "@/components/saves/save-list";
 import { threadsApi } from "@/lib/api";
+import { Loading } from "@/components/shell/loading";
 
 /** One goal: its saves, newest first, and a name the person can change. */
 export function ThreadView() {
@@ -28,7 +29,7 @@ export function ThreadView() {
     },
   });
 
-  if (isPending) return <p className="text-ink-2">Opening this goal…</p>;
+  if (isPending) return <Loading label="Opening this goal…" />;
   if (isError) return <p className="text-ink-2">{error.message}</p>;
 
   return (

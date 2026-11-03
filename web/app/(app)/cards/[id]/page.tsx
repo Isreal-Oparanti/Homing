@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 
 import { PrepView } from "@/components/today/prep-view";
+import { Loading } from "@/components/shell/loading";
 
 export default function CardPage() {
   return (
-    <Suspense fallback={<p className="text-ink-2">Opening this card…</p>}>
+    <Suspense fallback={<Loading label="Opening this card…" />}>
       <PrepView />
     </Suspense>
   );

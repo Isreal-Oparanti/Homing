@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 
 import { AskView } from "@/components/search/ask-view";
+import { Loading } from "@/components/shell/loading";
 
 export default function AskPage() {
   return (
-    <Suspense fallback={<p className="text-ink-2">Opening your question…</p>}>
+    <Suspense fallback={<Loading label="Opening your question…" />}>
       <AskView />
     </Suspense>
   );

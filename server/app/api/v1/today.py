@@ -10,13 +10,13 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.agents.today import act, ask_for_sheet, compose
 from app.core.auth import CurrentUser, require_user
 from app.core.errors import AppError
-from app.db.models import Card, Moment, Reading, Save, Thread, ThreadSave, User, When
+from app.db.models import Card, Check, Moment, Reading, Save, Thread, ThreadSave, User, When
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
 from app.jobs import queue
@@ -77,10 +77,46 @@ class MomentOut(BaseModel):
     threads: list[GoalOut]  # empty until When will you need it? has matched them
 
 
+class ComingBack(BaseModel):
+    """A save already set to come back: when it returns, and the date it's for."""
+
+    save_id: str
+    title: str
+    back_on: str
+    due: str
+
+
 class TodayOut(BaseModel):
     date: str
     cards: list[CardOut]
     moments: list[MomentOut]
+    coming_back: list[ComingBack]
+
+
+COMING_BACK_SHOWN = 3
+
+
+def _coming_back(db: Session, user_id: str, now: datetime, tz: str) -> list[ComingBack]:
+    rows = db.execute(
+        select(Save.id, Reading.title, When.bring_back_at, When.due_at)
+        .join(Reading, Reading.save_id == Save.id)
+        .join(When, When.save_id == Save.id)
+        .outerjoin(Check, Check.save_id == Save.id)
+        .where(
+            Save.user_id == user_id,
+            Save.visibility == "normal",
+            When.kind == "date",
+            When.bring_back_at > now,
+            When.due_at > now,
+            or_(Check.verdict.is_(None), Check.verdict.notin_(("not_for_you", "closed"))),
+        )
+        .order_by(When.bring_back_at)
+        .limit(COMING_BACK_SHOWN)
+    ).all()
+    return [
+        ComingBack(save_id=i, title=t, back_on=display(b, tz), due=display(d, tz))
+        for i, t, b, d in rows
+    ]
 
 
 class MomentIn(BaseModel):
@@ -124,6 +160,7 @@ def today(user: CurrentUser = Depends(require_user), db: Session = Depends(get_d
         date=now.astimezone(ZoneInfo(owner.tz)).date().isoformat(),
         cards=[CardOut.of(c) for c in cards],
         moments=[_moment_out(db, m, owner.tz) for m in moments],
+        coming_back=_coming_back(db, user.id, now, owner.tz),
     )
 
 

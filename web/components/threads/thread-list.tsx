@@ -8,6 +8,7 @@ import { useCallback, useState } from "react";
 import { EmptyState } from "@/components/shell/empty-state";
 import { type AgentEvent, threadsApi } from "@/lib/api";
 import { useEventStream } from "@/lib/events";
+import { Loading } from "@/components/shell/loading";
 
 function when(iso: string | null): string {
   if (!iso) return "";
@@ -40,7 +41,7 @@ export function ThreadList() {
   );
   useEventStream(onEvent);
 
-  if (isPending) return <p className="text-ink-2">Looking at your goals…</p>;
+  if (isPending) return <Loading label="Looking at your goals…" />;
   if (isError) return <p className="text-ink-2">{error.message}</p>;
 
   const button = (

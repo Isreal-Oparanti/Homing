@@ -21,6 +21,7 @@ import {
   savesApi,
 } from "@/lib/api";
 import { useEventStream } from "@/lib/events";
+import { Loading } from "@/components/shell/loading";
 
 const PLATFORM: Record<string, string> = {
   youtube: "YouTube",
@@ -893,7 +894,7 @@ export function SaveCardView() {
   );
   useEventStream(onEvent);
 
-  if (isPending) return <p className="text-ink-2">Opening your save…</p>;
+  if (isPending) return <Loading label="Opening your save…" />;
   if (isError) return <p className="text-ink-2">{error.message}</p>;
   return <Card card={data} />;
 }

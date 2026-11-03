@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type PrepSheet, type SheetItem, todayApi } from "@/lib/api";
+import { Loading } from "@/components/shell/loading";
 
 const LIVE = ["queued", "working"];
 
@@ -140,7 +141,7 @@ export function PrepView() {
   });
   const stop = useCallback(() => setClips([]), []);
 
-  if (isPending) return <p className="text-ink-2">Opening this card…</p>;
+  if (isPending) return <Loading label="Opening this card…" />;
   if (isError) return <p className="text-ink-2">{error.message}</p>;
   const sheet = data.sheet;
   const reelSeconds = (sheet?.reel ?? []).reduce(

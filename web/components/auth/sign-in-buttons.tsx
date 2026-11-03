@@ -18,7 +18,7 @@ export function SignInButtons({ demo, google }: { demo: boolean; google: boolean
           type="button"
           onClick={() => go("demo")}
           disabled={pending !== null}
-          className="rounded-full bg-red px-6 py-3 text-sm font-semibold text-white shadow-[0_6px_20px_rgb(210_64_47/0.35)] hover:bg-red-600 disabled:opacity-70"
+          className="rounded-full bg-red px-6 py-3 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-70"
         >
           {pending === "demo" ? "Opening the demo…" : "Try the demo"}
         </button>

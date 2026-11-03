@@ -161,7 +161,7 @@ export function ImportView() {
               type="button"
               onClick={send}
               disabled={uploading}
-              className="flex items-center gap-2 rounded-full bg-red px-5 py-2 text-sm font-semibold text-white shadow-[0_6px_20px_rgb(210_64_47/0.35)] hover:bg-red-600 disabled:opacity-60"
+              className="flex items-center gap-2 rounded-full bg-red px-5 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60"
             >
               <Upload className="size-4" aria-hidden />
               Import

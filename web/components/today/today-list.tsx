@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import { EmptyState } from "@/components/shell/empty-state";
+import { Loading } from "@/components/shell/loading";
 import { type AgentEvent, type Moment, type TodayCard, todayApi } from "@/lib/api";
 import { useEventStream } from "@/lib/events";
 
@@ -182,15 +183,19 @@ export function TodayList() {
   );
   useEventStream(onEvent);
 
-  if (isPending) return <p className="text-ink-2">Looking at what&apos;s coming up…</p>;
+  if (isPending) return <Loading label="Looking at what's coming up…" lines={3} />;
   if (isError) return <p className="text-ink-2">{error.message}</p>;
   return (
     <>
       <Moments moments={data.moments} />
       {data.cards.length === 0 ? (
         <EmptyState
-          title="Nothing needs you yet."
-          body="When something you saved matters, it comes back here with the next step. Tell Homing what's coming up, and it gets your saves ready."
+          title="Nothing needs you right now."
+          body={
+            data.comingBack.length > 0
+              ? "Your saves come back here the morning they matter, with the next step. Here's what's next."
+              : "When something you saved matters, it comes back here with the next step. Tell Homing what's coming up, and it gets your saves ready."
+          }
         />
       ) : (
         <ul className="space-y-3">
@@ -198,6 +203,28 @@ export function TodayList() {
             <Card key={card.id} card={card} />
           ))}
         </ul>
+      )}
+      {data.comingBack.length > 0 && (
+        <section className="mt-5">
+          <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.07em] text-muted">
+            Coming back
+          </h2>
+          <ul className="glass divide-y divide-line rounded-[var(--radius-card)] px-5">
+            {data.comingBack.map((c) => (
+              <li key={c.saveId}>
+                <Link href={`/saves/${c.saveId}`} className="flex items-start gap-3 py-3.5 hover:underline">
+                  <CalendarClock className="mt-0.5 size-4 shrink-0 text-amber" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold leading-snug">{c.title}</span>
+                    <span className="block text-sm text-ink-2">
+                      Back on {c.backOn} · for {c.due}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </>
   );

@@ -325,6 +325,9 @@ export type TodayCard = {
   unconfirmed: boolean;
 };
 
+/** A save already set to come back, and the date it's for. */
+export type ComingBack = { saveId: string; title: string; backOn: string; due: string };
+
 /** Something coming up, in your words; When will you need it? finds the goals it needs. */
 export type Moment = {
   id: string;
@@ -661,9 +664,29 @@ function toSheet(s: RawSheet): PrepSheet {
 }
 
 export const todayApi = {
-  async get(): Promise<{ date: string; cards: TodayCard[]; moments: Moment[] }> {
-    const raw = await api<{ date: string; cards: RawCard[]; moments: Moment[] }>("today");
-    return { date: raw.date, cards: raw.cards.map(toCard), moments: raw.moments };
+  async get(): Promise<{
+    date: string;
+    cards: TodayCard[];
+    moments: Moment[];
+    comingBack: ComingBack[];
+  }> {
+    const raw = await api<{
+      date: string;
+      cards: RawCard[];
+      moments: Moment[];
+      coming_back: { save_id: string; title: string; back_on: string; due: string }[];
+    }>("today");
+    return {
+      date: raw.date,
+      cards: raw.cards.map(toCard),
+      moments: raw.moments,
+      comingBack: raw.coming_back.map((c) => ({
+        saveId: c.save_id,
+        title: c.title,
+        backOn: c.back_on,
+        due: c.due,
+      })),
+    };
   },
   /** use: done with it; dismiss: never again; later: back tomorrow morning. */
   async act(cardId: string, action: "use" | "dismiss" | "later"): Promise<void> {
