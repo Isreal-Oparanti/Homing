@@ -140,6 +140,13 @@ def test_wonder_answers_and_code_is_the_gate(
         assert refused.models == []  # code refused it, not a model
         assert "isn't in S1's text word for word" in refused.summary
         assert answer["agent"]["turns"] == 5
+        assert [s["kind"] for s in answer["steps"]] == [
+            "search",
+            "open",
+            "refused",
+            "refused",
+            "accepted",
+        ]
 
 
 @pytest.mark.integration

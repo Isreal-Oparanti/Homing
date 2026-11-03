@@ -100,6 +100,7 @@ class Seen:
     searches: list[str] = field(default_factory=list)
     refusals: int = 0
     dropped: int = 0
+    steps: list[dict[str, str]] = field(default_factory=list)  # shown live on the answer page
 
     def ref(self, save: Save, reading: Reading) -> str:
         if save.id not in self.by_save:
@@ -171,6 +172,13 @@ def _check(s: Seen, args: dict[str, Any]) -> tuple[list[dict[str, Any]], list[st
     return kept[:MAX_POINTS], problems
 
 
+def _step(ctx: JobContext, ask: Ask, s: Seen, kind: str, text: str) -> None:
+    """One step, written onto the question as it happens: the answer page shows it live."""
+    s.steps.append({"kind": kind, "text": text})
+    ask.answer = {"steps": list(s.steps)}
+    ctx.db.commit()
+
+
 def run_agent(ctx: JobContext, ask: Ask) -> dict[str, Any] | None:
     """The answer, or None when Wonder didn't get to one (the caller falls back)."""
     s = Seen(ctx.db, ask.user_id)
@@ -205,44 +213,54 @@ def run_agent(ctx: JobContext, ask: Ask) -> dict[str, Any] | None:
                 args = {}
             if name == "search_saves":
                 result: Any = _search(s, args.get("query", ask.question))
+                said = f"Searched your saves for “{s.searches[-1]}”: {len(result)} found."
                 emit(
-                    ctx.db,
-                    user_id=ask.user_id,
-                    agent="system",
-                    action="ask_searched",
-                    summary=f"Searched your saves for “{s.searches[-1]}”: {len(result)} found.",
+                    ctx.db, user_id=ask.user_id, agent="system", action="ask_searched", summary=said
                 )
+                _step(ctx, ask, s, "search", said)
             elif name == "open_save":
                 result = _open(s, str(args.get("save", "")))
                 if "error" not in result:
                     save, reading = s.refs[result["save"]]
+                    said = f"Opened “{reading.title}” to read it for your question."
                     emit(
                         ctx.db,
                         user_id=ask.user_id,
                         agent="system",
                         action="ask_opened",
-                        summary=f"Opened “{reading.title}” to read it for your question.",
+                        summary=said,
                         save_id=save.id,
                     )
+                    _step(ctx, ask, s, "open", said)
             elif name == "submit_answer":
                 kept, problems = _check(s, args)
                 if problems and s.refusals < MAX_REFUSALS and not last:
                     s.refusals += 1
+                    said = (
+                        f"Code refused the answer: {len(problems)} of "
+                        f"{len(args.get('points') or [])} points didn't hold up "
+                        f"({problems[0].split(': ', 1)[1]}). Sent back to fix."
+                    )
                     emit(
                         ctx.db,
                         user_id=ask.user_id,
                         agent="system",
                         action="ask_refused",
-                        summary=(
-                            f"Code refused the answer: {len(problems)} of "
-                            f"{len(args.get('points') or [])} points didn't hold up "
-                            f"({problems[0].split(': ', 1)[1]}). Sent back to fix."
-                        ),
+                        summary=said,
                         models=[],  # code did this, not a model
                     )
+                    _step(ctx, ask, s, "refused", said)
                     result = {"refused": True, "problems": problems}
                 else:
                     s.dropped = len(problems)
+                    s.steps.append(
+                        {
+                            "kind": "accepted",
+                            "text": f"Code found every quote word for word: {len(kept)} "
+                            f"{'point holds' if len(kept) == 1 else 'points hold'} up"
+                            + (f", {s.dropped} left out." if s.dropped else "."),
+                        }
+                    )
                     also = []
                     for ref in args.get("also") or []:
                         if ref in s.refs and ref not in s.opened:
@@ -256,6 +274,7 @@ def run_agent(ctx: JobContext, ask: Ask) -> dict[str, Any] | None:
                         "considered": len(s.refs),
                         "read": len(s.opened),
                         "dropped": s.dropped,
+                        "steps": s.steps,
                         "agent": {
                             "model": WONDER,
                             "turns": turn + 1,
