@@ -109,3 +109,17 @@ def no_real_embedder(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.search import hybrid
 
     monkeypatch.setattr(hybrid, "embedder_factory", _QuietEmbedder)
+
+
+class _NoWonder:
+    def __init__(self, db: object) -> None:
+        raise RuntimeError("tests never call the real Muse Wonder")
+
+
+@pytest.fixture(autouse=True)
+def no_real_wonder(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ask's agent never reaches the real model in tests: it fails at once and the Spark
+    pipeline (with each test's own fake) answers; tests of the agent pass their own fake."""
+    from app.search import ask_agent
+
+    monkeypatch.setattr(ask_agent, "gateway_factory", _NoWonder)
