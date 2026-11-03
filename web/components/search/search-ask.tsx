@@ -80,15 +80,21 @@ export function SearchAsk() {
 
       {q.length < 2 && recent.data && recent.data.length > 0 && (
         <section>
-          <h2 className="font-display text-lg font-bold tracking-[-0.02em]">Questions you asked</h2>
-          <ul className="mt-2 space-y-1.5">
-            {recent.data.map((a) => (
-              <li key={a.id}>
-                <Link href={`/ask/${a.id}`} className="text-sm font-semibold text-ink-2 hover:underline">
-                  {a.question}
-                </Link>
-              </li>
-            ))}
+          <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.07em] text-muted">
+            Questions you asked
+          </h2>
+          <ul className="glass divide-y divide-line rounded-[var(--radius-card)] px-5">
+            {/* Asked twice, shown once: the latest answer page. */}
+            {recent.data
+              .filter((a, i, all) => all.findIndex((b) => b.question === a.question) === i)
+              .map((a) => (
+                <li key={a.id}>
+                  <Link href={`/ask/${a.id}`} className="flex items-center gap-3 py-3 hover:underline">
+                    <MessageCircleQuestion className="size-4 shrink-0 text-muted" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate font-semibold">{a.question}</span>
+                  </Link>
+                </li>
+              ))}
           </ul>
         </section>
       )}
