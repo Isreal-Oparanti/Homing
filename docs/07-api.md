@@ -117,6 +117,8 @@ As built in S4, the three answers differ slightly from the example above:
 | GET | `/cards/{id}` | — | `Card` plus `sheet`: for a prep card `{status, agree, disagree, checklist, videos{V1: {save_id, title, url, thread, points[{t_start, t_end, point, quote}]}}, reel[{video, start, end}], watched, dropped_points, skipped{no_captions, reels, others}}`. Opening a prep card with no sheet queues `card.prep`. |
 | POST | `/cards/{id}/act` | `{action: "use" \| "dismiss" \| "later"}` | `Card`. `later` always means 09:00 tomorrow, user time; 422 for any other action. |
 | GET | `/saves/{id}/calendar.ics` | — | `text/calendar` attachment: the save's date, reminder a day before. 404 `no_date` when it has none. |
+| GET | `/me/calendar` | — | `{https_url, webcal_url, google_url}`: the person's private calendar feed link (3 Nov). |
+| GET | `/calendar/{token}.ics` | — | **No sign-in** (calendar apps can't): the feed. Every dated save in the last 30 days and next year (not "not for you"), reminded when Homing brings it back; every moment, reminded the day before and an hour before; each event links to its card. The token is the user id signed with its own key (`calendar-feed`); a forged one gets 404. Calendars are asked to refresh hourly. |
 
 ### Moments
 | Method | Path | Body | Returns |
