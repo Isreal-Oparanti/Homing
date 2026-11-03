@@ -25,8 +25,12 @@ READING = (
 INPUTS = {"save": {"text": "hello"}}
 
 
-def _settings(total: int = 1_000_000, per_user: int = 10_000) -> Settings:
-    return Settings(model_daily_token_budget=total, model_user_daily_token_budget=per_user)
+def _settings(total: int = 1_000_000, per_user: int = 10_000, demo: int = 5_000) -> Settings:
+    return Settings(
+        model_daily_token_budget=total,
+        model_user_daily_token_budget=per_user,
+        model_demo_daily_token_budget=demo,
+    )
 
 
 def _used(db: Session, user_id: str, tokens: int, *, days_ago: int = 0) -> None:
@@ -83,7 +87,7 @@ def test_yesterday_does_not_count(sessions: sessionmaker[Session], calls: list[s
 
 
 @pytest.mark.integration
-def test_demo_user_gets_half(sessions: sessionmaker[Session], calls: list[str]) -> None:
+def test_the_shared_demo_has_its_own_cap(sessions: sessionmaker[Session], calls: list[str]) -> None:
     with sessions() as db:
         ensure_user(db, ALICE)
         ensure_user(db, DEMO)

@@ -91,7 +91,7 @@ result = gateway.run(
 2. **Cache:** `input_hash = sha256(model ‖ prompt_version ‖ canonical JSON of inputs)`. If an `ok` row exists in `model_calls`, return its output with no call and no cost.
 3. **Budget, in tokens** (Meta hasn't published prices, so dollars can't be counted yet). Two checks, each on tokens in plus out since midnight UTC, plus this call's estimate (characters / 4 + 1,500 for the output):
    - everyone's total must stay under `MODEL_DAILY_TOKEN_BUDGET`;
-   - this user's must stay under `MODEL_USER_DAILY_TOKEN_BUDGET`, halved for the demo user.
+   - this user's must stay under `MODEL_USER_DAILY_TOKEN_BUDGET`; the demo account, shared by every visitor, under `MODEL_DEMO_DAILY_TOKEN_BUDGET` (3M a day, 3 Nov).
 
    Cached answers skip this check (they cost nothing). Over budget → `BudgetExceeded` → the job waits until just after midnight without using up an attempt. The save card says "Paused until tomorrow", and The team gets one "paused" line per user per day.
 4. **Concurrency:** a semaphore per provider (`SPARK_MAX_CONCURRENCY=6`, `TRANSCRIBE_MAX_CONCURRENCY=2`, `SPARK_OPEN_MAX_CONCURRENCY=2`).
@@ -189,7 +189,8 @@ YOUTUBE_API_KEY
 EMBED_MODEL=intfloat/multilingual-e5-small
 EMBED_DIM=384
 MODEL_DAILY_TOKEN_BUDGET=5000000        # everyone, per day
-MODEL_USER_DAILY_TOKEN_BUDGET=1500000   # per user per day; the demo user gets half
+MODEL_USER_DAILY_TOKEN_BUDGET=1500000   # per user per day
+MODEL_DEMO_DAILY_TOKEN_BUDGET=3000000   # the shared demo account, per day
 SPARK_MAX_CONCURRENCY=6
 TRANSCRIBE_MAX_CONCURRENCY=2
 SPARK_OPEN_MAX_CONCURRENCY=2

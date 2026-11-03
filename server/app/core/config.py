@@ -49,9 +49,11 @@ class Settings(BaseSettings):
     # For example http://USER-rotate:PASS@p.webshare.io:80/. It holds a password: never log it.
     captions_proxy_url: str = ""
     # Spend guards in tokens (in + out), because Meta hasn't published prices.
-    # The demo user gets half the per-user budget (docs/06-models.md#gateway-behaviour).
+    # Per day. The shared demo account has its own cap below (docs/06-models.md#gateway-behaviour).
     model_daily_token_budget: int = 5_000_000
     model_user_daily_token_budget: int = 1_500_000
+    # The demo account is shared by every visitor (judges included), so it gets its own cap.
+    model_demo_daily_token_budget: int = 3_000_000
     spark_max_concurrency: int = 6
 
     # Files: the local disk in development, a private Supabase bucket in production.

@@ -7,8 +7,8 @@ export const GOOGLE_ENABLED = Boolean(
   process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
 );
 
-// Google sign-in only for the emails listed here (comma-separated), so strangers can't spend
-// the model budget; judges use the demo. Empty: anyone with a Google account.
+// Google sign-in for anyone when this is empty (each person gets their own account; the model
+// budget caps each one and everyone together). A list (comma-separated) limits it to those emails.
 const GOOGLE_ALLOWED = (process.env.GOOGLE_ALLOWED_EMAILS ?? "")
   .split(",")
   .map((e) => e.trim().toLowerCase())

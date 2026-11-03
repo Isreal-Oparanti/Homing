@@ -193,7 +193,7 @@ class ModelGateway:
         estimate = input_estimate + OUTPUT_TOKENS_ESTIMATE
         user_limit = self._settings.model_user_daily_token_budget
         if user_id and self._db.scalar(select(User.is_demo).where(User.id == user_id)):
-            user_limit //= 2
+            user_limit = self._settings.model_demo_daily_token_budget  # shared by all visitors
         over_total = total + estimate > self._settings.model_daily_token_budget
         over_user = bool(user_id) and mine + estimate > user_limit
         if over_total or over_user:
