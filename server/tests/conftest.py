@@ -4,10 +4,15 @@ No Docker needed: the schema is created, migrated, used and dropped (docs/11-tes
 Tests marked `integration` are skipped when TEST_DATABASE_URL isn't set.
 """
 
+import os
 import uuid
 from collections.abc import Iterator
 
-import pytest
+# Tests never hold a real model key (a placeholder lets the client be built; every model call
+# in tests is a fake). Set before any Settings is read, so it wins over server/.env.
+os.environ["META_API_KEY"] = "test-placeholder-not-a-key"
+
+import pytest  # noqa: E402
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, create_engine, event, text

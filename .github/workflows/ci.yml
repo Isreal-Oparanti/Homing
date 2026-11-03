@@ -1,0 +1,64 @@
+# Every push: the server's lint and all its tests against a real Postgres with pgvector, and
+# the web app's lint, types and production build (docs/11-testing-evals.md). No model is called:
+# tests use fakes, and the real Meta API key never reaches CI.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server:
+    name: Server (lint and tests)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: homing
+          POSTGRES_PASSWORD: homing
+          POSTGRES_DB: homing
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U homing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://homing:homing@localhost:5432/homing
+      TEST_DATABASE_URL: postgresql+psycopg://homing:homing@localhost:5432/homing
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q -p no:cacheprovider
+
+  web:
+    name: Web (lint, types and build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ci-only-not-a-secret
+      HOMING_API_URL: http://localhost:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
