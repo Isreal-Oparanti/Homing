@@ -1,5 +1,7 @@
 # Homing
 
+[![CI](https://github.com/Isreal-Oparanti/Homing/actions/workflows/ci.yml/badge.svg)](https://github.com/Isreal-Oparanti/Homing/actions/workflows/ci.yml)
+
 **Save anything to use now or later.**
 
 Homing answers four questions about every save: *What is it? Is it true? What's it for? When will you need it?* Then it brings the save back when it's needed.
