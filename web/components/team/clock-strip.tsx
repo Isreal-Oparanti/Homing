@@ -56,7 +56,7 @@ export function ClockStrip({ overview }: { overview: TeamOverview }) {
           </div>
         ))}
         <span />
-        <div className="grid grid-cols-24 text-[10px] text-muted">
+        <div className="grid grid-cols-24 text-[11px] text-muted">
           {HOURS.map((h) => (
             <span key={h} className={h % 6 === 0 ? "" : "invisible"}>
               {String(h).padStart(2, "0")}

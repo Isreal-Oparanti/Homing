@@ -24,6 +24,10 @@ type Layout = {
   ry: number;
   captionY: number;
   label: string;
+  // On a phone the map is drawn smaller, so its small text is set larger.
+  small: string;
+  tiny: string;
+  caption: string;
   room: number;
 };
 
@@ -43,6 +47,9 @@ const WIDE: Layout = {
   ry: 80,
   captionY: 286,
   label: "text-[15px]",
+  small: "text-[12px]",
+  tiny: "text-[11px]",
+  caption: "text-[13px]",
   room: 78,
 };
 // Phones: a taller map drawn at full size, not the wide one shrunk to half.
@@ -60,8 +67,11 @@ const TALL: Layout = {
   rx: 96,
   ry: 70,
   captionY: 326,
-  label: "text-[13px]",
-  room: 44,
+  label: "text-[14px]",
+  small: "text-[14px]",
+  tiny: "text-[13px]",
+  caption: "text-[14px]",
+  room: 40,
 };
 
 const AGENT_R = 24;
@@ -292,7 +302,7 @@ export function AgentMap({
           x={L.hub.x}
           y={L.hub.y + 14}
           textAnchor="middle"
-          className="fill-ink-2 text-[12px]"
+          className={`fill-ink-2 ${L.small}`}
         >
           your saves
         </text>
@@ -410,7 +420,7 @@ export function AgentMap({
                   y={y + 64}
                   textAnchor="middle"
                   fill={color}
-                  className="text-[12px] font-semibold"
+                  className={`font-semibold ${L.small}`}
                 >
                   Working on {jobs}
                 </text>
@@ -432,7 +442,7 @@ export function AgentMap({
           x={L.hub.x}
           y={L.captionY}
           textAnchor="middle"
-          className="fill-ink-2 text-[13px] font-semibold"
+          className={`fill-ink-2 font-semibold ${L.caption}`}
         >
           {caption}
         </text>
@@ -479,7 +489,7 @@ export function AgentMap({
             x={L.you.x}
             y={L.you.y + 4}
             textAnchor="middle"
-            className="fill-white text-[11px] font-semibold"
+            className={`fill-white font-semibold ${L.tiny}`}
           >
             you
           </text>
@@ -501,7 +511,7 @@ export function AgentMap({
               x={L.you.x + 30}
               y={L.you.y + 4}
               fill={NEEDS}
-              className="text-[12px] font-semibold"
+              className={`font-semibold ${L.small}`}
             >
               {tall
                 ? "Need you"
