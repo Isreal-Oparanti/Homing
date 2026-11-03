@@ -19,7 +19,10 @@ from app.db.repo import media as media_repo
 from app.db.repo import saves as saves_repo
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
+from app.events.emitter import emit
 from app.ingest.files import MAX_FILE_BYTES, UnsupportedFile, sniff
+from app.ingest.gather import transcript_text
+from app.ingest.pasted import parse_transcript
 from app.ingest.urls import canonical_url
 from app.jobs import queue
 from app.storage import Storage, get_storage
@@ -500,6 +503,66 @@ def check_now(
     )
     db.commit()
     return {"queued": True}
+
+
+class TranscriptIn(BaseModel):
+    text: str = Field(min_length=20, max_length=300_000)
+
+
+@router.post("/{save_id}/transcript", status_code=202)
+def paste_transcript(
+    save_id: str,
+    body: TranscriptIn,
+    user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """A YouTube video's transcript, copied by the person from YouTube's own "Show transcript"
+    (YouTube shares captions only with a video's owner, and not with our server). Kept as the
+    save's transcript with its timestamps, then the save is read again."""
+    save = saves_repo.get_save(db, user.id, save_id)
+    if save is None:
+        raise AppError("save_not_found", "That save doesn't exist.", status=404)
+    if save.visibility == "private":
+        raise AppError("private", "Private saves are never sent to AI.", status=409)
+    if save.platform != "youtube":
+        raise AppError("not_youtube", "Transcripts can be added to YouTube saves.", status=422)
+    segments = parse_transcript(body.text)
+    if not segments:
+        raise AppError(
+            "no_timestamps",
+            "That doesn't look like a transcript with timestamps. On YouTube, open the video, "
+            "choose … then Show transcript, and copy it all.",
+            status=422,
+        )
+    snapshot = Snapshot(
+        save_id=save.id,
+        kind="transcript",
+        source_url=save.url,
+        text=transcript_text(segments),
+        meta={"segments": segments, "source": "pasted"},
+    )
+    db.add(snapshot)
+    save.status = "received"
+    db.flush()
+    emit(
+        db,
+        user_id=user.id,
+        agent="what",
+        action="transcript_added",
+        summary=f"Got the transcript you pasted: {len(segments)} timed lines. Reading it again.",
+        save_id=save.id,
+        models=[],  # code read the timestamps
+    )
+    queue.enqueue(
+        db,
+        "save.read",
+        {"save_id": save.id},
+        user_id=user.id,
+        priority=queue.PRIORITY_USER,
+        dedupe_key=f"read:{save.id}:{snapshot.id}",
+    )
+    db.commit()
+    return {"lines": len(segments)}
 
 
 @router.post("/{save_id}/answer", response_model=AnswerOut)

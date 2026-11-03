@@ -758,6 +758,75 @@ function Copies({ copies }: { copies: Copy[] }) {
   );
 }
 
+/** YouTube shares captions only with a video's owner, and not with our server: the person can
+ * copy the transcript YouTube shows anyone, and Homing reads it with its timestamps. */
+function PasteTranscript({ saveId }: { saveId: string }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const paste = useMutation({
+    mutationFn: () => savesApi.pasteTranscript(saveId, text),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["save", saveId] }),
+  });
+  if (paste.isSuccess) {
+    return (
+      <p className="mt-2 text-sm text-ink-2">
+        Got {paste.data.lines} timed lines. Reading the video again with them…
+      </p>
+    );
+  }
+  if (!open) {
+    return (
+      <p className="mt-2 text-sm text-ink-2">
+        YouTube didn&apos;t share this video&apos;s captions with us.{" "}
+        <button type="button" onClick={() => setOpen(true)} className="font-semibold underline">
+          Paste its transcript
+        </button>{" "}
+        and Homing can point to the exact second.
+      </p>
+    );
+  }
+  return (
+    <form
+      className="mt-2 space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (text.trim().length >= 20) paste.mutate();
+      }}
+    >
+      <p className="text-sm text-ink-2">
+        On YouTube, open the video, choose <b>…</b> then <b>Show transcript</b>, select it all
+        and copy it here.
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={5}
+        placeholder={"0:00\nWelcome back to the channel…"}
+        aria-label="The video's transcript"
+        className="w-full rounded-2xl border border-line bg-white/70 p-3 text-sm outline-none focus:border-ink/30"
+      />
+      {paste.isError && <p className="text-sm text-red">{paste.error.message}</p>}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={text.trim().length < 20 || paste.isPending}
+          className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {paste.isPending ? "Reading…" : "Add transcript"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="rounded-full px-3 py-1.5 text-sm font-semibold text-ink-2 hover:bg-grey-soft"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function Card({ card }: { card: SaveCard }) {
   const { save, what, copies, pending } = card;
   const isPrivate = save.visibility === "private";
@@ -832,6 +901,10 @@ function Card({ card }: { card: SaveCard }) {
                   ))}
                 </ul>
               )}
+              {save.platform === "youtube" &&
+                !copies.some((c) => c.kind === "transcript") && (
+                  <PasteTranscript saveId={save.id} />
+                )}
             </>
           ) : save.status === "failed" ? (
             <p className="text-amber">

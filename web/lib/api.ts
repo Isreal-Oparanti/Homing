@@ -542,6 +542,13 @@ export const savesApi = {
   async checkNow(id: string): Promise<void> {
     await api(`saves/${encodeURIComponent(id)}/check`, { method: "POST" });
   },
+  /** A YouTube transcript the person copied from "Show transcript"; the save is read again. */
+  async pasteTranscript(id: string, text: string): Promise<{ lines: number }> {
+    return api<{ lines: number }>(`saves/${encodeURIComponent(id)}/transcript`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    });
+  },
   /** The owner's own text of a private save, fetched only when they tap Show. */
   async reveal(id: string): Promise<string> {
     const raw = await api<{ text: string }>(`saves/${encodeURIComponent(id)}/reveal`, {

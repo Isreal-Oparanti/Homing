@@ -338,14 +338,31 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
                 purpose = "read.video"
         else:
             gathered = _gather(save)
+        # Reading again: a copy identical to one we kept is reused, not stored twice.
+        kept_copies = {
+            (k.kind, k.text): k
+            for k in ctx.db.scalars(select(Snapshot).where(Snapshot.save_id == save.id))
+        }
         snapshots = [
-            Snapshot(
+            kept_copies.get((s.kind, s.text))
+            or Snapshot(
                 save_id=save.id, kind=s.kind, source_url=s.source_url, text=s.text, meta=s.meta
             )
             for s in gathered.snapshots
         ]
-        ctx.db.add_all(snapshots)
+        ctx.db.add_all([s for s in snapshots if s.id is None])
         ctx.db.flush()
+        if save.kind == "link" and not any(s.kind == "transcript" for s in snapshots):
+            # Captions we already have (pasted by the person, or fetched from a home connection)
+            # are read again too: YouTube won't give this server the captions itself.
+            kept = ctx.db.scalars(
+                select(Snapshot)
+                .where(Snapshot.save_id == save.id, Snapshot.kind == "transcript")
+                .order_by(Snapshot.fetched_at.desc())
+                .limit(1)
+            ).first()
+            if kept is not None:
+                snapshots.append(kept)
         if purpose == "read.video" and file_reading is not None:
             # What Spark saw stays in `what`; facts must be words the person or the video said.
             file_reading = _own_facts_only(file_reading, save, snapshots)
