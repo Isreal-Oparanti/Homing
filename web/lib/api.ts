@@ -947,6 +947,8 @@ export type AskStatus = {
   notCovered: string[];
   considered: number;
   read: number;
+  /** When Muse Wonder ran it as an agent: its own searches, what it opened, what code refused. */
+  agent: { model: string; turns: number; searches: string[]; opened: number; refusals: number } | null;
   error: string | null;
 };
 
@@ -961,6 +963,7 @@ type RawAsk = {
     not_covered: string[];
     considered: number;
     read: number;
+    agent?: AskStatus["agent"];
   } | null;
 };
 
@@ -982,6 +985,7 @@ function toAsk(raw: RawAsk): AskStatus {
     notCovered: a?.not_covered ?? [],
     considered: a?.considered ?? 0,
     read: a?.read ?? 0,
+    agent: a?.agent ?? null,
   };
 }
 

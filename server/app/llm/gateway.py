@@ -100,6 +100,10 @@ PURPOSES: dict[str, Purpose] = {
     # Ask (S10): pick the saves that help, then answer from them with quotes code verifies.
     "ask.select": Purpose("ask.select", "ask_select.v1.md", AskPick, 60, "low"),
     "ask.answer": Purpose("ask.answer", "ask_answer.v1.md", AskAnswer, 120),
+    # Muse Wonder runs Ask as an agent: it picks its own tools; code is the gate (search/ask_agent).
+    "ask.agent": Purpose(
+        "ask.agent", "ask_agent.v1.md", AskAnswer, 120, "low", model="muse-wonder-1.0"
+    ),
     # The whole pile in one long-context call: it sees every save, so it groups them well.
     "place.rebuild": Purpose("place.rebuild", "place_rebuild.v1.md", Rebuild, 300),
     "video.points": Purpose("video.points", "video_points.v1.md", VideoPoints, 120, "low"),
@@ -317,6 +321,92 @@ class ModelGateway:
             output=result.model_dump(mode="json"),
         )
         return result
+
+    def prompt(self, purpose: str) -> str:
+        return (PROMPTS / PURPOSES[purpose].prompt).read_text(encoding="utf-8")
+
+    def chat_tools(
+        self,
+        purpose: str,
+        *,
+        user_id: str | None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        save_ids: list[str],
+        tool_choice: Any = "auto",
+    ) -> Any:
+        """One turn of an agent that picks its own tools (Muse Wonder). Returns the assistant
+        message (text and tool calls). Budgeted, recorded and credited like every call; not
+        cached, because a turn depends on everything before it."""
+        p = PURPOSES[purpose]
+        self._refuse_private(save_ids)
+        model = p.model or self._settings.meta_spark_model
+        credits.note(model, save_ids)
+        version = p.prompt.removesuffix(".md")
+        sent = json.dumps(messages, default=str)
+        self._check_budget(user_id, len(sent) // 4)
+        input_hash = hashlib.sha256(f"{model}\n{version}\n{sent}".encode()).hexdigest()
+        started = time.perf_counter()
+        usage = {"in": 0, "out": 0}
+        extra: dict[str, Any] = {}
+        if p.reasoning_effort:
+            extra["reasoning_effort"] = p.reasoning_effort
+        try:
+            with _semaphore(self._settings.spark_max_concurrency):
+                response = self._client.chat.completions.create(
+                    model=model,
+                    messages=messages,  # type: ignore[arg-type]
+                    tools=tools,  # type: ignore[arg-type]
+                    tool_choice=tool_choice,
+                    max_tokens=4000,
+                    timeout=p.timeout_s,
+                    extra_body=extra or None,
+                )
+        except openai.APIStatusError as err:
+            self._record(
+                p,
+                version,
+                model,
+                user_id,
+                input_hash,
+                "error",
+                usage,
+                started,
+                error=f"{err.status_code}: {err.message}"[:2000],
+            )
+            if err.status_code in (400, 401, 403, 404, 422):
+                raise PermanentError(
+                    f"The model rejected this request ({err.status_code})."
+                ) from err
+            raise RetryableError(f"{purpose}: model error {err.status_code}") from err
+        except openai.APIConnectionError as err:
+            self._record(
+                p,
+                version,
+                model,
+                user_id,
+                input_hash,
+                "error",
+                usage,
+                started,
+                error=str(err)[:2000],
+            )
+            raise RetryableError(f"{purpose}: couldn't reach the model") from err
+        if response.usage:
+            usage = {"in": response.usage.prompt_tokens, "out": response.usage.completion_tokens}
+        message = response.choices[0].message
+        self._record(
+            p,
+            version,
+            model,
+            user_id,
+            input_hash,
+            "ok",
+            usage,
+            started,
+            output=message.model_dump(mode="json", exclude_none=True),
+        )
+        return message
 
     def transcribe(self, wav: bytes, *, user_id: str | None, save_ids: list[str]) -> Transcript:
         """Muse Voice Transcribe: 16 kHz mono WAV in (10 minutes at most), the words out. Cached

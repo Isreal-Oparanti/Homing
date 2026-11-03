@@ -4,7 +4,7 @@
 
 Homing answers four questions about every save: *What is it? Is it true? What's it for? When will you need it?* Then it brings the save back when it's needed.
 
-Built for the Meta Global AI Developer Hackathon (Indie track) on Meta's Muse Spark and Muse Voice Transcribe.
+Built for the Meta Global AI Developer Hackathon (Indie track) on Meta's Muse Spark, Muse Wonder and Muse Voice Transcribe.
 
 > The judges' version of this README (what it does, how well it works, limits) is written on Wed 4 Nov.
 
@@ -22,6 +22,7 @@ Models read, compare and organise; code checks every claim before you see it. Th
 | | Organises a whole pile into goals in one long-context pass | 340 of 405 saves placed into 24 goals for 42,560 tokens, against about 900,000 placing them one at a time |
 | | Pulls the useful points from each saved video, at the second they're said, and writes a prep sheet | 44 of 45 points confirmed in the captions at that second |
 | | Answers questions from your saves only (Ask) | 49 of 49 quotes found word for word in the cited save |
+| **Muse Wonder** | Runs Ask as an agent: searches your saves in its own words, opens what looks useful, and submits an answer that code checks before you see it (a refused answer comes back with the problems named) | First run: 6 searches, 6 saves opened, 4 points, every quote verified |
 | **Muse Voice Transcribe** | Turns voice notes and the sound of videos into words, so they can be read and checked | 31 recordings |
 
 Code, not a model, decides dates and time zones, eligibility verdicts, whether a quote really appears in its source, whether a video point is said at that second, and when a save comes back. Numbers: [server/evals/REPORT.md](server/evals/REPORT.md).

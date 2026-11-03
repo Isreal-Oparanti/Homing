@@ -21,6 +21,7 @@ def emit(
     thread_id: str | None = None,
     card_id: str | None = None,
     evidence: list[dict[str, Any]] | None = None,
+    models: list[str] | None = None,  # say who did it when it isn't the job's model calls
 ) -> AgentEvent:
     if agent not in AGENTS:
         raise ValueError(f"unknown agent {agent!r}")
@@ -34,7 +35,7 @@ def emit(
         card_id=card_id,
         evidence=evidence or [],
         # The Meta models behind this step; none means code did it.
-        models=credits.models_for(save_id),
+        models=credits.models_for(save_id) if models is None else models,
     )
     db.add(event)
     db.flush()

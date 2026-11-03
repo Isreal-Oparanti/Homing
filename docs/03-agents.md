@@ -328,6 +328,8 @@ These aren't extra agents. They're jobs that use what the four agents have alrea
 
 **Never:** answers from outside the user's saves; cites a private save; keeps a point it can't verify.
 
+**As built (3 Nov): Muse Wonder runs Ask as an agent** (`search/ask_agent.py`). Wonder picks its own steps with three tools: `search_saves(query)` (hybrid search, 8 results, short ids S1, S2…), `open_save(S3)` (the save's own text; under 300 characters it says to list it in `also`), and `submit_answer(points, not_covered, also)`. Submitting is the gate it can't skip: code checks that each point's save was opened, that its quote is in that text word for word, and that its numbers are in its quote; a refused answer comes back with the problems named. At most 10 turns and 3 refusals; then only verified points are kept. Every search, open and refusal is a step in Your agents (credited to Muse Wonder; refusals to code). If Wonder errors, the Spark pipeline above answers and the answer says which ran. First real run (demo pile, "funding without giving up equity"): 6 searches in its own words, 6 saves opened, 4 points, every quote found, 0 refused, 52 s; it also said which grants' equity terms the saves don't confirm.
+
 ### Audit
 
 `server/app/audit/run.py`. Scope: one thread, or the whole library.

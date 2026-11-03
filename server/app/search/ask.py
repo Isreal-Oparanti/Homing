@@ -15,15 +15,19 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
+from app.core.logging import get_logger
 from app.db.models import Ask, Reading, Save, Snapshot, ThreadSave
 from app.events.emitter import emit
-from app.jobs.errors import PermanentError
+from app.jobs.errors import DeferredError, PermanentError
 from app.jobs.runner import JobContext
 from app.llm.gateway import ModelGateway
 from app.schemas.agents import AskAnswer, AskPick
 from app.search.hybrid import search
 from app.verify.quotes import match_quote
 from app.verify.timestamps import numbers_supported
+
+log = get_logger("ask")
 
 FOUND = 40  # from search
 NEIGHBOURS_OF = 8  # top hits whose goals bring in their other saves
@@ -90,7 +94,7 @@ def answer(ctx: JobContext, payload: dict[str, Any]) -> None:
     if ask is None or ask.user_id != ctx.user_id:
         raise PermanentError("That question doesn't exist.")
     try:
-        result = _answer(ctx, ask)
+        result = _with_agent(ctx, ask) or _answer(ctx, ask)
     except Exception:
         if ctx.attempt >= ctx.max_attempts:
             ctx.db.rollback()
@@ -114,6 +118,23 @@ def answer(ctx: JobContext, payload: dict[str, Any]) -> None:
             else f"Looked for “{ask.question[:80]}”: your saves don't cover it yet."
         ),
     )
+
+
+def _with_agent(ctx: JobContext, ask: Ask) -> dict[str, Any] | None:
+    """Muse Wonder answers as an agent; if it can't (an error, or no answer in its turns),
+    the Spark pipeline below does, and the answer says which ran."""
+    if not get_settings().ask_agent:
+        return None
+    from app.search import ask_agent  # imports ask.py's helpers
+
+    try:
+        return ask_agent.run_agent(ctx, ask)
+    except DeferredError:
+        raise  # out of budget: wait, don't spend it on the fallback
+    except Exception as exc:
+        ctx.db.rollback()
+        log.warning("ask.agent_failed", extra={"fields": {"error": type(exc).__name__}})
+        return None
 
 
 def _answer(ctx: JobContext, ask: Ask) -> dict[str, Any]:

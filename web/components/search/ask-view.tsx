@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 
 import { askApi } from "@/lib/api";
 import { Loading } from "@/components/shell/loading";
+import { ByLine } from "@/components/team/by-line";
 
 function savedOn(iso: string): string {
   const d = new Date(iso);
@@ -47,6 +48,36 @@ export function AskView() {
             From your own saves: looked at {data.considered}, read {data.read}. Every quote below was found word for
             word in the save it cites.
           </p>
+          {data.agent && (
+            <section className="glass mt-3 rounded-[var(--radius-card)] px-4 py-3">
+              <p className="text-sm font-semibold">How it was found</p>
+              <ByLine
+                models={[data.agent.model]}
+                how={`searched ${data.agent.searches.length} ${
+                  data.agent.searches.length === 1 ? "way" : "ways"
+                } and opened ${data.agent.opened} ${data.agent.opened === 1 ? "save" : "saves"}, choosing each step itself`}
+              />
+              <ul className="mt-2 flex flex-wrap gap-1.5">
+                {data.agent.searches.map((q) => (
+                  <li key={q} className="rounded-full bg-grey-soft px-2.5 py-0.5 text-xs text-ink-2">
+                    &ldquo;{q}&rdquo;
+                  </li>
+                ))}
+              </ul>
+              <ByLine
+                models={[]}
+                how={
+                  data.agent.refusals
+                    ? `refused ${data.agent.refusals} ${
+                        data.agent.refusals === 1 ? "answer" : "answers"
+                      } with quotes that didn't hold up, and sent ${
+                        data.agent.refusals === 1 ? "it" : "them"
+                      } back to fix`
+                    : "checked every quote word for word before showing the answer"
+                }
+              />
+            </section>
+          )}
 
           {data.points.length > 0 && (
             <ol className="mt-4 space-y-3">
