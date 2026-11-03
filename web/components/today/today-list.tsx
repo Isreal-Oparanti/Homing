@@ -169,6 +169,53 @@ function CalendarFeed() {
   );
 }
 
+/** Google Calendar opens with the event filled in (no file); Apple and Outlook take the
+ * calendar file, which a phone opens straight into "Add event". */
+function AddToCalendar({ saveId, title, dueAt, why }: { saveId: string; title: string; dueAt: string; why: string }) {
+  const [open, setOpen] = useState(false);
+  const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const start = new Date(dueAt);
+  const end = new Date(start.getTime() + 30 * 60 * 1000);
+  const google =
+    "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+    `&text=${encodeURIComponent(title)}` +
+    `&dates=${stamp(start)}/${stamp(end)}` +
+    `&details=${encodeURIComponent(`${why}\n\nOpen it in Homing: ${window.location.origin}/saves/${saveId}`)}`;
+  return (
+    <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex items-center gap-1 text-sm font-semibold text-ink-2 hover:underline"
+      >
+        <CalendarPlus className="size-4" aria-hidden />
+        Add to calendar
+      </button>
+      {open && (
+        <div className="flex basis-full flex-wrap justify-end gap-2 text-sm">
+          <a
+            href={google}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => setOpen(false)}
+            className="rounded-full bg-ink px-3.5 py-1.5 font-semibold text-white"
+          >
+            Google Calendar
+          </a>
+          <a
+            href={`/api/backend/saves/${saveId}/calendar.ics`}
+            onClick={() => setOpen(false)}
+            className="glass rounded-full px-3.5 py-1.5 font-semibold"
+          >
+            Apple or Outlook
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Card({ card }: { card: TodayCard }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -224,13 +271,7 @@ function Card({ card }: { card: TodayCard }) {
           Dismiss
         </button>
         {card.saveId && card.dueAt && (
-          <a
-            href={`/api/backend/saves/${card.saveId}/calendar.ics`}
-            className="ml-auto flex items-center gap-1 text-sm font-semibold text-ink-2 hover:underline"
-          >
-            <CalendarPlus className="size-4" aria-hidden />
-            Add to calendar
-          </a>
+          <AddToCalendar saveId={card.saveId} title={card.title} dueAt={card.dueAt} why={card.whyNow} />
         )}
       </div>
       {act.isError && <p className="mt-1 text-sm text-red">{act.error.message}</p>}

@@ -1,4 +1,5 @@
 import { Cpu, Sparkles } from "lucide-react";
+import Image from "next/image";
 
 /** muse-spark-1.3 -> Muse Spark: the names people know. */
 export function modelName(model: string): string {
@@ -8,6 +9,14 @@ export function modelName(model: string): string {
   if (model.startsWith("muse-wonder")) return "Muse Wonder";
   if (model.startsWith("sam-")) return "SAM";
   return model;
+}
+
+/** The model's mark: Meta's Muse logo for the Muse models. */
+export function ModelIcon({ name, size = 14 }: { name: string; size?: number }) {
+  if (name.startsWith("Muse")) {
+    return <Image src="/brand/muse.png" alt="" width={size} height={size} className="shrink-0" />;
+  }
+  return <Sparkles className="shrink-0" style={{ width: size, height: size }} aria-hidden />;
 }
 
 /**
@@ -24,7 +33,7 @@ export function ByLine({ models, how }: { models: string[]; how?: string }) {
             key={n}
             className="inline-flex items-center gap-1 rounded-full bg-grey-soft px-2 py-0.5 font-semibold text-ink-2"
           >
-            <Sparkles className="size-3" aria-hidden />
+            <ModelIcon name={n} size={13} />
             {n}
           </span>
         ))

@@ -1,6 +1,4 @@
-import { Sparkles } from "lucide-react";
-
-import { modelName } from "@/components/team/by-line";
+import { ModelIcon, modelName } from "@/components/team/by-line";
 import type { ModelUse } from "@/lib/api";
 
 const NUMBER = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
@@ -33,7 +31,9 @@ export function ModelStrip({ models }: { models: ModelUse[] }) {
       <ul className="mt-3 grid gap-2 sm:grid-cols-2">
         {[...merged.values()].map((m) => (
           <li key={m.model} className="flex items-start gap-2.5 rounded-2xl bg-grey-soft/70 px-3 py-2.5">
-            <Sparkles className="mt-0.5 size-4 shrink-0 text-ink-2" aria-hidden />
+            <span className="mt-0.5">
+              <ModelIcon name={m.model} size={18} />
+            </span>
             <div className="min-w-0">
               <p className="font-semibold">{m.model}</p>
               <p className="text-xs text-ink-2">
