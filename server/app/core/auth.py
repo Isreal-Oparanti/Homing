@@ -50,6 +50,31 @@ def _signed(body: str, secret: str) -> str:
     return f"{body}.{_b64(hmac.new(key, body.encode(), hashlib.sha256).digest())}"
 
 
+def _feed_sig(body: str, secret: str) -> str:
+    key = hmac.new(secret.encode(), b"calendar-feed", hashlib.sha256).digest()
+    return _b64(hmac.new(key, body.encode(), hashlib.sha256).digest())
+
+
+def calendar_token(user_id: str, secret: str) -> str:
+    """The private part of a person's calendar feed link: who it's for, signed. A calendar
+    app can't sign in, so the link itself is the key; it has its own signing key."""
+    body = _b64(user_id.encode())
+    return f"{body}.{_feed_sig(body, secret)}"
+
+
+def user_from_calendar_token(token: str, secret: str) -> str | None:
+    """The user id a feed link was made for, or None if it's forged or malformed."""
+    body, _, sig = token.partition(".")
+    if not secret or not body or not sig:
+        return None
+    if not hmac.compare_digest(_feed_sig(body, secret), sig):
+        return None
+    try:
+        return base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)).decode() or None
+    except ValueError:
+        return None
+
+
 def sign_ticket(payload: dict[str, object], secret: str) -> str:
     """The same signing as web/lib/server/backend.ts; tests use it to make tickets."""
     return _signed(_b64(json.dumps(payload, separators=(",", ":")).encode()), secret)

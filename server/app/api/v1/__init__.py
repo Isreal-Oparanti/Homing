@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import dev, health, imports, me, saves, search, team, threads, today
+from app.api.v1 import calendar, dev, health, imports, me, saves, search, team, threads, today
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(health.router)
@@ -11,4 +11,5 @@ router.include_router(threads.router)
 router.include_router(search.router)
 router.include_router(team.router)
 router.include_router(today.router)
+router.include_router(calendar.router)
 router.include_router(dev.router)

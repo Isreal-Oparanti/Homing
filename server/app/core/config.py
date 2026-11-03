@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # stays below db_pool_size.
     worker_threads: int = 3
     proxy_secret: str = ""
+    # Public addresses, for links that leave the app (the calendar feed). Not secrets.
+    public_api_url: str = "https://homing-api.crowscap.xyz"
+    web_url: str = "https://homing-rho.vercel.app"
     admin_token: str = ""
     run_worker_in_api: bool = True
     # Development and production share the database, not each other's work: each worker

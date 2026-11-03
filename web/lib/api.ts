@@ -170,6 +170,13 @@ export const teamApi = {
 
 export const meApi = {
   get: () => api<{ id: string; email: string; name: string | null }>("me"),
+  /** The private calendar feed: every date and moment, in the person's own calendar. */
+  async calendar(): Promise<{ httpsUrl: string; webcalUrl: string; googleUrl: string }> {
+    const raw = await api<{ https_url: string; webcal_url: string; google_url: string }>(
+      "me/calendar",
+    );
+    return { httpsUrl: raw.https_url, webcalUrl: raw.webcal_url, googleUrl: raw.google_url };
+  },
 };
 
 export type SaveSummary = {

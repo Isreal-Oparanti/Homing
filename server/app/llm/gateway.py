@@ -101,7 +101,7 @@ PURPOSES: dict[str, Purpose] = {
     # The whole pile in one long-context call: it sees every save, so it groups them well.
     "place.rebuild": Purpose("place.rebuild", "place_rebuild.v1.md", Rebuild, 300),
     "video.points": Purpose("video.points", "video_points.v1.md", VideoPoints, 120, "low"),
-    "prep.sheet": Purpose("prep.sheet", "prep_sheet.v2.md", PrepSheet, 120),
+    "prep.sheet": Purpose("prep.sheet", "prep_sheet.v3.md", PrepSheet, 120),
 }
 
 

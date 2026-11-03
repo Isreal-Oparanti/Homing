@@ -4,7 +4,7 @@ Today is composed when it's opened (app/agents/today.py): at most three new card
 chosen by code.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -14,6 +14,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.agents.today import act, ask_for_sheet, compose
+from app.agents.when_needed import explain_now
+from app.calendar_ics import Event, calendar
 from app.core.auth import CurrentUser, require_user
 from app.core.errors import AppError
 from app.db.models import Card, Check, Moment, Reading, Save, Thread, ThreadSave, User, When
@@ -234,10 +236,6 @@ def act_on_card(
     return CardOut.of(card)
 
 
-def _ics_text(value: str) -> str:
-    return value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
-
-
 @router.get("/saves/{save_id}/calendar.ics")
 def calendar_file(
     save_id: str, user: CurrentUser = Depends(require_user), db: Session = Depends(get_db)
@@ -253,33 +251,20 @@ def calendar_file(
         raise AppError("no_date", "This save has no date to put in a calendar.", status=404)
     save, reading, when = row
     assert when.due_at is not None
-    stamp = "%Y%m%dT%H%M%SZ"
-    start = when.due_at.astimezone(UTC)
     goals = db.scalars(
         select(Thread.title).join(ThreadSave).where(ThreadSave.save_id == save.id)
     ).all()
-    about = when.explanation + (f" Goal: {', '.join(goals)}." if goals else "")
-    lines = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//Homing//Homing//EN",
-        "BEGIN:VEVENT",
-        f"UID:{save.id}@homing",
-        f"DTSTAMP:{datetime.now(UTC):{stamp}}",
-        f"DTSTART:{start:{stamp}}",
-        f"DTEND:{start + timedelta(minutes=30):{stamp}}",
-        f"SUMMARY:{_ics_text(reading.title)}",
-        f"DESCRIPTION:{_ics_text(about)}",
-        "BEGIN:VALARM",
-        "ACTION:DISPLAY",
-        f"DESCRIPTION:{_ics_text(reading.title)}",
-        "TRIGGER:-P1D",
-        "END:VALARM",
-        "END:VEVENT",
-        "END:VCALENDAR",
-    ]
+    now = datetime.now(UTC)
+    about = explain_now(when, now) + (f" Goal: {', '.join(goals)}." if goals else "")
+    event = Event(
+        uid=f"save-{save.id}@homing",
+        start=when.due_at,
+        summary=reading.title,
+        description=about,
+        alarms=["-P1D"],
+    )
     return Response(
-        "\r\n".join(lines) + "\r\n",
+        calendar([event], now=now),
         media_type="text/calendar",
         headers={"Content-Disposition": 'attachment; filename="homing.ics"'},
     )

@@ -1,14 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, CalendarPlus, Clock, Sparkles, X } from "lucide-react";
+import { CalendarClock, CalendarPlus, Check, Clock, Copy, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import { EmptyState } from "@/components/shell/empty-state";
 import { Loading } from "@/components/shell/loading";
-import { type AgentEvent, type Moment, type TodayCard, todayApi } from "@/lib/api";
+import { type AgentEvent, meApi, type Moment, type TodayCard, todayApi } from "@/lib/api";
 import { useEventStream } from "@/lib/events";
 
 /** "Something coming up?": the person's own moments, and the goals each one needs. */
@@ -91,6 +91,79 @@ function Moments({ moments }: { moments: Moment[] }) {
             </li>
           ))}
         </ul>
+      )}
+    </section>
+  );
+}
+
+/** Homing has no push: your phone's calendar brings saves back when you're not in the app. */
+function CalendarFeed() {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const feed = useQuery({ queryKey: ["calendar-feed"], queryFn: () => meApi.calendar(), enabled: open });
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mb-5 flex items-center gap-1.5 px-1 text-sm font-semibold text-ink-2 hover:text-ink"
+      >
+        <CalendarPlus className="size-4" aria-hidden />
+        Get these on your phone&apos;s calendar
+      </button>
+    );
+  }
+  return (
+    <section className="glass mb-5 rounded-[var(--radius-card)] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">Your saves, in your calendar</p>
+          <p className="mt-0.5 text-sm text-ink-2">
+            Add this once. Every date and moment then arrives with your phone&apos;s own reminder,
+            and opens back here.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label="Close"
+          className="rounded-full p-1 text-muted hover:bg-grey-soft"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+      {feed.isPending && <p className="mt-3 text-sm text-ink-2">Making your link…</p>}
+      {feed.isError && <p className="mt-3 text-sm text-red">{feed.error.message}</p>}
+      {feed.data && (
+        <>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a
+              href={feed.data.googleUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white"
+            >
+              Add to Google Calendar
+            </a>
+            <a href={feed.data.webcalUrl} className="glass rounded-full px-4 py-1.5 text-sm font-semibold">
+              Apple or phone calendar
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(feed.data.httpsUrl).then(() => setCopied(true));
+              }}
+              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ink-2 hover:bg-grey-soft"
+            >
+              {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+              {copied ? "Copied" : "Copy link"}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            Your calendar checks for changes about every hour; Google Calendar can take a few hours.
+            The link is private: anyone who has it can see your saved dates.
+          </p>
+        </>
       )}
     </section>
   );
@@ -188,6 +261,7 @@ export function TodayList() {
   return (
     <>
       <Moments moments={data.moments} />
+      <CalendarFeed />
       {data.cards.length === 0 ? (
         <EmptyState
           title="Nothing needs you right now."
