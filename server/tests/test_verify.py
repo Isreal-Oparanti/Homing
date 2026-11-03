@@ -160,6 +160,15 @@ def test_a_date_with_no_year_that_just_passed_means_this_year(text: str, year: i
     assert d is not None and d.at.year == year
 
 
+def test_a_weekday_deadline_is_the_next_one_after_it_was_written() -> None:
+    tuesday = datetime(2026, 11, 3, 9, tzinfo=UTC)
+    d = parse_deadline("Apply by Friday", base=tuesday, user_tz=LAGOS)
+    assert d is not None and display(d.at, LAGOS) == "Fri 6 Nov, 23:59 Lagos time" and d.relative
+    d = parse_deadline("Applications close this Friday at 5pm", base=tuesday, user_tz=LAGOS)
+    assert d is not None and display(d.at, LAGOS) == "Fri 6 Nov, 17:00 Lagos time"
+    assert parse_deadline("Black Friday sale", base=tuesday, user_tz=LAGOS) is None
+
+
 @pytest.mark.parametrize("text", ["mid-September to early December", "Aged 20-32", "in 2016", ""])
 def test_vague_or_non_dates_give_nothing(text: str) -> None:
     assert parse_deadline(text, base=datetime(2026, 10, 1, tzinfo=UTC), user_tz=LAGOS) is None

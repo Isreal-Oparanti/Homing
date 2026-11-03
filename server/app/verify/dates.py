@@ -138,8 +138,17 @@ def parse_deadline(
     zone = stated_zone or source_tz_hint or user_tz
     tz = ZoneInfo(zone)
     hit = _find(text, base.astimezone(tz).replace(tzinfo=None))
-    if hit is None:
+    weekday = _WEEKDAY.search(text) if hit is None else None
+    if weekday and re.search(r"\bblack\s+friday\b", text, re.I):
+        weekday = None  # a sale, not a day to act by
+    if hit is None and weekday is None:
         return None
+    if hit is None:
+        # "Apply by Friday": the next Friday after it was written (that day, if it's Friday).
+        assert weekday is not None
+        local = base.astimezone(tz).replace(tzinfo=None)
+        ahead = (_WEEKDAYS.index(weekday.group(1).lower()) - local.weekday()) % 7
+        hit = (weekday.group(0), datetime.combine(local.date() + timedelta(days=ahead), time(0)))
     words, parsed = hit
     parsed = _this_year_if_just_past(words, parsed, base.astimezone(tz).replace(tzinfo=None))
     time_stated = bool(_TIME.search(words))
@@ -156,7 +165,7 @@ def parse_deadline(
         tz=zone,
         tz_stated=stated_zone is not None,
         time_stated=time_stated,
-        relative=bool(_RELATIVE.search(words)),
+        relative=bool(_RELATIVE.search(words)) or weekday is not None,
     )
 
 

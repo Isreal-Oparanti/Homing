@@ -1,14 +1,10 @@
 # Homing evaluation
 
-_Run 03 Nov 2026, 11:05. Every number below is computed by `evals/run.py` from fixed test sets or the stored record of real runs._
+_Run 03 Nov 2026, 14:39. Every number below is computed by `evals/run.py` from fixed test sets or the stored record of real runs._
 
 ## 1. Reading dates
 
-**29 of 30 right** (96%). Each phrase was read as of when it was written, in Lagos time; the right answer was worked out by hand. No model: dates are read by code.
-
-| Phrase | Right answer | Homing read |
-|---|---|---|
-| Apply by Friday | 2026-11-06 22:59Z | no date |
+**30 of 30 right** (100%). Each phrase was read as of when it was written, in Lagos time; the right answer was worked out by hand. No model: dates are read by code.
 
 ## 2. Search by meaning
 
@@ -34,23 +30,24 @@ _Run 03 Nov 2026, 11:05. Every number below is computed by `evals/run.py` from f
 
 ## 3. What the checks did on real runs
 
-- **Ask:** 7 answers. The model proposed 49 points from 252 candidate saves; code found 49 quotes word for word in the cited save and dropped 0.
+- **Ask:** 8 answers. The model proposed 53 points from 264 candidate saves; code found 53 quotes word for word in the cited save and dropped 0.
 - **Prep sheets:** 1 sheet. Of 45 points taken from videos, 44 were found in the captions at the stated second and 1 was dropped.
 
-**Model use so far:** 593 calls, 2,221,752 tokens in all.
+**Model use so far:** 600 calls, 2,264,367 tokens in all.
 
 | Purpose | Calls | Tokens per call |
 |---|---|---|
-| read.text | 178 | 2,615 |
-| place.assign | 169 | 1,827 |
+| read.text | 179 | 2,609 |
+| place.assign | 170 | 1,825 |
 | check.compare | 92 | 6,425 |
 | read.batch | 37 | 6,094 |
 | transcribe.voice | 31 | not reported |
-| read.file | 24 | 3,302 |
 | video.points | 24 | 7,579 |
+| read.file | 24 | 3,302 |
 | read.video | 14 | 9,022 |
-| place.rebuild | 6 | 21,335 |
+| place.rebuild | 7 | 20,002 |
 | prep.sheet | 6 | 9,996 |
-| ask.select | 5 | 2,494 |
 | ask.answer | 5 | 8,005 |
+| ask.select | 5 | 2,494 |
+| ask.agent | 4 | 6,900 |
 | when.match_moment | 2 | 1,339 |
