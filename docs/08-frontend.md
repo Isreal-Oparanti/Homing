@@ -27,7 +27,7 @@
 | `/threads` | **Threads** | List with counts and the next date. Until threads exist (S9), it lists every save, newest first, so any save can be found again. |
 | `/threads/[id]` | One thread | Saves in order, plus agent notes |
 | `/saves/[id]` | **Save card** | Full page. Also opens as a sheet over other screens |
-| `/team` | **The team** | Live feed, filterable by question |
+| `/agents` | **Your agents** (was The team, 3 Nov; `/team` redirects) | The agents map, today's clock, and every step, filterable by agent |
 | `/search` | **Search and ask** | One box. Typing shows matching saves instantly (words and meaning). **Ask** creates an answer page. |
 | `/ask/[id]` | **Answer page** | One question's verified answer; "Ask a follow-up" creates a new page |
 | `/audit/[id]` | **Audit report** | Started from a thread ("Audit this thread") or from Settings ("Audit everything") |
@@ -41,7 +41,7 @@
 
 ## Layout
 
-- **Mobile first.** Most first users are on Android. Bottom tab bar: **Today · Threads · Ask · Team**, with a floating **+** (Add). The **Ask** tab is the search-and-ask box.
+- **Mobile first.** Most first users are on Android. Bottom tab bar: **Today · Threads · Ask · Agents**, with a floating **+** (Add). The **Ask** tab is the search-and-ask box.
 - **Desktop:** left sidebar with the same items. The save card opens as a right-hand sheet.
 - Max content width is 720px for reading surfaces.
 
@@ -68,6 +68,9 @@ Icons and labels are monochrome (`--ink-2`). Red is reserved for the brand and t
 | `TodayCard` | `why_now` (bold), title, `next_step`, proof chips, and the actions **Use it · Not for me · Later**. The rough S4 card has no actions yet. It says when the date is from the post rather than the official page, and when the time zone wasn't stated. |
 | `PrepSheet` | 5 points, each with source chips (`Video title · 4:12`) that open the player at that second; then "They agree" / "They disagree" sections |
 | `ReelPlayer` | YouTube IFrame API playing segments in order (`start`/`end`), or a `<video>` for files. Next/previous, with the segment source shown. |
+| `AgentMap` | (3 Nov) Your library in the middle (real save count), your 8 largest goals around it, the four agents at the corners, you at the bottom. A dot travels only when a real event arrives: from the agent to the goal the event names (or the save's goal), or to you when it needs a decision; the caption is the event's own words. Click an agent to filter the log. A taller layout on phones, drawn at full size. |
+| `ClockStrip` | (3 Nov) Today hour by hour, one row per agent, from `GET /team/overview`, counting live steps as they arrive. |
+| `AgentMark` | (3 Nov) Each agent's character: one shape and one colour from the palette (What is it? red circle, Is it true? green hexagon, What's it for? ink square, When will you need it? amber diamond), used on the map, the log, the clock and the save card. |
 | `TeamFeed` | Virtualised list of `AgentEvent`s: avatar, question name, summary (links to the save card), relative time, evidence chips ("Our copy of the page / post / captions" opens the card's copy; "Original link" opens the source). New events slide in live. |
 | `ThreadList`, `ThreadView` | Titles, counts, next date; rename inline (sets `locked_by_user`) |
 | `ImportPanel` | Drop zone → direct upload with progress → live counters from events (read, private, duplicates) → summary |

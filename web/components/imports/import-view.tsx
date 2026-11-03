@@ -53,8 +53,8 @@ function Progress({ imp }: { imp: ImportStatus }) {
       </ul>
       <p className="mt-3 text-sm">
         Homing is reading them now, a few at a time. Watch it happen in{" "}
-        <Link href="/team" className="font-semibold underline">
-          The team
+        <Link href="/agents" className="font-semibold underline">
+          Your agents
         </Link>
         , or see where they went in{" "}
         <Link href="/threads" className="font-semibold underline">

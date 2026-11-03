@@ -165,8 +165,8 @@ export function PrepView() {
       {!sheet || LIVE.includes(sheet.status) ? (
         <p className="mt-4 text-ink-2">
           Going through your videos for this, one by one. Each step shows up in{" "}
-          <Link href="/team" className="font-semibold hover:underline">
-            The team
+          <Link href="/agents" className="font-semibold hover:underline">
+            Your agents
           </Link>
           .
         </p>

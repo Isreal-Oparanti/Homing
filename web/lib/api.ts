@@ -95,6 +95,15 @@ export function toAgentEvent(raw: RawAgentEvent): AgentEvent {
 
 export type TeamPage = { items: AgentEvent[]; nextCursor: string | null };
 
+export type TeamOverview = {
+  saves: number;
+  goals: { id: string; title: string; saves: number }[];
+  goalOf: Record<string, string>;
+  date: string;
+  hours: Record<string, number[]>;
+  hourNow: number;
+};
+
 export const teamApi = {
   async list(cursor?: string): Promise<TeamPage> {
     const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
@@ -102,6 +111,25 @@ export const teamApi = {
       `team${query}`,
     );
     return { items: page.items.map(toAgentEvent), nextCursor: page.next_cursor };
+  },
+  /** What the agents map and today's clock draw: real counts only. */
+  async overview(): Promise<TeamOverview> {
+    const raw = await api<{
+      saves: number;
+      goals: { id: string; title: string; saves: number }[];
+      goal_of: Record<string, string>;
+      date: string;
+      hours: Record<string, number[]>;
+      hour_now: number;
+    }>("team/overview");
+    return {
+      saves: raw.saves,
+      goals: raw.goals,
+      goalOf: raw.goal_of,
+      date: raw.date,
+      hours: raw.hours,
+      hourNow: raw.hour_now,
+    };
   },
   /** Local development only: queues a system.echo job to test the live feed. */
   echo(message: string) {

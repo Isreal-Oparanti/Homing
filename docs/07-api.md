@@ -129,6 +129,7 @@ As built in S4, the three answers differ slightly from the example above:
 | Method | Path | Query | Returns |
 |---|---|---|---|
 | GET | `/team` | `?cursor&limit&agent` | `{items: AgentEvent[], next_cursor}` |
+| GET | `/team/overview` | — | `{saves, goals[{id, title, saves}] (the 8 largest), goal_of{save_id: goal_id}, date, hours{what,true,for,when: 24 counts, the person's time}, hour_now}`: what the agents map and today's clock draw (3 Nov). |
 | GET | `/events/stream` | header `Last-Event-ID` | SSE stream |
 
 SSE format:

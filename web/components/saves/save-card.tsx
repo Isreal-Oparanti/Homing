@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import { QuestionView } from "@/components/saves/question";
+import { AgentMark } from "@/components/team/agent-mark";
 import { AGENTS } from "@/components/team/agents";
 import {
   type AgentEvent,
@@ -49,7 +50,11 @@ const FINDING_KIND: Record<string, string> = {
 
 function ordinal(n: number) {
   const tens = n % 100;
-  const suffix = tens >= 11 && tens <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+  const suffix =
+    tens >= 11 && tens <= 13
+      ? "th"
+      : (({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ??
+        "th");
   return `${n}${suffix}`;
 }
 
@@ -66,9 +71,11 @@ const NOT_YET: Record<Exclude<Answer, "what">, string> = {
 };
 
 function savedOn(iso: string) {
-  return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" }).format(
-    new Date(iso),
-  );
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(iso));
 }
 
 function hostOf(url: string) {
@@ -79,13 +86,23 @@ function hostOf(url: string) {
   }
 }
 
-function AnswerRow({ answer, children }: { answer: Answer; children: React.ReactNode }) {
-  const { label, Icon } = AGENTS[answer];
+function AnswerRow({
+  answer,
+  children,
+}: {
+  answer: Answer;
+  children: React.ReactNode;
+}) {
+  const { label } = AGENTS[answer];
   return (
     <div className="grid grid-cols-[22px_1fr] gap-2.5 border-t border-line py-3">
-      <Icon className="mt-0.5 size-[18px] text-ink-2" strokeWidth={1.8} aria-hidden />
+      <span className="mt-0.5">
+        <AgentMark agent={answer} size={18} />
+      </span>
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted">{label}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted">
+          {label}
+        </p>
         <div className="mt-0.5 text-[15px] leading-relaxed">{children}</div>
       </div>
     </div>
@@ -95,7 +112,10 @@ function AnswerRow({ answer, children }: { answer: Answer; children: React.React
 function Working({ text }: { text: string }) {
   return (
     <p className="flex items-center gap-2 text-ink-2">
-      <span className="inline-block size-2 animate-pulse rounded-full bg-red" aria-hidden />
+      <span
+        className="inline-block size-2 animate-pulse rounded-full bg-red"
+        aria-hidden
+      />
       {text}
     </p>
   );
@@ -109,9 +129,15 @@ function Muted({ children }: { children: React.ReactNode }) {
 const VERDICT: Record<string, { label: string; tone: string }> = {
   fits_you: { label: "Fits you", tone: "bg-green-soft text-green" },
   not_for_you: { label: "Not for you", tone: "bg-grey-soft text-ink-2" },
-  needs_your_answer: { label: "Needs your answer", tone: "bg-amber-soft text-amber" },
+  needs_your_answer: {
+    label: "Needs your answer",
+    tone: "bg-amber-soft text-amber",
+  },
   closed: { label: "Closed", tone: "bg-grey-soft text-ink-2" },
-  couldnt_confirm: { label: "Couldn't confirm", tone: "bg-grey-soft text-ink-2" },
+  couldnt_confirm: {
+    label: "Couldn't confirm",
+    tone: "bg-grey-soft text-ink-2",
+  },
 };
 
 const FIRST_QUESTIONS = 3; // more than this on one card is too much at once
@@ -123,11 +149,24 @@ const RESULT: Record<string, { mark: string; tone: string; words: string }> = {
 };
 
 /** The flyer, screenshots or PDF itself, so you can see what you saved. */
-function Files({ saveId, kind, count }: { saveId: string; kind: string; count: number }) {
+function Files({
+  saveId,
+  kind,
+  count,
+}: {
+  saveId: string;
+  kind: string;
+  count: number;
+}) {
   const src = (i: number) => `/api/backend/saves/${saveId}/files/${i}`;
   if (kind === "pdf") {
     return (
-      <a href={src(0)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm text-ink-2 underline">
+      <a
+        href={src(0)}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2 inline-flex items-center gap-1 text-sm text-ink-2 underline"
+      >
         <ExternalLink className="size-3.5" aria-hidden />
         Open the PDF
       </a>
@@ -136,9 +175,19 @@ function Files({ saveId, kind, count }: { saveId: string; kind: string; count: n
   return (
     <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
       {Array.from({ length: count }, (_, i) => (
-        <a key={i} href={src(i)} target="_blank" rel="noreferrer" className="shrink-0">
+        <a
+          key={i}
+          href={src(i)}
+          target="_blank"
+          rel="noreferrer"
+          className="shrink-0"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element -- private, owner-only file */}
-          <img src={src(i)} alt={`Saved image ${i + 1}`} className="h-36 w-auto rounded-xl border border-line object-cover" />
+          <img
+            src={src(i)}
+            alt={`Saved image ${i + 1}`}
+            className="h-36 w-auto rounded-xl border border-line object-cover"
+          />
         </a>
       ))}
     </div>
@@ -157,7 +206,12 @@ const ITEM_VERDICT: Record<string, string> = {
 /** Rules only the person can judge, with no per-item question: listed for them to check. */
 function checkYourself(item: CheckedItem): string[] {
   return item.rules
-    .filter((r) => r.rule === "other" && r.strength === "required" && r.result === "unknown")
+    .filter(
+      (r) =>
+        r.rule === "other" &&
+        r.strength === "required" &&
+        r.result === "unknown",
+    )
     .map((r) => r.plain);
 }
 
@@ -165,20 +219,29 @@ function checkYourself(item: CheckedItem): string[] {
 function ItemsView({ items }: { items: CheckedItem[] }) {
   const done = items.filter((i) => i.status === "done");
   const counts = new Map<string, number>();
-  for (const i of done) counts.set(i.verdict ?? "couldnt_confirm", (counts.get(i.verdict ?? "couldnt_confirm") ?? 0) + 1);
+  for (const i of done)
+    counts.set(
+      i.verdict ?? "couldnt_confirm",
+      (counts.get(i.verdict ?? "couldnt_confirm") ?? 0) + 1,
+    );
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
         {items.length} items, each checked on its own page
       </p>
       <p className="mt-0.5 text-sm text-ink-2">
-        {[...counts.entries()].map(([v, n]) => `${n} ${(ITEM_VERDICT[v] ?? v).toLowerCase()}`).join(" · ")}
-        {done.length < items.length && `${done.length ? " · " : ""}${items.length - done.length} still checking`}
+        {[...counts.entries()]
+          .map(([v, n]) => `${n} ${(ITEM_VERDICT[v] ?? v).toLowerCase()}`)
+          .join(" · ")}
+        {done.length < items.length &&
+          `${done.length ? " · " : ""}${items.length - done.length} still checking`}
       </p>
       <ul className="mt-2 divide-y divide-line">
         {items.map((item, i) => {
           const verdict = item.verdict ? VERDICT[item.verdict] : null;
-          const failing = item.rules.filter((r) => r.strength === "required" && r.result === "fails");
+          const failing = item.rules.filter(
+            (r) => r.strength === "required" && r.result === "fails",
+          );
           // A difference first, then something left out, then a confirmation.
           const telling = ["differs", "left_out", "confirmed"]
             .map((kind) => item.findings.find((f) => f.kind === kind))
@@ -186,15 +249,24 @@ function ItemsView({ items }: { items: CheckedItem[] }) {
           const reason =
             item.status !== "done"
               ? null
-              : item.problem ??
-                (failing.length ? `You don't meet: ${failing.map((r) => r.plain).join("; ")}` : null) ??
-                (telling ? `${telling.kind === "differs" ? "Differs: " : ""}${telling.point}` : null);
+              : (item.problem ??
+                (failing.length
+                  ? `You don't meet: ${failing.map((r) => r.plain).join("; ")}`
+                  : null) ??
+                (telling
+                  ? `${telling.kind === "differs" ? "Differs: " : ""}${telling.point}`
+                  : null));
           return (
             <li key={i} className="py-2">
               <div className="flex items-center gap-2">
                 <p className="min-w-0 flex-1 truncate font-semibold">
                   {item.url ? (
-                    <a href={item.url} target="_blank" rel="noreferrer" className="hover:underline">
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:underline"
+                    >
                       {item.name}
                     </a>
                   ) : (
@@ -204,26 +276,43 @@ function ItemsView({ items }: { items: CheckedItem[] }) {
                 {item.status !== "done" ? (
                   <Working text="Checking…" />
                 ) : (
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${verdict?.tone ?? "bg-grey-soft text-ink-2"}`}>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${verdict?.tone ?? "bg-grey-soft text-ink-2"}`}
+                  >
                     {ITEM_VERDICT[item.verdict ?? ""] ?? "Checked"}
                   </span>
                 )}
               </div>
-              {item.note && <p className="mt-0.5 text-xs text-muted">The post says: {item.note}</p>}
+              {item.note && (
+                <p className="mt-0.5 text-xs text-muted">
+                  The post says: {item.note}
+                </p>
+              )}
               {reason && <p className="mt-0.5 text-sm text-ink-2">{reason}</p>}
               {item.status === "done" && checkYourself(item).length > 0 && (
-                <p className="mt-0.5 text-sm text-ink-2">Check yourself: {checkYourself(item).join("; ")}</p>
+                <p className="mt-0.5 text-sm text-ink-2">
+                  Check yourself: {checkYourself(item).join("; ")}
+                </p>
               )}
               {item.officialUrl && (
                 <p className="text-xs text-muted">
                   Checked on{" "}
-                  <a href={item.officialUrl} target="_blank" rel="noreferrer" className="underline">
+                  <a
+                    href={item.officialUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
                     {hostOf(item.officialUrl)}
                   </a>
                   {item.foundBy === "search" && " · found by searching"}
                 </p>
               )}
-              {item.deadline && <p className="text-xs text-muted">Closes {item.deadline.display}</p>}
+              {item.deadline && (
+                <p className="text-xs text-muted">
+                  Closes {item.deadline.display}
+                </p>
+              )}
             </li>
           );
         })}
@@ -247,7 +336,13 @@ function TrueAnswerView({
   const [showAll, setShowAll] = useState(false);
   const reply = useMutation({
     // Wait for the card's own refresh, so the message and the verdict change together.
-    mutationFn: async ({ id, value }: { id: string; value: string | number | boolean }) => {
+    mutationFn: async ({
+      id,
+      value,
+    }: {
+      id: string;
+      value: string | number | boolean;
+    }) => {
       const text = await savesApi.answer(saveId, id, value);
       await queryClient.refetchQueries({ queryKey: ["save", saveId] });
       return text;
@@ -261,16 +356,18 @@ function TrueAnswerView({
   });
   const checkNow = useMutation({
     mutationFn: () => savesApi.checkNow(saveId),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["save", saveId] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["save", saveId] }),
   });
 
-  if (answer.verdict === "nothing_to_check") return <Muted>Nothing to check.</Muted>;
+  if (answer.verdict === "nothing_to_check")
+    return <Muted>Nothing to check.</Muted>;
   if (answer.verdict === "not_checked") {
     return (
       <div>
         <p className="text-sm text-ink-2">
-          Not checked yet. It came in with your WhatsApp import and looks closed or old, so Homing held off to
-          save effort.
+          Not checked yet. It came in with your WhatsApp import and looks closed
+          or old, so Homing held off to save effort.
         </p>
         <button
           type="button"
@@ -280,7 +377,9 @@ function TrueAnswerView({
         >
           {checkNow.isSuccess ? "Checking…" : "Check it now"}
         </button>
-        {checkNow.isError && <p className="mt-1 text-sm text-red">{checkNow.error.message}</p>}
+        {checkNow.isError && (
+          <p className="mt-1 text-sm text-red">{checkNow.error.message}</p>
+        )}
       </div>
     );
   }
@@ -292,18 +391,29 @@ function TrueAnswerView({
   ];
   const host = answer.officialUrl ? hostOf(answer.officialUrl) : null;
   const verdict = VERDICT[answer.verdict];
-  const failing = answer.rules.filter((r) => r.strength === "required" && r.result === "fails");
+  const failing = answer.rules.filter(
+    (r) => r.strength === "required" && r.result === "fails",
+  );
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         {verdict && (
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${verdict.tone}`}>{verdict.label}</span>
+          <span
+            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${verdict.tone}`}
+          >
+            {verdict.label}
+          </span>
         )}
         {host && !answer.note && (
           <span className="text-sm text-ink-2">
             Checked against{" "}
-            <a href={answer.officialUrl!} target="_blank" rel="noreferrer" className="underline">
+            <a
+              href={answer.officialUrl!}
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
               {host}
             </a>
           </span>
@@ -311,7 +421,9 @@ function TrueAnswerView({
       </div>
       {answer.verdict === "closed" && (
         <p className="font-semibold">
-          {answer.fromPost || !answer.officialUrl ? "Closed, going by the date in the post." : "Closed, per the official page."}
+          {answer.fromPost || !answer.officialUrl
+            ? "Closed, going by the date in the post."
+            : "Closed, per the official page."}
         </p>
       )}
       {answer.verdict === "not_for_you" && failing.length > 0 && (
@@ -322,61 +434,90 @@ function TrueAnswerView({
           </Link>
         </p>
       )}
-      {answer.verdict === "fits_you" && <p>Nothing on the official page rules you out.</p>}
+      {answer.verdict === "fits_you" && (
+        <p>Nothing on the official page rules you out.</p>
+      )}
       {answer.fromPost &&
         answer.verdict === "couldnt_confirm" &&
         answer.rules.length > 0 &&
-        answer.rules.every((r) => r.strength !== "required" || r.result === "meets") && (
-          <p>Going by the post, nothing rules you out.</p>
-        )}
+        answer.rules.every(
+          (r) => r.strength !== "required" || r.result === "meets",
+        ) && <p>Going by the post, nothing rules you out.</p>}
       {answer.note && <p className="text-amber">{answer.note}</p>}
 
       {questions.length > 0 && (
         <div className="space-y-3 rounded-xl bg-amber-soft/60 p-3">
           <p className="text-sm text-ink-2">
-            Answer {questions.length === 1 ? "this" : "these"} to see if it fits you.
+            Answer {questions.length === 1 ? "this" : "these"} to see if it fits
+            you.
             {questions.some((q) => !q.id.startsWith("rule:")) &&
               " Homing remembers, so other opportunities won't ask again."}
           </p>
-          {questions.slice(0, showAll ? undefined : FIRST_QUESTIONS).map((q) => (
-            <QuestionView
-              key={q.id}
-              question={q}
-              busy={reply.isPending}
-              onAnswer={(value) => reply.mutate({ id: q.id, value })}
-            />
-          ))}
+          {questions
+            .slice(0, showAll ? undefined : FIRST_QUESTIONS)
+            .map((q) => (
+              <QuestionView
+                key={q.id}
+                question={q}
+                busy={reply.isPending}
+                onAnswer={(value) => reply.mutate({ id: q.id, value })}
+              />
+            ))}
           {!showAll && questions.length > FIRST_QUESTIONS && (
-            <button type="button" onClick={() => setShowAll(true)} className="text-sm text-ink-2 underline">
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="text-sm text-ink-2 underline"
+            >
               Show {questions.length - FIRST_QUESTIONS} more{" "}
-              {questions.length - FIRST_QUESTIONS === 1 ? "question" : "questions"}
+              {questions.length - FIRST_QUESTIONS === 1
+                ? "question"
+                : "questions"}
             </button>
           )}
         </div>
       )}
       {summary && <p className="text-sm font-semibold text-green">{summary}</p>}
-      {reply.isError && <p className="text-sm text-amber">{reply.error.message}</p>}
+      {reply.isError && (
+        <p className="text-sm text-amber">{reply.error.message}</p>
+      )}
 
       {answer.rules.length > 0 && (
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">Who can apply</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
+            Who can apply
+          </p>
           <ul className="mt-1 space-y-2">
             {answer.rules.map((r, i) => {
               const result = RESULT[r.result] ?? RESULT.unknown;
               return (
                 <li key={i} className="grid grid-cols-[18px_1fr] gap-1.5">
-                  <span className={`font-bold ${result.tone}`} title={result.words} aria-label={result.words}>
+                  <span
+                    className={`font-bold ${result.tone}`}
+                    title={result.words}
+                    aria-label={result.words}
+                  >
                     {result.mark}
                   </span>
                   <div>
                     <p>
                       {r.plain.replace(/\s*\(preferred\)\s*$/i, "")}
-                      {r.strength === "preferred" && <span className="text-muted"> · preferred, not required</span>}
+                      {r.strength === "preferred" && (
+                        <span className="text-muted">
+                          {" "}
+                          · preferred, not required
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-ink-2">
                       “{r.quote}”
                       {host && <span className="text-green"> · on {host}</span>}
-                      {answer.fromPost && <span className="text-muted"> · in the post, not confirmed</span>}
+                      {answer.fromPost && (
+                        <span className="text-muted">
+                          {" "}
+                          · in the post, not confirmed
+                        </span>
+                      )}
                     </p>
                   </div>
                 </li>
@@ -393,12 +534,18 @@ function TrueAnswerView({
           {answer.findings.map((f, i) => (
             <li key={i}>
               <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
-                {answer.samePage && f.kind === "left_out" ? "On the official page" : (FINDING_KIND[f.kind] ?? f.kind)}
+                {answer.samePage && f.kind === "left_out"
+                  ? "On the official page"
+                  : (FINDING_KIND[f.kind] ?? f.kind)}
               </p>
               <p>{f.point}</p>
               <blockquote className="mt-1 border-l-2 border-green pl-2.5 text-sm text-ink-2">
                 “{f.quote}”
-                {host && <span className="mt-0.5 block text-xs text-green">Found word for word on {host}</span>}
+                {host && (
+                  <span className="mt-0.5 block text-xs text-green">
+                    Found word for word on {host}
+                  </span>
+                )}
               </blockquote>
             </li>
           ))}
@@ -407,10 +554,14 @@ function TrueAnswerView({
       {answer.deadline ? (
         <p className="text-sm">
           Official closing date: {answer.deadline.display}
-          {!answer.deadline.tzStated && <span className="text-muted"> · time zone not stated</span>}
+          {!answer.deadline.tzStated && (
+            <span className="text-muted"> · time zone not stated</span>
+          )}
         </p>
       ) : host && postHasDeadline && !answer.note ? (
-        <p className="text-sm text-ink-2">We didn&apos;t find a closing date on the official page.</p>
+        <p className="text-sm text-ink-2">
+          We didn&apos;t find a closing date on the official page.
+        </p>
       ) : null}
     </div>
   );
@@ -431,10 +582,15 @@ function ForAnswerView({ answer }: { answer: ForAnswer }) {
       )}
       {thread ? (
         <p>
-          <Link href={`/threads/${thread.id}`} className="font-semibold hover:underline">
+          <Link
+            href={`/threads/${thread.id}`}
+            className="font-semibold hover:underline"
+          >
             {thread.title}
           </Link>
-          {thread.count > 1 ? `: your ${ordinal(thread.position)} save on this.` : ": the first save on this."}
+          {thread.count > 1
+            ? `: your ${ordinal(thread.position)} save on this.`
+            : ": the first save on this."}
         </p>
       ) : (
         !answer.duplicateOf && <Muted>Not sure what this is for yet.</Muted>
@@ -481,7 +637,10 @@ function PrivateText({ saveId }: { saveId: string }) {
     <div className="mt-2">
       {text === null ? (
         <div className="flex items-center gap-3 rounded-xl bg-grey-soft px-3 py-2.5">
-          <span className="select-none font-mono text-sm tracking-widest text-muted blur-[3px]" aria-hidden>
+          <span
+            className="select-none font-mono text-sm tracking-widest text-muted blur-[3px]"
+            aria-hidden
+          >
             ••••-••••-••••
           </span>
           <button
@@ -496,7 +655,9 @@ function PrivateText({ saveId }: { saveId: string }) {
         </div>
       ) : (
         <div className="flex items-start gap-3 rounded-xl bg-grey-soft px-3 py-2.5">
-          <p className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-sm">{text}</p>
+          <p className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-sm">
+            {text}
+          </p>
           <button
             type="button"
             onClick={() => setText(null)}
@@ -531,11 +692,17 @@ function Copies({ copies }: { copies: Copy[] }) {
         {copies.map((copy) => (
           <section key={copy.id}>
             <p className="text-xs text-muted">
-              {COPY_KIND[copy.kind] ?? copy.kind} · {copy.chars.toLocaleString("en-GB")} characters
+              {COPY_KIND[copy.kind] ?? copy.kind} ·{" "}
+              {copy.chars.toLocaleString("en-GB")} characters
               {copy.sourceUrl && (
                 <>
                   {" · "}
-                  <a href={copy.sourceUrl} target="_blank" rel="noreferrer" className="underline">
+                  <a
+                    href={copy.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
                     {hostOf(copy.sourceUrl)}
                   </a>
                 </>
@@ -558,12 +725,19 @@ function Card({ card }: { card: SaveCard }) {
   const paused = !what && save.status !== "failed" && save.error;
   const title = isPrivate
     ? "Private save"
-    : (what?.title ?? save.label ?? (save.url ? hostOf(save.url) : save.text?.slice(0, 80)) ?? "Your save");
+    : (what?.title ??
+      save.label ??
+      (save.url ? hostOf(save.url) : save.text?.slice(0, 80)) ??
+      "Your save");
   // Amounts and requirements only mean something on an opportunity; on a talk they're stray numbers.
   const facts = [
     ...(what?.keyFacts.dates ?? []).map((d) => d.text),
-    ...(what?.isOpportunity ? (what.keyFacts.amounts ?? []).map((a) => a.text) : []),
-    ...(what?.isOpportunity ? (what.keyFacts.requirements ?? []).map((r) => r.text) : []),
+    ...(what?.isOpportunity
+      ? (what.keyFacts.amounts ?? []).map((a) => a.text)
+      : []),
+    ...(what?.isOpportunity
+      ? (what.keyFacts.requirements ?? []).map((r) => r.text)
+      : []),
   ].slice(0, 6);
 
   return (
@@ -573,7 +747,9 @@ function Card({ card }: { card: SaveCard }) {
         {save.platform && ` · ${PLATFORM[save.platform] ?? save.platform}`}
         {isPrivate && " · Private"}
       </p>
-      <h1 className="font-display mt-1 text-[22px] font-bold leading-snug tracking-[-0.02em]">{title}</h1>
+      <h1 className="font-display mt-1 text-[22px] font-bold leading-snug tracking-[-0.02em]">
+        {title}
+      </h1>
       {save.url && !isPrivate && (
         <a
           href={save.url}
@@ -585,7 +761,9 @@ function Card({ card }: { card: SaveCard }) {
           <span className="truncate">{save.url}</span>
         </a>
       )}
-      {save.files > 0 && !isPrivate && <Files saveId={save.id} kind={save.kind} count={save.files} />}
+      {save.files > 0 && !isPrivate && (
+        <Files saveId={save.id} kind={save.kind} count={save.files} />
+      )}
 
       <div className="mt-4">
         <AnswerRow answer="what">
@@ -603,7 +781,10 @@ function Card({ card }: { card: SaveCard }) {
               {facts.length > 0 && (
                 <ul className="mt-2 flex flex-wrap gap-1.5">
                   {facts.map((f) => (
-                    <li key={f} className="rounded-full bg-grey-soft px-2.5 py-0.5 text-xs text-ink-2">
+                    <li
+                      key={f}
+                      className="rounded-full bg-grey-soft px-2.5 py-0.5 text-xs text-ink-2"
+                    >
                       {f}
                     </li>
                   ))}
@@ -611,7 +792,9 @@ function Card({ card }: { card: SaveCard }) {
               )}
             </>
           ) : save.status === "failed" ? (
-            <p className="text-amber">{save.error ?? "Couldn't read this save."}</p>
+            <p className="text-amber">
+              {save.error ?? "Couldn't read this save."}
+            </p>
           ) : paused ? (
             <p className="text-amber">{save.error}</p>
           ) : (
@@ -630,7 +813,9 @@ function Card({ card }: { card: SaveCard }) {
               <TrueAnswerView
                 saveId={save.id}
                 answer={card.true}
-                postHasDeadline={(what?.keyFacts.dates ?? []).some((d) => d.role === "deadline")}
+                postHasDeadline={(what?.keyFacts.dates ?? []).some(
+                  (d) => d.role === "deadline",
+                )}
               />
             ) : answer === "for" && card.for ? (
               <ForAnswerView answer={card.for} />
@@ -656,12 +841,17 @@ export function SaveCardView() {
     // Safety net for the live feed: keep asking while the reading is on its way, but not
     // while it's paused (a budget pause lasts until tomorrow).
     refetchInterval: (q) =>
-      q.state.data && q.state.data.pending.length > 0 && !q.state.data.save.error ? 3000 : false,
+      q.state.data &&
+      q.state.data.pending.length > 0 &&
+      !q.state.data.save.error
+        ? 3000
+        : false,
   });
 
   const onEvent = useCallback(
     (event: AgentEvent) => {
-      if (event.saveId === id) void queryClient.invalidateQueries({ queryKey: ["save", id] });
+      if (event.saveId === id)
+        void queryClient.invalidateQueries({ queryKey: ["save", id] });
     },
     [id, queryClient],
   );

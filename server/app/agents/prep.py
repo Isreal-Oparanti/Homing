@@ -260,7 +260,8 @@ def _said(video: Video, moment: str) -> str:
         if video.points
         else "nothing for this moment"
     )
-    dropped = f"; dropped {video.dropped} that weren't" if video.dropped else ""
+    weren_t = "that wasn't" if video.dropped == 1 else "that weren't"
+    dropped = f"; dropped {video.dropped} {weren_t}" if video.dropped else ""
     return f"Went through '{video.title}' for {moment}: {found}{dropped}."
 
 

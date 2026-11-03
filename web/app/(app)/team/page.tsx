@@ -1,5 +1,6 @@
-import { TeamFeed } from "@/components/team/team-feed";
+import { redirect } from "next/navigation";
 
+/** The team is now Your agents; old links still land there. */
 export default function TeamPage() {
-  return <TeamFeed showDevTools={process.env.NODE_ENV === "development"} />;
+  redirect("/agents");
 }

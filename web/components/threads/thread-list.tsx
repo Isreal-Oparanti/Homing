@@ -57,8 +57,8 @@ export function ThreadList() {
       {asked && (
         <p className="mt-1 text-sm text-muted">
           What&apos;s it for? is reading your whole pile. Watch it in{" "}
-          <Link href="/team" className="underline">
-            The team
+          <Link href="/agents" className="underline">
+            Your agents
           </Link>
           ; this page updates when it&apos;s done.
         </p>

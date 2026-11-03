@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.auth import CurrentUser
 from app.core.config import Settings, get_settings
-from app.db.models import AgentEvent, Job, User
+from app.db.models import AgentEvent, Job, Save, Thread, ThreadSave, User
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
 from app.events.emitter import emit
@@ -188,6 +188,51 @@ def test_team_feed_is_per_user(sessions: sessionmaker[Session]) -> None:
     }
     items = client.get("/api/v1/team", headers=headers).json()["items"]
     assert [i["summary"] for i in items] == ["for alice"]
+
+
+@pytest.mark.integration
+def test_the_agents_overview_counts_only_real_steps(sessions: sessionmaker[Session]) -> None:
+    with sessions() as db:
+        for user in (ALICE, BOB):
+            ensure_user(db, user)
+        db.flush()
+        saves = [
+            Save(user_id=ALICE.id, kind="note", origin="paste", text=f"n{i}", content_hash=f"h{i}")
+            for i in range(3)
+        ]
+        db.add_all(saves)
+        goal = Thread(user_id=ALICE.id, title="Speaking better")
+        db.add(goal)
+        db.flush()
+        db.add_all(
+            [ThreadSave(thread_id=goal.id, save_id=s.id, added_by="agent") for s in saves[:2]]
+        )
+        emit(db, user_id=ALICE.id, agent="what", action="read", summary="a")
+        emit(db, user_id=ALICE.id, agent="what", action="read", summary="b")
+        emit(db, user_id=ALICE.id, agent="for", action="placed", summary="c")
+        emit(db, user_id=BOB.id, agent="when", action="when_set", summary="not alice's")
+        db.commit()
+        goal_id, placed = goal.id, {s.id for s in saves[:2]}
+
+    def override_db():  # type: ignore[no-untyped-def]
+        with sessions() as session:
+            yield session
+
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(proxy_secret="s")
+    app.dependency_overrides[get_db] = override_db
+    headers = {
+        "X-Homing-Proxy-Secret": "s",
+        "X-Homing-User-Id": ALICE.id,
+        "X-Homing-User-Email": ALICE.email,
+    }
+    o = TestClient(app).get("/api/v1/team/overview", headers=headers).json()
+    assert o["saves"] == 3
+    assert o["goals"] == [{"id": goal_id, "title": "Speaking better", "saves": 2}]
+    assert set(o["goal_of"]) == placed
+    assert sum(o["hours"]["what"]) == 2 and sum(o["hours"]["for"]) == 1
+    assert sum(o["hours"]["when"]) == 0  # Bob's step isn't Alice's
+    assert o["hours"]["what"][o["hour_now"]] == 2
 
 
 @pytest.mark.integration

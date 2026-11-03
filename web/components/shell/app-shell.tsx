@@ -7,7 +7,7 @@ import {
   Search,
   Sun,
   UserRound,
-  Users,
+  Bot,
   Waypoints,
   type LucideIcon,
 } from "lucide-react";
@@ -23,12 +23,19 @@ const NAV: { href: string; label: string; Icon: LucideIcon }[] = [
   { href: "/today", label: "Today", Icon: Sun },
   { href: "/threads", label: "Threads", Icon: Waypoints },
   { href: "/search", label: "Ask", Icon: Search },
-  { href: "/team", label: "Team", Icon: Users },
+  { href: "/agents", label: "Agents", Icon: Bot },
 ];
 
-export function AppShell({ name, children }: { name: string; children: React.ReactNode }) {
+export function AppShell({
+  name,
+  children,
+}: {
+  name: string;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
   const [adding, setAdding] = useState(false);
 
   return (
@@ -50,7 +57,9 @@ export function AppShell({ name, children }: { name: string; children: React.Rea
               key={href}
               href={href}
               className={`flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-semibold ${
-                isActive(href) ? "bg-ink text-white" : "text-ink-2 hover:bg-glass-strong"
+                isActive(href)
+                  ? "bg-ink text-white"
+                  : "text-ink-2 hover:bg-glass-strong"
               }`}
             >
               <Icon className="size-[18px]" strokeWidth={1.8} aria-hidden />
@@ -62,7 +71,9 @@ export function AppShell({ name, children }: { name: string; children: React.Rea
           <Link
             href="/import"
             className={`mb-2 flex items-center gap-3 rounded-full px-4 py-2 text-sm font-semibold ${
-              isActive("/import") ? "bg-ink text-white" : "text-ink-2 hover:bg-glass-strong"
+              isActive("/import")
+                ? "bg-ink text-white"
+                : "text-ink-2 hover:bg-glass-strong"
             }`}
           >
             <Import className="size-[18px]" strokeWidth={1.8} aria-hidden />
@@ -72,7 +83,9 @@ export function AppShell({ name, children }: { name: string; children: React.Rea
           <Link
             href="/profile"
             className={`mt-1 flex items-center gap-3 rounded-full px-4 py-2 text-sm font-semibold ${
-              isActive("/profile") ? "bg-ink text-white" : "text-ink-2 hover:bg-glass-strong"
+              isActive("/profile")
+                ? "bg-ink text-white"
+                : "text-ink-2 hover:bg-glass-strong"
             }`}
           >
             <UserRound className="size-[18px]" strokeWidth={1.8} aria-hidden />
@@ -93,7 +106,11 @@ export function AppShell({ name, children }: { name: string; children: React.Rea
       <header className="flex items-center justify-between px-5 pt-5 md:hidden">
         <Logo size={24} />
         <div className="flex gap-2">
-          <Link href="/profile" aria-label="What Homing knows about you" className="glass rounded-full p-2">
+          <Link
+            href="/profile"
+            aria-label="What Homing knows about you"
+            className="glass rounded-full p-2"
+          >
             <UserRound className="size-[18px] text-ink-2" strokeWidth={1.8} />
           </Link>
           <button
