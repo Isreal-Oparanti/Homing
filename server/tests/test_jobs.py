@@ -16,6 +16,7 @@ from app.jobs import queue
 from app.jobs.errors import PermanentError, RetryableError
 from app.jobs.handlers import HANDLERS
 from app.jobs.runner import JobContext, Runner
+from app.llm import credits
 from app.main import create_app
 
 ALICE = CurrentUser(id="u-alice", email="alice@example.com")
@@ -284,3 +285,31 @@ def test_me_creates_the_user_once(sessions: sessionmaker[Session]) -> None:
         assert response.json() == {"id": ALICE.id, "email": ALICE.email, "name": None}
     with sessions() as db:
         assert db.scalar(select(func.count()).select_from(User)) == 1
+
+
+@pytest.mark.integration
+def test_each_step_records_the_meta_models_behind_it(sessions: sessionmaker[Session]) -> None:
+    with sessions() as db:
+        ensure_user(db, ALICE)
+        db.flush()
+        a, b = (
+            Save(user_id=ALICE.id, kind="note", origin="paste", text=t, content_hash=t)
+            for t in ("one", "two")
+        )
+        db.add_all([a, b])
+        db.flush()
+        credits.start()
+        credits.note("muse-voice-transcribe-1.0", [a.id])
+        credits.note("muse-spark-1.3", [a.id, b.id])
+        read_a = emit(db, user_id=ALICE.id, agent="what", action="read", summary="a", save_id=a.id)
+        read_b = emit(db, user_id=ALICE.id, agent="what", action="read", summary="b", save_id=b.id)
+        job = emit(db, user_id=ALICE.id, agent="for", action="organised", summary="all")
+        credits.start()  # the next job called no model: code did it
+        dated = emit(
+            db, user_id=ALICE.id, agent="when", action="when_set", summary="d", save_id=a.id
+        )
+        db.commit()
+        assert read_a.models == ["muse-voice-transcribe-1.0", "muse-spark-1.3"]
+        assert read_b.models == ["muse-spark-1.3"]  # the voice model was only for a
+        assert job.models == ["muse-voice-transcribe-1.0", "muse-spark-1.3"]
+        assert dated.models == []

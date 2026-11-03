@@ -8,6 +8,7 @@ import { useCallback, useState } from "react";
 
 import { QuestionView } from "@/components/saves/question";
 import { AgentMark } from "@/components/team/agent-mark";
+import { ByLine } from "@/components/team/by-line";
 import { AGENTS } from "@/components/team/agents";
 import {
   type AgentEvent,
@@ -89,9 +90,12 @@ function hostOf(url: string) {
 
 function AnswerRow({
   answer,
+  by,
   children,
 }: {
   answer: Answer;
+  /** What produced this answer: Meta models by name, or code. */
+  by?: { models: string[]; how: string };
   children: React.ReactNode;
 }) {
   const { label } = AGENTS[answer];
@@ -105,6 +109,7 @@ function AnswerRow({
           {label}
         </p>
         <div className="mt-0.5 text-[15px] leading-relaxed">{children}</div>
+        {by && <ByLine models={by.models} how={by.how} />}
       </div>
     </div>
   );
@@ -803,7 +808,7 @@ function Card({ card }: { card: SaveCard }) {
       )}
 
       <div className="mt-4">
-        <AnswerRow answer="what">
+        <AnswerRow answer="what" by={isPrivate ? undefined : card.by.what}>
           {isPrivate ? (
             <>
               <p className="flex items-start gap-2 text-ink-2">
@@ -839,7 +844,11 @@ function Card({ card }: { card: SaveCard }) {
           )}
         </AnswerRow>
         {(["true", "for", "when"] as const).map((answer) => (
-          <AnswerRow key={answer} answer={answer}>
+          <AnswerRow
+            key={answer}
+            answer={answer}
+            by={isPrivate || pending.includes(answer) ? undefined : card.by[answer]}
+          >
             {isPrivate ? (
               <Muted>Not used for private saves.</Muted>
             ) : pending.includes("what") ? (

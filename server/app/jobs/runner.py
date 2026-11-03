@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.logging import get_logger
 from app.jobs import queue
 from app.jobs.errors import DeferredError, PermanentError
+from app.llm import credits
 
 log = get_logger("jobs")
 
@@ -67,6 +68,7 @@ class Runner:
             handler = self._handlers.get(job.kind)
             if handler is None:
                 raise PermanentError(f"No handler for job kind {job.kind!r}.")
+            credits.start()  # this job's steps are credited to this job's model calls only
             with self._sessions() as db:
                 handler(
                     JobContext(db, job.id, job.kind, job.user_id, job.attempts, job.max_attempts),

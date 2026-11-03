@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Identity, Index, Integer, Numeric, Text
 from sqlalchemy import text as sql
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, utc_now
@@ -65,6 +65,8 @@ class AgentEvent(Base):
     thread_id: Mapped[str | None] = mapped_column(Text)
     card_id: Mapped[str | None] = mapped_column(Text)
     evidence: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    # The Meta models that did this step (e.g. muse-spark-1.3); empty when code did it.
+    models: Mapped[list[str] | None] = mapped_column(ARRAY(Text))  # None: from before we kept it
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     __table_args__ = (Index("ix_agent_events_user_id_id", "user_id", "id"),)

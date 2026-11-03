@@ -6,13 +6,14 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agents import is_it_true
 from app.agents.when_needed import explain_now
 from app.core.auth import CurrentUser, require_uploader, require_user
 from app.core.errors import AppError
-from app.db.models import Check, Media, Save, Snapshot, User, When
+from app.db.models import AgentEvent, Check, Media, Save, Snapshot, User, When
 from app.db.repo import answers as answers_repo
 from app.db.repo import media as media_repo
 from app.db.repo import saves as saves_repo
@@ -97,6 +98,81 @@ class WhatOut(BaseModel):
     is_opportunity: bool
 
 
+def model_name(model: str) -> str:
+    """muse-spark-1.3 -> Muse Spark: the names people know."""
+    for prefix, name in (
+        ("muse-voice-transcribe", "Muse Voice Transcribe"),
+        ("muse-spark-open", "Muse Spark Open"),
+        ("muse-spark", "Muse Spark"),
+        ("muse-wonder", "Muse Wonder"),
+        ("sam-", "SAM"),
+    ):
+        if model.startswith(prefix):
+            return name
+    return model
+
+
+class By(BaseModel):
+    """What produced an answer: the Meta models (none: code did it) and how, in a few words."""
+
+    models: list[str]
+    how: str
+
+
+HOW_READ = {
+    "read_video": "watched the video",
+    "read_file": "read your file",
+    "read_batch": "read it with others in one call",
+}
+
+
+def _by(
+    db: Session,
+    save: Save,
+    reading: Any,
+    check: Check | None,
+    when: When | None,
+    copies: list[Snapshot],
+) -> dict[str, By]:
+    by: dict[str, By] = {}
+    if reading is not None:
+        if reading.model == "none":
+            by["what"] = By(models=[], how="nothing to read, so no model was used")
+        else:
+            heard = any(c.kind == "speech" for c in copies)
+            kind = reading.prompt_version.rsplit(".", 1)[0]
+            how = HOW_READ.get(kind, "heard and read it" if heard else "read it")
+            models = [model_name(reading.model)]
+            if heard:
+                models.insert(0, "Muse Voice Transcribe")
+            by["what"] = By(models=models, how=how)
+    if check is not None and check.model and check.model != "none":
+        how = (
+            "compared it with the official page; code found every quote word for word"
+            if check.official_url
+            else "read the post's own rules; code found every quote word for word"
+        )
+        by["true"] = By(models=[model_name(check.model)], how=how)
+    placed = db.scalars(
+        select(AgentEvent.models)
+        .where(
+            AgentEvent.save_id == save.id,
+            AgentEvent.agent == "for",
+            AgentEvent.models.is_not(None),
+        )
+        .order_by(AgentEvent.id.desc())
+        .limit(1)
+    ).first()
+    if placed is not None:
+        by["for"] = By(
+            models=[model_name(m) for m in placed],
+            how="matched it to your goals" if placed else "linked it to the same save you had",
+        )
+    if when is not None and when.kind == "date":
+        by["when"] = By(models=[], how="code read the date and worked out when to bring it back")
+    return by
+
+
 class SaveCard(BaseModel):
     save: SaveOut
     what: WhatOut | None
@@ -105,6 +181,7 @@ class SaveCard(BaseModel):
     when: dict[str, Any] | None = None
     copies: list[CopyOut] = Field(default_factory=list)
     pending: list[str]
+    by: dict[str, By] = Field(default_factory=dict)  # what produced each answer
 
 
 class SavePage(BaseModel):
@@ -378,14 +455,17 @@ def save_card(
             "duplicate_of": save.duplicate_of,
         }
 
+    when = None if is_private else answers_repo.get_when(db, save.id)
+    snapshots = saves_repo.snapshots_for(db, save.id)
     return SaveCard(
         save=SaveOut.of(save),
         what=WhatOut.model_validate(reading, from_attributes=True) if reading else None,
         true=true,
         for_=for_,
-        when=None if is_private else when_out(answers_repo.get_when(db, save.id), user_tz),
-        copies=[CopyOut.of(snap) for snap in saves_repo.snapshots_for(db, save.id)],
+        when=when_out(when, user_tz) if when is not None else None,
+        copies=[CopyOut.of(snap) for snap in snapshots],
         pending=sorted(set(pending), key=["what", "true", "for", "when"].index),
+        by={} if is_private else _by(db, save, reading, check, when, list(snapshots)),
     )
 
 

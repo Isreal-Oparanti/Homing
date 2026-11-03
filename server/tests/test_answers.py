@@ -175,6 +175,12 @@ def test_all_four_answers_fill_in(client: TestClient, sessions: sessionmaker[Ses
     assert (when["kind"], when["source"]) == ("date", "check")  # the official date wins
     assert when["explanation"].endswith("per the official page.")
 
+    # What produced each answer, said plainly: the model, or code.
+    assert card["by"]["what"] == {"models": ["Muse Spark"], "how": "read it"}
+    assert card["by"]["true"]["models"] == ["Muse Spark"]
+    assert "word for word" in card["by"]["true"]["how"]
+    assert card["by"]["when"]["models"] == []  # dates are worked out by code
+
     with sessions() as db:
         actions = db.scalars(select(AgentEvent.action).where(AgentEvent.save_id == save_id)).all()
     assert {"read", "checked", "placed", "when_set"} <= set(actions)

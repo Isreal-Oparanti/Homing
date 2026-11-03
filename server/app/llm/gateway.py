@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.db.models import ModelCall, Save, User
 from app.jobs.errors import DeferredError, PermanentError, RetryableError
+from app.llm import credits
 from app.schemas.agents import (
     AskAnswer,
     AskPick,
@@ -78,6 +79,7 @@ class Purpose:
     output: type[BaseModel]
     timeout_s: float
     reasoning_effort: str | None = None
+    model: str | None = None  # None: Muse Spark, the default
 
 
 # Not a chat purpose: Muse Voice Transcribe has its own endpoint (ModelGateway.transcribe).
@@ -206,7 +208,8 @@ class ModelGateway:
     ) -> Any:
         p = PURPOSES[purpose]
         self._refuse_private(save_ids)
-        model = self._settings.meta_spark_model
+        model = p.model or self._settings.meta_spark_model
+        credits.note(model, save_ids)
         instructions = (PROMPTS / p.prompt).read_text(encoding="utf-8")
         version = p.prompt.removesuffix(".md")
         user_text = render_blocks(inputs)
@@ -320,6 +323,7 @@ class ModelGateway:
         by the sound itself and recorded in model_calls like every other call."""
         self._refuse_private(save_ids)
         model = self._settings.meta_transcribe_model
+        credits.note(model, save_ids)
         input_hash = hashlib.sha256(f"{model}\nasr\n".encode() + hashlib.sha256(wav).digest())
         input_hash_hex = input_hash.hexdigest()
         cached = self._db.scalar(

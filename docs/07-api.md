@@ -131,6 +131,7 @@ As built in S4, the three answers differ slightly from the example above:
 | Method | Path | Query | Returns |
 |---|---|---|---|
 | GET | `/team` | `?cursor&limit&agent` | `{items: AgentEvent[], next_cursor}` |
+| | | | **3 Nov:** every `AgentEvent` has `models`: the Meta models behind the step (`[]` code did it; `null` from before 0009, unknown). Filled by `app/llm/credits.py`: the gateway notes each call (cached ones too) with its saves; an event about a save credits that save's calls in the same job, an event about no one save credits the job's calls. `GET /team/overview` adds `models[{model, calls_today, calls, tokens}]` from `model_calls`; `GET /saves/{id}` adds `by{what,true,for,when: {models, how}}`. |
 | GET | `/team/overview` | — | `{saves, goals[{id, title, saves}] (the 8 largest), goal_of{save_id: goal_id}, date, hours{what,true,for,when: 24 counts, the person's time}, hour_now}`: what the agents map and today's clock draw (3 Nov). |
 | GET | `/events/stream` | header `Last-Event-ID` | SSE stream |
 

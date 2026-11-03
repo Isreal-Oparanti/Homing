@@ -18,6 +18,7 @@ from app.db.models import (
     AgentEvent,
     Check,
     Job,
+    ModelCall,
     Reading,
     Save,
     Thread,
@@ -46,6 +47,7 @@ class AgentEventOut(BaseModel):
     thread_id: str | None
     card_id: str | None
     evidence: list[dict[str, Any]]
+    models: list[str] | None  # the Meta models behind it; [] code did it; None unknown
     created_at: datetime
 
     @classmethod
@@ -157,6 +159,13 @@ class GoalDot(BaseModel):
     saves: int
 
 
+class ModelUse(BaseModel):
+    model: str
+    calls_today: int
+    calls: int
+    tokens: int
+
+
 class Overview(BaseModel):
     """What the agents map and the clock strip draw: all real counts, none made up."""
 
@@ -167,6 +176,7 @@ class Overview(BaseModel):
     hours: dict[str, list[int]]  # agent -> events in each hour of today, the person's time
     hour_now: int
     now: Attention
+    models: list[ModelUse]  # each Meta model's real calls for this person, from model_calls
 
 
 @router.get("/team/overview", response_model=Overview)
@@ -212,6 +222,20 @@ def overview(user: CurrentUser = Depends(require_user), db: Session = Depends(ge
         hours=hours,
         hour_now=now.hour,
         now=attention(db, user.id),
+        models=[
+            ModelUse(model=m, calls_today=t or 0, calls=n, tokens=k or 0)
+            for m, t, n, k in db.execute(
+                select(
+                    ModelCall.model,
+                    func.count().filter(ModelCall.created_at >= midnight),
+                    func.count(),
+                    func.sum(ModelCall.tokens_in + ModelCall.tokens_out),
+                )
+                .where(ModelCall.user_id == user.id, ModelCall.status == "ok")
+                .group_by(ModelCall.model)
+                .order_by(func.count().desc())
+            )
+        ],
     )
 
 

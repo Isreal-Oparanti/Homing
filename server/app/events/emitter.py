@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.db.models import AgentEvent
+from app.llm import credits
 
 AGENTS = frozenset({"what", "true", "for", "when", "system"})
 
@@ -32,6 +33,8 @@ def emit(
         thread_id=thread_id,
         card_id=card_id,
         evidence=evidence or [],
+        # The Meta models behind this step; none means code did it.
+        models=credits.models_for(save_id),
     )
     db.add(event)
     db.flush()

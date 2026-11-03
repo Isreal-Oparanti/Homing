@@ -57,6 +57,8 @@ export type AgentEvent = {
   threadId: string | null;
   cardId: string | null;
   evidence: Evidence[];
+  /** The Meta models behind this step: [] means code did it; null, from before we kept it. */
+  models: string[] | null;
   createdAt: string;
 };
 
@@ -71,6 +73,7 @@ type RawAgentEvent = {
   thread_id: string | null;
   card_id: string | null;
   evidence: RawEvidence[];
+  models?: string[] | null;
   created_at: string;
 };
 
@@ -89,6 +92,7 @@ export function toAgentEvent(raw: RawAgentEvent): AgentEvent {
       snapshotId: e.snapshot_id,
       quote: e.quote,
     })),
+    models: raw.models ?? null,
     createdAt: raw.created_at,
   };
 }
@@ -116,8 +120,12 @@ function toAttention(a: RawAttention): Attention {
   };
 }
 
+/** One Meta model's real calls for this person. */
+export type ModelUse = { model: string; callsToday: number; calls: number; tokens: number };
+
 export type TeamOverview = {
   now: Attention;
+  models: ModelUse[];
   saves: number;
   goals: { id: string; title: string; saves: number }[];
   goalOf: Record<string, string>;
@@ -148,8 +156,15 @@ export const teamApi = {
       hours: Record<string, number[]>;
       hour_now: number;
       now: RawAttention;
+      models?: { model: string; calls_today: number; calls: number; tokens: number }[];
     }>("team/overview");
     return {
+      models: (raw.models ?? []).map((m) => ({
+        model: m.model,
+        callsToday: m.calls_today,
+        calls: m.calls,
+        tokens: m.tokens,
+      })),
       now: toAttention(raw.now),
       saves: raw.saves,
       goals: raw.goals,
@@ -316,6 +331,8 @@ export type SaveCard = {
   when: WhenAnswer | null;
   copies: Copy[];
   pending: Answer[];
+  /** What produced each answer: the Meta models (none: code did it), and how. */
+  by: Partial<Record<Answer, { models: string[]; how: string }>>;
 };
 
 export type TodayCard = {
@@ -541,6 +558,7 @@ export const savesApi = {
       when: RawWhen | null;
       copies: RawCopy[];
       pending: Answer[];
+      by?: SaveCard["by"];
     }>(`saves/${encodeURIComponent(id)}`);
     return {
       save: toSave(raw.save),
@@ -562,6 +580,7 @@ export const savesApi = {
         excerpt: c.excerpt,
       })),
       pending: raw.pending,
+      by: raw.by ?? {},
     };
   },
 };

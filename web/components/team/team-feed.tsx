@@ -8,7 +8,9 @@ import { useCallback, useRef, useState } from "react";
 import { AgentMap } from "@/components/team/agent-map";
 import { AgentMark } from "@/components/team/agent-mark";
 import { AGENTS, FOUR } from "@/components/team/agents";
+import { ByLine } from "@/components/team/by-line";
 import { ClockStrip } from "@/components/team/clock-strip";
+import { ModelStrip } from "@/components/team/model-strip";
 import {
   type Agent,
   type AgentEvent,
@@ -221,6 +223,7 @@ export function TeamFeed({ showDevTools }: { showDevTools: boolean }) {
               )}
             </section>
           )}
+          <ModelStrip models={overview.data.models} />
           <ClockStrip overview={overview.data} />
         </>
       )}
@@ -303,6 +306,7 @@ export function TeamFeed({ showDevTools }: { showDevTools: boolean }) {
                 ) : (
                   <p className="mt-0.5">{event.summary}</p>
                 )}
+                {event.models !== null && <ByLine models={event.models} />}
                 <EvidenceChips event={event} />
               </div>
             </li>
