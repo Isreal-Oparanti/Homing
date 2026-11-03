@@ -72,6 +72,23 @@ def _explain(dated: Dated, user_tz: str, now: datetime) -> str:
     )
 
 
+def explain_now(when: When, now: datetime) -> str:
+    """The explanation is written when the date is set; once the date has passed, say so
+    ("Closes Sat 31 Oct…" read on 3 Nov must be "Closed on Sat 31 Oct…")."""
+    text = when.explanation or ""
+    if when.due_at is None or when.due_at > now:
+        return text
+    if text.startswith("Closes "):
+        return ("Closed on " + text.removeprefix("Closes ")).replace(
+            "if the post is right", "if the post was right"
+        )
+    if text.startswith("On ") and text.endswith(", if the post is right."):
+        return f"That was on {text.removeprefix('On ').removesuffix(', if the post is right.')}."
+    if "Next on the page: " in text:
+        return text.replace("Next on the page: ", "The next date on the page has passed too: ")
+    return text
+
+
 def set_when(ctx: JobContext, payload: dict[str, Any]) -> None:
     if ctx.user_id is None:
         raise PermanentError("save.when needs a user.")

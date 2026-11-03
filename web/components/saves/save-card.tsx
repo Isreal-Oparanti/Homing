@@ -148,6 +148,18 @@ const RESULT: Record<string, { mark: string; tone: string; words: string }> = {
   unknown: { mark: "?", tone: "text-amber", words: "Not known yet" },
 };
 
+const FIRST_FINDINGS = 3;
+
+/** "7 rules · 1 met · 6 to check": the whole list in one line. */
+function ruleSummary(rules: { result: string }[]): string {
+  const count = (r: string) => rules.filter((x) => x.result === r).length;
+  const parts = [`${rules.length} ${rules.length === 1 ? "rule" : "rules"}`];
+  if (count("meets")) parts.push(`${count("meets")} met`);
+  if (count("fails")) parts.push(`${count("fails")} not met`);
+  if (count("unknown")) parts.push(`${count("unknown")} to check`);
+  return parts.join(" · ");
+}
+
 /** The flyer, screenshots or PDF itself, so you can see what you saved. */
 function Files({
   saveId,
@@ -334,6 +346,7 @@ function TrueAnswerView({
   const queryClient = useQueryClient();
   const [summary, setSummary] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [showFindings, setShowFindings] = useState(false);
   const reply = useMutation({
     // Wait for the card's own refresh, so the message and the verdict change together.
     mutationFn: async ({
@@ -482,12 +495,56 @@ function TrueAnswerView({
         <p className="text-sm text-amber">{reply.error.message}</p>
       )}
 
+      {answer.findings.length > 0 && (
+        <ul className="space-y-2.5">
+          {answer.findings
+            .slice(0, showFindings ? undefined : FIRST_FINDINGS)
+            .map((f, i) => (
+              <li key={i}>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
+                  {answer.samePage && f.kind === "left_out"
+                    ? "On the official page"
+                    : (FINDING_KIND[f.kind] ?? f.kind)}
+                </p>
+                <p>{f.point}</p>
+                <blockquote className="mt-1 border-l-2 border-green pl-2.5 text-sm text-ink-2">
+                  “{f.quote}”
+                  {host && (
+                    <span className="mt-0.5 block text-xs text-green">
+                      Found word for word on {host}
+                    </span>
+                  )}
+                </blockquote>
+              </li>
+            ))}
+          {!showFindings && answer.findings.length > FIRST_FINDINGS && (
+            <li>
+              <button
+                type="button"
+                onClick={() => setShowFindings(true)}
+                className="text-sm text-ink-2 underline"
+              >
+                Show {answer.findings.length - FIRST_FINDINGS} more
+              </button>
+            </li>
+          )}
+        </ul>
+      )}
+      {answer.items.length > 0 && <ItemsView items={answer.items} />}
+
       {answer.rules.length > 0 && (
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
-            Who can apply
-          </p>
-          <ul className="mt-1 space-y-2">
+        <details className="group rounded-2xl bg-grey-soft/60 px-3 py-2">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm">
+            <span>
+              <span className="font-semibold">Who can apply</span>
+              <span className="text-ink-2"> · {ruleSummary(answer.rules)}</span>
+            </span>
+            <span className="text-xs text-muted group-open:hidden">Show</span>
+            <span className="hidden text-xs text-muted group-open:inline">
+              Hide
+            </span>
+          </summary>
+          <ul className="mt-2 space-y-2">
             {answer.rules.map((r, i) => {
               const result = RESULT[r.result] ?? RESULT.unknown;
               return (
@@ -524,33 +581,9 @@ function TrueAnswerView({
               );
             })}
           </ul>
-        </div>
+        </details>
       )}
 
-      {answer.items.length > 0 && <ItemsView items={answer.items} />}
-
-      {answer.findings.length > 0 && (
-        <ul className="space-y-2.5">
-          {answer.findings.map((f, i) => (
-            <li key={i}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
-                {answer.samePage && f.kind === "left_out"
-                  ? "On the official page"
-                  : (FINDING_KIND[f.kind] ?? f.kind)}
-              </p>
-              <p>{f.point}</p>
-              <blockquote className="mt-1 border-l-2 border-green pl-2.5 text-sm text-ink-2">
-                “{f.quote}”
-                {host && (
-                  <span className="mt-0.5 block text-xs text-green">
-                    Found word for word on {host}
-                  </span>
-                )}
-              </blockquote>
-            </li>
-          ))}
-        </ul>
-      )}
       {answer.deadline ? (
         <p className="text-sm">
           Official closing date: {answer.deadline.display}
@@ -731,7 +764,10 @@ function Card({ card }: { card: SaveCard }) {
       "Your save");
   // Amounts and requirements only mean something on an opportunity; on a talk they're stray numbers.
   const facts = [
-    ...(what?.keyFacts.dates ?? []).map((d) => d.text),
+    // "closes TOMORROW" was true the day it was posted; When will you need it? gives the date.
+    ...(what?.keyFacts.dates ?? [])
+      .map((d) => d.text)
+      .filter((t) => !/\b(today|tonight|tomorrow|yesterday)\b/i.test(t)),
     ...(what?.isOpportunity
       ? (what.keyFacts.amounts ?? []).map((a) => a.text)
       : []),

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.agents import is_it_true
+from app.agents.when_needed import explain_now
 from app.core.auth import CurrentUser, require_uploader, require_user
 from app.core.errors import AppError
 from app.db.models import Check, Media, Save, Snapshot, User, When
@@ -207,7 +208,7 @@ def when_out(when: When | None, user_tz: str) -> dict[str, Any] | None:
         "due_at": when.due_at,
         "display": display(when.due_at, user_tz) if when.due_at else None,
         "bring_back_at": when.bring_back_at,
-        "explanation": when.explanation,
+        "explanation": explain_now(when, datetime.now(UTC)),
         "source_text": when.source_text,
         "tz_stated": when.tz_stated,
         "time_stated": when.time_stated,

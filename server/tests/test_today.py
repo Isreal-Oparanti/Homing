@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.agents import today as today_agent
 from app.agents.today import act, compose, match_moment, priority
+from app.agents.when_needed import explain_now
 from app.core.auth import CurrentUser
 from app.core.config import Settings, get_settings
 from app.db.models import (
@@ -59,6 +60,21 @@ def test_a_moment_is_read_from_the_persons_words() -> None:
     assert tonight is not None and tonight.at == datetime(2026, 11, 2, 19, 0, tzinfo=UTC)
     assert parse_moment("someday soon", now=NOW, user_tz="Africa/Lagos") is None
     assert parse_moment("interview on 11/12", now=NOW, user_tz="Africa/Lagos") is None
+
+
+def test_a_passed_date_is_told_in_the_past() -> None:
+    def when(text: str, hours: float) -> When:
+        return When(save_id="s", kind="date", due_at=NOW + timedelta(hours=hours), explanation=text)
+
+    post = "Closes Sat 31 Oct, 23:59 Lagos time, if the post is right."
+    assert explain_now(when(post, 5), NOW) == post  # still ahead: as written
+    assert explain_now(when(post, -5), NOW) == (
+        "Closed on Sat 31 Oct, 23:59 Lagos time, if the post was right."
+    )
+    official = "Closes Mon 2 Nov, 09:00 Lagos time, per the official page."
+    assert explain_now(when(official, -1), NOW).startswith("Closed on Mon 2 Nov")
+    event = "On Fri 30 Oct, 18:00 Lagos time, if the post is right."
+    assert explain_now(when(event, -1), NOW) == "That was on Fri 30 Oct, 18:00 Lagos time."
 
 
 # Composing Today -----------------------------------------------------------------------------
