@@ -58,6 +58,8 @@ def _out(find: Find, goal: str | None, tz: str) -> FindOut:
     if find.deadline_at is not None:
         day = find.deadline_at.astimezone(ZoneInfo(tz))
         closes = f"Closes {day:%a} {day.day} {day:%b}"
+    else:
+        closes = "No closing date on the page"
     return FindOut(
         id=find.id,
         goal=goal,

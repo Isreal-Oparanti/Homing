@@ -260,6 +260,7 @@ def test_a_year_in_a_footer_isnt_a_sign_a_call_is_open() -> None:
         "Our 2019 cohort was great. \u00a9 2026 The Fund. All rights reserved.", now
     )
     assert open_this_year("Applications for the 2027 cohort are open now.", now)
+    assert open_this_year("Africa AI Week 2026. EXECUTE AFRICA AI CHALLENGE. Join us.", now)
     assert not open_this_year("Read our 2026 annual report on impact.", now)
 
 

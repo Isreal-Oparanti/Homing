@@ -303,7 +303,30 @@ FIT_WORDS = {
     "needs_your_answer": "one thing to check to see if it fits you",
     "checked": "open to apply; the page doesn't say who can",
 }
-APPLY_WORDS = ("appl", "deadline", "cohort", "call for", "intake", "submission", "register", "open")
+# Words that make a year about a call for applicants, not about a report or a past edition.
+APPLY_WORDS = (
+    "appl",
+    "deadline",
+    "cohort",
+    "call for",
+    "intake",
+    "submission",
+    "register",
+    "open",
+    "challenge",
+    "competition",
+    "prize",
+    "award",
+    "hackathon",
+    "fellowship",
+    "accelerator",
+    "programme",
+    "program",
+    "grant",
+    "edition",
+    "season",
+    "nominat",
+)
 FOOTER_WORDS = ("©", "copyright", "rights reserved")
 
 
@@ -311,7 +334,7 @@ def open_this_year(text: str, now: datetime) -> bool:
     """With no closing date: the page names this year or next beside words about applying.
     A year in a copyright footer says nothing about whether a call is open."""
     for m in re.finditer(rf"\b(?:{now.year}|{now.year + 1})\b", text):
-        near = text[max(0, m.start() - 120) : m.end() + 120].lower()
+        near = text[max(0, m.start() - 160) : m.end() + 160].lower()
         if any(w in near for w in FOOTER_WORDS):
             continue
         if any(w in near for w in APPLY_WORDS):
@@ -420,8 +443,8 @@ def _loop(run: Run, gateway: Any, messages: list[dict[str, Any]]) -> None:
                 result: Any = {"error": "Plan first: call plan before anything else."}
             elif name == "plan":
                 run.plan = args
-                looking = " ".join(str(args.get("looking_for", "")).split())[:200]
-                skip = " ".join(str(args.get("rule_out", "")).split())[:200]
+                looking = " ".join(str(args.get("looking_for", "")).split())[:320]
+                skip = " ".join(str(args.get("rule_out", "")).split())[:320]
                 run.step(
                     "find_planned",
                     f"Plan: looking for {looking}." + (f" Ruling out: {skip}." if skip else ""),
