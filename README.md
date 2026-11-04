@@ -63,7 +63,7 @@ flowchart LR
 The load-bearing mechanisms:
 
 - **Code is the gate.** A quote is kept only if code finds it word for word in the source. A number, only if its quote states it. Dates are read by code, never by a model, in your time zone ("open 1 September to 18 November 2026" closes on 18 November). Who can apply is judged by code against what you told Homing; your profile is never sent to a model.
-- **Muse Wonder works as an agent, three times.** In **Ask** it searches your saves and answers. In **Is it true?** it follows a blog or a post to the organisation's own page. In **What's it for?** it searches the web for more for your goals. Each time it chooses its own steps, and each time code refuses what it can't prove, says why, and sends it back.
+- **Muse Wonder works as an agent, four times.** In **What is it?** it digs when the first read comes back thin (a "this 👇" post, a page that loads blank, a sign-in wall): it follows the save's links or searches, and finds what the save points to. In **Ask** it searches your saves and answers. In **Is it true?** it follows a blog or a post to the organisation's own page. In **What's it for?** it searches the web for more for your goals. Each time it chooses its own steps, and each time code refuses what it can't prove, says why, and sends it back.
 - **It plans, and it learns.** Finding more starts with a plan you can read. Each goal keeps a memory: the searches it ran and what they found, the sites refused and why, what you kept, what you said wasn't for you, and the lesson Wonder wrote at the end of the run. The next run starts from it.
 - **The context stays sharp.** Wonder can only name refs (W1, L12, P2), never type a URL, so words on a page can't send it anywhere. Code ranks a page's links before Wonder sees them, and pages it read a while ago shrink in its context; code always checks against the full page.
 - **It acts on its own.** Keep watching runs at 5 am and 5 pm. It re-reads official pages that can still change. An unchanged page costs no model call. A changed one is checked again, and you're told exactly what changed: "the deadline moved from 12 Nov to 15 Nov".
@@ -99,6 +99,8 @@ sequenceDiagram
 ```
 
 **Is it true?** runs the same way with its own tools: follow the post's links or search, open pages, then `choose_source` or `give_up`. If Wonder chooses a page the post's words aren't really on, code refuses it and Wonder keeps looking. If it runs out of turns, a fixed path takes over, so every save still gets checked.
+
+**What is it?** reads most saves in one Muse Spark pass. Only when that read is thin does Wonder dig, with `web_search`, `open_page`, then `read_this` or `enough` (it can decide the save says all there is). Code accepts a page only if Wonder opened it and it's reached from the save's own links, or names what the save names word for word. That page joins the save's copy and Spark reads it.
 
 **Ask** gives Wonder your saves as its tools (`search_saves`, `open_save`, `submit_answer`): it searches, reads, then answers. Code shows a point only when its quote is found word for word in the save it cites.
 

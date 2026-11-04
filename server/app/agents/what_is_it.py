@@ -4,11 +4,14 @@ See docs/03-agents.md#what-is-it. Never calls a model on a private save, never i
 it couldn't read, and never edits what the user saved.
 """
 
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
 
+from app.agents.read_agent import FOUND_BY, dig, is_thin
+from app.agents.web_tools import Web
 from app.core.config import get_settings
 from app.db.models import AgentEvent, Media, Save, Snapshot, User
 from app.db.repo import saves as saves_repo
@@ -22,6 +25,7 @@ from app.jobs import queue
 from app.jobs.errors import DeferredError, PermanentError
 from app.jobs.runner import JobContext
 from app.llm.gateway import PURPOSES, Attachment, ModelGateway, VideoLink
+from app.llm.search import get_search
 from app.schemas.agents import FileReading, KeyFacts, ListItem, Reading
 from app.storage import get_storage
 from app.verify.dates import display, parse_deadline
@@ -86,6 +90,9 @@ PAUSED = "Paused until tomorrow: today's reading budget is used up."
 gateway_factory: Any = ModelGateway
 fetcher_factory: Any = SafeFetcher
 storage_factory: Any = get_storage
+search_factory: Any = get_search
+
+log = logging.getLogger(__name__)
 
 
 def _read_file(ctx: JobContext, save: Save) -> tuple[Gathered, FileReading | None]:
@@ -370,6 +377,8 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
         if purpose == "read.video" and file_reading is not None:
             # What Spark saw stays in `what`; facts must be words the person or the video said.
             file_reading = _own_facts_only(file_reading, save, snapshots)
+        if file_reading is None:
+            snapshots += _dig_if_thin(ctx, save, snapshots)
         if file_reading is None and save.kind == "link" and not snapshots and not _own_words(save):
             # Nothing came back and the person wrote nothing: a model could only guess.
             _nothing_to_read(ctx, save, gathered)
@@ -409,6 +418,48 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
         raise
 
     _finish(ctx, save, reading, snapshots, purpose)
+
+
+def _dig_if_thin(ctx: JobContext, save: Save, snapshots: list[Snapshot]) -> list[Snapshot]:
+    """One pass reads most saves. When the first read is thin, Muse Wonder digs for what the
+    save points to (read_agent) and the page it finds joins the copy. A re-read reuses the page
+    found before. Any failure means the one-pass read goes ahead, never an error."""
+    found = next(
+        (
+            s
+            for s in ctx.db.scalars(select(Snapshot).where(Snapshot.save_id == save.id))
+            if (s.meta or {}).get("found_by") == FOUND_BY
+        ),
+        None,
+    )
+    if found is not None:
+        return [] if found in snapshots else [found]
+    copies = [s.text for s in snapshots]
+    if not get_settings().read_agent or not is_thin(save, copies):
+        return []
+    ctx.db.commit()  # what's read so far is kept, whatever happens on the web
+    try:
+        dug = dig(
+            ctx,
+            save,
+            copies,
+            gateway=gateway_factory(ctx.db),
+            web=Web(search_factory(), fetcher_factory()),
+        )
+    except DeferredError:
+        raise
+    except Exception:
+        log.exception("read agent failed; the one-pass read goes ahead")
+        ctx.db.rollback()
+        return []
+    if dug is None:
+        return []
+    page = Snapshot(
+        save_id=save.id, kind=dug.kind, source_url=dug.source_url, text=dug.text, meta=dug.meta
+    )
+    ctx.db.add(page)
+    ctx.db.flush()
+    return [page]
 
 
 def _finish(

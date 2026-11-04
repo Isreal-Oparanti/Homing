@@ -108,6 +108,10 @@ PURPOSES: dict[str, Purpose] = {
     "check.agent": Purpose(
         "check.agent", "check_source.v1.md", AskAnswer, 120, "low", model="muse-wonder-1.0"
     ),
+    # What is it? digs with Wonder when a save's first read is thin; code checks its pick.
+    "read.agent": Purpose(
+        "read.agent", "read_agent.v1.md", AskAnswer, 120, "low", model="muse-wonder-1.0"
+    ),
     # The same compare, for a find: billed to the web agents' share of the budget.
     "find.compare": Purpose("find.compare", "check_compare.v2.md", ProposedCheck, 120),
     # What's it for? finds more: Wonder goes on the web for a goal; code is the gate (finds_more).
@@ -131,7 +135,7 @@ class BudgetExceeded(DeferredError):
 
 
 # Their calls come out of the web agents' own share of the budget (see _check_agent_share).
-WEB_AGENT_PURPOSES = ("find.agent", "find.compare", "check.agent")
+WEB_AGENT_PURPOSES = ("find.agent", "find.compare", "check.agent", "read.agent")
 
 
 class AgentShareUsed(Exception):
