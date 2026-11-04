@@ -10,6 +10,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import object_session
@@ -88,8 +89,10 @@ def _searched_candidates(reading: Reading) -> list[str]:
 
 
 def _agent_source(ctx: JobContext, save: Save, reading: Reading) -> tuple[str, SnapshotIn] | None:
-    """Muse Wonder looks for the source of a save the person added; imports keep the fixed
-    path (hundreds at a time). Any failure falls back to the fixed path, never to an error."""
+    """Muse Wonder looks for the source of a save the person added, when the save's own links
+    don't lead to it: a blog, a post, a forwarded message, no link at all. A direct official
+    link takes the fast fixed path; imports always do (hundreds at a time). Any failure falls
+    back to the fixed path, never to an error."""
     if save.import_id or not get_settings().check_agent:
         return None
     try:
@@ -304,14 +307,25 @@ def check(ctx: JobContext, payload: dict[str, Any]) -> None:
     try:
         by_agent = False
         prior = ctx.db.scalar(select(Check).where(Check.save_id == save.id))
+        # Keep watching: what the check said before, to tell the person exactly what changed.
+        before = (
+            (prior.deadline_at, prior.verdict, len(prior.eligibility or []))
+            if payload.get("recheck") and prior is not None
+            else None
+        )
         if payload.get("recheck") and prior is not None and prior.official_url:
             # Keep watching saw the official page change: read the same page again.
             again = _fetch_source(prior.official_url, reading.title, fetcher_factory())
             found = (prior.official_url, again) if again is not None else None
         else:
-            found = _agent_source(ctx, save, reading)
-            by_agent = found is not None
-            found = found or _find_official(save, reading)
+            # The cheapest thing that works first: a direct official link needs no agent.
+            found = _find_official(save, reading) if _candidates(save, reading) else None
+            if found is None:
+                found = _agent_source(ctx, save, reading)
+                by_agent = found is not None
+                found = found or (
+                    None if _candidates(save, reading) else _find_official(save, reading)
+                )
         if found is None:
             tried = _candidates(save, reading)
             if tried:
@@ -387,7 +401,11 @@ def check(ctx: JobContext, payload: dict[str, Any]) -> None:
     official = page.source_url or url
     host = _host(official)
     if not proposed.is_same_opportunity:
-        note = f"The post's link goes to a different page on {host}, so it's unconfirmed."
+        note = (
+            f"The page Homing found on {host} is about something else, so it's unconfirmed."
+            if by_agent
+            else f"The post's link goes to a different page on {host}, so it's unconfirmed."
+        )
         rules = []
         if reading.is_opportunity and len(words_of(save)) >= MIN_POST_CHARS:
             # Still say who it's for, going by the post's (or flyer's) own words.
@@ -410,7 +428,11 @@ def check(ctx: JobContext, payload: dict[str, Any]) -> None:
             user_id=save.user_id,
             agent="true",
             action="couldnt_confirm",
-            summary=f"The post's link on {host} isn't this opportunity's page.",
+            summary=(
+                f"The page found on {host} isn't this opportunity's page."
+                if by_agent
+                else f"The post's link on {host} isn't this opportunity's page."
+            ),
             save_id=save.id,
             evidence=[{"label": "Our copy of the page", "snapshot_id": page.id}],
         )
@@ -468,16 +490,51 @@ def check(ctx: JobContext, payload: dict[str, Any]) -> None:
     evidence += [
         {"label": f["point"], "url": official, "quote": f["quote"]} for f in (gaps or findings)[:3]
     ]
+    action = "checked"
+    if before is not None:
+        changes = what_changed(before, check, user_tz)
+        if changes:
+            action = "changed"
+            summary = f"The official page for {reading.title} changed: " + "; ".join(changes) + "."
+        else:
+            action = "rechecked"
+            summary = f"Re-read {host}: its words changed, but nothing that matters to you did."
     emit(
         ctx.db,
         user_id=save.user_id,
         agent="true",
-        action="checked",
+        action=action,
         summary=summary,
         save_id=save.id,
         evidence=evidence,
     )
     _then_when(ctx, save)
+
+
+def what_changed(before: tuple[datetime | None, str, int], check: Check, user_tz: str) -> list[str]:
+    """What a re-read changed that matters to the person, in plain words."""
+    deadline, verdict, rules = before
+    tz = ZoneInfo(user_tz)
+
+    def day(at: datetime) -> str:
+        local = at.astimezone(tz)
+        return f"{local.day} {local:%b}"
+
+    out = []
+    if check.deadline_at != deadline:
+        if deadline and check.deadline_at:
+            out.append(f"the deadline moved from {day(deadline)} to {day(check.deadline_at)}")
+        elif check.deadline_at:
+            out.append(f"it now gives a deadline: {day(check.deadline_at)}")
+        else:
+            out.append("it no longer gives a deadline")
+    if check.verdict != verdict and check.verdict == "closed":
+        out.append("it's now closed")
+    elif check.verdict != verdict:
+        out.append(f"now {VERDICT_WORDS.get(check.verdict, check.verdict)}")
+    if len(check.eligibility or []) != rules:
+        out.append("who can apply changed")
+    return out
 
 
 # Answers ------------------------------------------------------------------------------------

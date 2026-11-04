@@ -1036,6 +1036,8 @@ export type Find = {
   saveId: string | null;
 };
 
+export type DismissWhy = "wrong_country" | "not_my_stage" | "already_applied" | "not_interested";
+
 type RawFind = Omit<Find, "threadId" | "saveId"> & { thread_id: string | null; save_id: string | null };
 
 function toFind(raw: RawFind): Find {
@@ -1052,8 +1054,12 @@ export const findsApi = {
   async keep(id: string): Promise<Find> {
     return toFind(await api<RawFind>(`finds/${encodeURIComponent(id)}/keep`, { method: "POST" }));
   },
-  async dismiss(id: string): Promise<void> {
-    await api(`finds/${encodeURIComponent(id)}/dismiss`, { method: "POST" });
+  /** Not for me, with an optional reason the next run for this goal rules out. */
+  async dismiss(id: string, why?: DismissWhy): Promise<void> {
+    await api(`finds/${encodeURIComponent(id)}/dismiss`, {
+      method: "POST",
+      body: JSON.stringify({ why: why ?? null }),
+    });
   },
   /** Look on the web for more for this goal now. */
   async findNow(threadId: string): Promise<void> {

@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     model_user_daily_token_budget: int = 1_500_000
     # The demo account is shared by every visitor (judges included), so it gets its own cap.
     model_demo_daily_token_budget: int = 3_000_000
+    # The web agents (finds more, finding a source) have their own smaller share, per person
+    # and for everyone: when it's used up they stop for the day, and nothing else does.
+    model_web_agent_user_daily_token_budget: int = 600_000
+    model_web_agent_daily_token_budget: int = 1_500_000
     spark_max_concurrency: int = 6
 
     # Files: the local disk in development, a private Supabase bucket in production.

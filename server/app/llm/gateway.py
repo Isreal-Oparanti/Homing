@@ -108,9 +108,11 @@ PURPOSES: dict[str, Purpose] = {
     "check.agent": Purpose(
         "check.agent", "check_source.v1.md", AskAnswer, 120, "low", model="muse-wonder-1.0"
     ),
+    # The same compare, for a find: billed to the web agents' share of the budget.
+    "find.compare": Purpose("find.compare", "check_compare.v2.md", ProposedCheck, 120),
     # What's it for? finds more: Wonder goes on the web for a goal; code is the gate (finds_more).
     "find.agent": Purpose(
-        "find.agent", "find_more.v1.md", AskAnswer, 120, "low", model="muse-wonder-1.0"
+        "find.agent", "find_more.v2.md", AskAnswer, 120, "low", model="muse-wonder-1.0"
     ),
     # The whole pile in one long-context call: it sees every save, so it groups them well.
     "place.rebuild": Purpose("place.rebuild", "place_rebuild.v1.md", Rebuild, 300),
@@ -126,6 +128,14 @@ TRANSCRIBE_MAX_CONCURRENCY = 2
 
 class BudgetExceeded(DeferredError):
     """Today's token budget (all users, or this user) is used up. Runs again tomorrow."""
+
+
+# Their calls come out of the web agents' own share of the budget (see _check_agent_share).
+WEB_AGENT_PURPOSES = ("find.agent", "find.compare", "check.agent")
+
+
+class AgentShareUsed(Exception):
+    """The web agents' share of today's budget is used up: they stop, nothing else pauses."""
 
 
 @lru_cache
@@ -209,6 +219,26 @@ class ModelGateway:
                 "Today's model budget is used up.", until=today + timedelta(days=1, minutes=5)
             )
 
+    def _check_agent_share(self, purpose: str, user_id: str | None, input_estimate: int) -> None:
+        """Web agents spend from their own share, so a busy day of finding more can never
+        pause reading, Ask or prep (on the shared demo above all)."""
+        if purpose not in WEB_AGENT_PURPOSES:
+            return
+        today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        used = func.coalesce(ModelCall.tokens_in, 0) + func.coalesce(ModelCall.tokens_out, 0)
+        total, mine = self._db.execute(
+            select(
+                func.coalesce(func.sum(used), 0),
+                func.coalesce(func.sum(used).filter(ModelCall.user_id == user_id), 0),
+            ).where(ModelCall.created_at >= today, ModelCall.purpose.in_(WEB_AGENT_PURPOSES))
+        ).one()
+        estimate = input_estimate + OUTPUT_TOKENS_ESTIMATE
+        s = self._settings
+        if total + estimate > s.model_web_agent_daily_token_budget or (
+            user_id and mine + estimate > s.model_web_agent_user_daily_token_budget
+        ):
+            raise AgentShareUsed("The web agents' share of today's budget is used up.")
+
     def run(
         self,
         purpose: str,
@@ -246,7 +276,9 @@ class ModelGateway:
             VIDEO_TOKENS_ESTIMATE if isinstance(a, VideoLink) else min(len(a.data) // 3, 20_000)
             for a in attachments or []
         )
-        self._check_budget(user_id, (len(instructions) + len(user_text)) // 4 + file_tokens)
+        estimate = (len(instructions) + len(user_text)) // 4 + file_tokens
+        self._check_agent_share(purpose, user_id, estimate)
+        self._check_budget(user_id, estimate)
 
         schema = inline_schema(p.output)
         content: Any = user_text
@@ -341,7 +373,7 @@ class ModelGateway:
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         save_ids: list[str],
-        tool_choice: Any = "auto",
+        effort: str | None = None,
     ) -> Any:
         """One turn of an agent that picks its own tools (Muse Wonder). Returns the assistant
         message (text and tool calls). Budgeted, recorded and credited like every call; not
@@ -352,20 +384,23 @@ class ModelGateway:
         credits.note(model, save_ids)
         version = p.prompt.removesuffix(".md")
         sent = json.dumps(messages, default=str)
+        self._check_agent_share(purpose, user_id, len(sent) // 4)
         self._check_budget(user_id, len(sent) // 4)
         input_hash = hashlib.sha256(f"{model}\n{version}\n{sent}".encode()).hexdigest()
         started = time.perf_counter()
         usage = {"in": 0, "out": 0}
         extra: dict[str, Any] = {}
-        if p.reasoning_effort:
-            extra["reasoning_effort"] = p.reasoning_effort
+        if effort or p.reasoning_effort:
+            extra["reasoning_effort"] = effort or p.reasoning_effort
         try:
             with _semaphore(self._settings.spark_max_concurrency):
                 response = self._client.chat.completions.create(
                     model=model,
                     messages=messages,  # type: ignore[arg-type]
                     tools=tools,  # type: ignore[arg-type]
-                    tool_choice=tool_choice,
+                    # Muse Wonder accepts only "auto": an agent that must call a tool next is
+                    # told so in words, and code enforces the order (e.g. finds_more's plan).
+                    tool_choice="auto",
                     max_tokens=4000,
                     timeout=p.timeout_s,
                     extra_body=extra or None,

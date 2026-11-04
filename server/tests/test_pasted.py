@@ -170,6 +170,12 @@ def test_a_blocked_page_is_read_from_the_text_the_person_pasted(
 
     video = client.post(f"/api/v1/saves/{video_id}/text", json={"text": COPIED}, headers=HEADERS)
     assert video.status_code == 422  # a video takes its transcript instead
+    secret = client.post(
+        f"/api/v1/saves/{page_id}/text",
+        json={"text": "login: me@x.com password: Hunter22!x"},
+        headers=HEADERS,
+    )
+    assert secret.status_code == 422 and secret.json()["error"]["code"] == "looks_private"
     text = "Open call for builders: apply by 20 November. Grants of up to 5,000 euros."
     ok = client.post(f"/api/v1/saves/{page_id}/text", json={"text": text}, headers=HEADERS)
     assert ok.status_code == 202 and ok.json() == {"chars": len(text)}

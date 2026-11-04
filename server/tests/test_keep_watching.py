@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
@@ -70,7 +72,7 @@ def test_a_changed_official_page_is_checked_again(
         assert ("goal.find", None) in jobs  # and What's it for? looks for more for the goal
         said = db.scalar(select(AgentEvent.summary).where(AgentEvent.action == "watched"))
         assert said == (
-            "Kept watching: re-read 1 official page. 1 changed since last time "
+            "Kept watching: re-read 1 official page. 1 had new words "
             "(Lagos Founders Fund), so it's checked again."
         )
         assert save.id
@@ -96,7 +98,40 @@ def test_one_tick_is_always_waiting(sessions: sessionmaker[Session]) -> None:
         keep_watching.start_watching(db)  # the worker restarting doesn't add a second
         ticks = db.scalars(select(Job).where(Job.kind == "watch.tick")).all()
         assert len(ticks) == 1
+        assert ticks[0].run_after == keep_watching.next_watch(datetime.now(UTC))
+        ticks[0].status = "done"  # it ran: the tick queues the next one before anything else
         keep_watching.tick(JobContext(db, 0, "watch.tick", None), {})
         db.commit()
-        nxt = db.scalars(select(Job).where(Job.kind == "watch.tick").order_by(Job.id)).all()[-1]
-        assert nxt.run_after > ticks[0].run_after
+        waiting = db.scalars(
+            select(Job).where(Job.kind == "watch.tick", Job.status == "queued")
+        ).all()
+        assert len(waiting) == 1
+
+
+def test_watching_runs_at_five_in_the_morning_and_evening_lagos_time() -> None:
+    assert keep_watching.next_watch(datetime(2026, 11, 4, 3, 30, tzinfo=UTC)) == datetime(
+        2026, 11, 4, 4, 0, tzinfo=UTC
+    )
+    assert keep_watching.next_watch(datetime(2026, 11, 4, 16, 30, tzinfo=UTC)) == datetime(
+        2026, 11, 5, 4, 0, tzinfo=UTC
+    )
+
+
+def test_a_recheck_says_exactly_what_changed() -> None:
+    from app.agents.is_it_true import what_changed
+
+    before = (datetime(2026, 11, 12, 22, 59, tzinfo=UTC), "fits_you", 2)
+    moved = Check(deadline_at=datetime(2026, 11, 15, 22, 59, tzinfo=UTC), verdict="fits_you")
+    moved.eligibility = [{}, {}]
+    assert what_changed(before, moved, "Africa/Lagos") == [
+        "the deadline moved from 12 Nov to 15 Nov"
+    ]
+    closed = Check(deadline_at=before[0], verdict="closed")
+    closed.eligibility = [{}, {}, {}]
+    assert what_changed(before, closed, "Africa/Lagos") == [
+        "it's now closed",
+        "who can apply changed",
+    ]
+    same = Check(deadline_at=before[0], verdict="fits_you")
+    same.eligibility = [{}, {}]
+    assert what_changed(before, same, "Africa/Lagos") == []

@@ -8,9 +8,10 @@ always. Bounded by MAX_TURNS and the web budgets; None means the fixed path take
 """
 
 import json
+import time
 from typing import Any
 
-from app.agents.web_tools import OPEN_TOOL, SEARCH_TOOL, Web, host_of
+from app.agents.web_tools import OPEN_TOOL, SEARCH_TOOL, Web, host_of, trim_context
 from app.db.models import Reading, Save
 from app.events.emitter import emit
 from app.ingest.gather import SnapshotIn
@@ -21,6 +22,7 @@ from app.verify.quotes import match_quote
 from app.verify.sources import NEVER_OFFICIAL
 
 MAX_TURNS = 8
+RUN_SECONDS = 180  # then the fixed path takes over
 MAX_LINKS_FROM_SAVE = 6
 
 CHOOSE_TOOL = {
@@ -97,15 +99,23 @@ def find_source(
         {"role": "system", "content": gateway.prompt("check.agent")},
         {"role": "user", "content": "SAVE: " + json.dumps(brief, ensure_ascii=False)},
     ]
+    ends = time.monotonic() + RUN_SECONDS
     for turn in range(MAX_TURNS):
+        if time.monotonic() > ends:
+            return None
         last = turn == MAX_TURNS - 1
+        trim_context(messages)
+        if last:
+            # Muse Wonder only takes tool_choice="auto": the last turn is asked for in words.
+            messages.append(
+                {"role": "user", "content": "Last turn: call choose_source or give_up now."}
+            )
         message = gateway.chat_tools(
             "check.agent",
             user_id=save.user_id,
             messages=messages,
             tools=TOOLS,
             save_ids=[save.id],
-            tool_choice={"type": "function", "function": {"name": "give_up"}} if last else "auto",
         )
         messages.append(message.model_dump(mode="json", exclude_none=True))
         calls = message.tool_calls or []

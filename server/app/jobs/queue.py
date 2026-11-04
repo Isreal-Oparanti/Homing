@@ -22,6 +22,8 @@ STUCK_AFTER = timedelta(minutes=15)
 PRIORITY_USER = 10
 PRIORITY_NORMAL = 50
 PRIORITY_BACKLOG = 90
+# Long web-agent jobs: at most one runs at a time (see _CLAIM; kept in sync by test_jobs).
+HEAVY_KINDS = ("goal.find", "watch.user")
 
 
 @dataclass(frozen=True)
@@ -82,6 +84,12 @@ _CLAIM = text(
      WHERE id = (
             SELECT id FROM jobs
              WHERE status = 'queued' AND lane = :lane AND run_after <= now()
+               -- One long web-agent job at a time, so saves, Ask and prep always find a free
+               -- worker thread (HEAVY_KINDS).
+               AND (kind NOT IN ('goal.find', 'watch.user') OR NOT EXISTS (
+                     SELECT 1 FROM jobs busy
+                      WHERE busy.status = 'running' AND busy.lane = :lane
+                        AND busy.kind IN ('goal.find', 'watch.user')))
              ORDER BY priority, run_after, id
              FOR UPDATE SKIP LOCKED
              LIMIT 1)

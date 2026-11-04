@@ -189,9 +189,7 @@ def place(ctx: JobContext, payload: dict[str, Any]) -> None:
     )
     if reading.is_opportunity and not save.import_id:
         # An opportunity saved for a goal: look on the web for more like it (once a day a goal).
-        user = ctx.db.get(User, save.user_id)
-        today = datetime.now(ZoneInfo(user.tz if user else "Africa/Lagos")).date().isoformat()
-        queue_find(ctx.db, save.user_id, thread.id, today=today, priority=queue.PRIORITY_NORMAL)
+        queue_find(ctx.db, save.user_id, thread.id, priority=queue.PRIORITY_NORMAL)
 
 
 def _when_in(save: Save, tz: str) -> str:

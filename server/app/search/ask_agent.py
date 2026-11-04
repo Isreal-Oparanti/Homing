@@ -195,15 +195,20 @@ def run_agent(ctx: JobContext, ask: Ask) -> dict[str, Any] | None:
     ]
     for turn in range(MAX_TURNS):
         last = turn == MAX_TURNS - 1
+        if last:
+            # Muse Wonder only takes tool_choice="auto": the last turn is asked for in words.
+            messages.append(
+                {
+                    "role": "user",
+                    "content": "Last turn: call submit_answer now, with the points that hold up.",
+                }
+            )
         message = gateway.chat_tools(
             "ask.agent",
             user_id=ask.user_id,
             messages=messages,
             tools=TOOLS,
             save_ids=[sv.id for sv, _ in s.refs.values()],
-            tool_choice=(
-                {"type": "function", "function": {"name": "submit_answer"}} if last else "auto"
-            ),
         )
         messages.append(message.model_dump(mode="json", exclude_none=True))
         calls = message.tool_calls or []

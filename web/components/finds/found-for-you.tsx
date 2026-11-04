@@ -6,15 +6,27 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 
 import { ByLine } from "@/components/team/by-line";
-import { findsApi, type AgentEvent, type Find } from "@/lib/api";
+import { findsApi, type AgentEvent, type DismissWhy, type Find } from "@/lib/api";
 import { useEventStream } from "@/lib/events";
+
+const WHY_NOT: [DismissWhy, string][] = [
+  ["wrong_country", "Wrong country"],
+  ["not_my_stage", "Not my stage"],
+  ["already_applied", "Already applied"],
+  ["not_interested", "Not interested"],
+];
 
 function FindRow({ find }: { find: Find }) {
   const queryClient = useQueryClient();
   const done = () => void queryClient.invalidateQueries({ queryKey: ["finds"] });
   const keep = useMutation({ mutationFn: () => findsApi.keep(find.id), onSuccess: done });
-  const dismiss = useMutation({ mutationFn: () => findsApi.dismiss(find.id), onSuccess: done });
+  const dismiss = useMutation({
+    mutationFn: (why?: DismissWhy) => findsApi.dismiss(find.id, why),
+    onSuccess: done,
+  });
+  const [asking, setAsking] = useState(false);
   const busy = keep.isPending || dismiss.isPending;
+  const said = find.quotes.find((q) => q.label === "What the page says");
   return (
     <li className="py-4">
       <p className="text-xs font-semibold uppercase tracking-[0.07em] text-muted">
@@ -23,14 +35,23 @@ function FindRow({ find }: { find: Find }) {
       </p>
       <p className="font-display mt-1 text-lg font-bold leading-snug tracking-[-0.02em]">{find.name}</p>
       <p className="mt-1 text-[15px]">{find.what}</p>
-      <p className="mt-1.5 flex items-center gap-1.5 text-sm font-semibold text-green">
+      {said && (
+        <p className="mt-1 text-sm text-ink-2">
+          On the page: <q>{said.quote}</q>
+        </p>
+      )}
+      <p
+        className={`mt-1.5 flex items-center gap-1.5 text-sm font-semibold ${
+          find.verdict === "fits_you" ? "text-green" : find.verdict === "needs_your_answer" ? "text-amber" : "text-ink-2"
+        }`}
+      >
         <BadgeCheck className="size-4" aria-hidden />
         {find.fit}
       </p>
       <details className="mt-1.5 text-sm text-ink-2">
         <summary className="cursor-pointer">How Homing checked it</summary>
         <ul className="mt-1.5 space-y-1">
-          {find.quotes.map((q) => (
+          {find.quotes.filter((q) => q !== said).map((q) => (
             <li key={q.label}>
               {q.label}: <q>{q.quote}</q>
             </li>
@@ -62,13 +83,40 @@ function FindRow({ find }: { find: Find }) {
         </a>
         <button
           type="button"
-          onClick={() => dismiss.mutate()}
+          onClick={() => setAsking(true)}
           disabled={busy}
+          aria-expanded={asking}
           className="rounded-full px-3 py-1.5 text-sm font-semibold text-ink-2 hover:bg-grey-soft"
         >
           Not for me
         </button>
       </div>
+      {asking && (
+        <div className="mt-2">
+          <p className="text-sm text-ink-2">Why not? Homing rules out the like next time.</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {WHY_NOT.map(([why, label]) => (
+              <button
+                key={why}
+                type="button"
+                onClick={() => dismiss.mutate(why)}
+                disabled={busy}
+                className="glass rounded-full px-3 py-1 text-sm font-semibold"
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => dismiss.mutate(undefined)}
+              disabled={busy}
+              className="rounded-full px-3 py-1 text-sm font-semibold text-ink-2 hover:bg-grey-soft"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      )}
       {(keep.isError || dismiss.isError) && (
         <p className="mt-1 text-sm text-red">{(keep.error ?? dismiss.error)?.message}</p>
       )}

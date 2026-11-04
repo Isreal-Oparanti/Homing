@@ -591,6 +591,14 @@ def paste_page_text(
         raise AppError("private", "Private saves are never sent to AI.", status=409)
     if save.kind != "link" or save.platform == "youtube":
         raise AppError("not_a_page", "Text can be added to a saved web page or post.", status=422)
+    if screen(body.text).private:
+        # The same check every save gets: what looks private never goes to AI.
+        raise AppError(
+            "looks_private",
+            "That text looks private (a password, code or account number). "
+            "Homing never sends private text to AI, so it wasn't added.",
+            status=422,
+        )
     snapshot = Snapshot(
         save_id=save.id,
         kind="pasted_text",

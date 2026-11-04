@@ -364,10 +364,23 @@ Wonder only ever names refs: W1 for a search result, L12 for a link on a page it
 
 Code keeps a `goal.find` proposal only when all of these hold:
 - It's the organisation's own page, and the name is on it word for word.
-- Every number in the summary is on the page.
+- The summary comes with a quote from the page, word for word, and every number in the summary is in that quote. The card shows the quote.
 - The page doesn't say it's closed.
-- The closing date, read by code and stated with a year, is ahead. With no date given, the page must name this year or next.
-- Who can apply is judged by code against the profile, and the profile never goes to Wonder. A find that isn't for the person is left out quietly.
+- The closing date, read by code and stated with a year, is ahead. With no date given, the page must name this year or next beside words about applying; a year in a copyright footer doesn't count.
+- Who can apply is judged by code against the profile, and the profile never goes to Wonder. A find that isn't for the person is left out quietly. A page that doesn't say who can apply is shown as "Open to apply · the page doesn't say who can", never as "Fits you".
+
+How finds more thinks:
+- **It plans first.** Its first step is always a plan you can read in Your agents: what it's looking for, for whom and where, and what it will rule out. That turn gets more thinking time (`effort="medium"`); the steps after it stay fast.
+- **It remembers each goal** (`agents/goal_memory.py`, kept in `agent_memory`). It keeps:
+  - the searches it ran, and how many finds each one led to;
+  - the sites Homing refused, and why;
+  - what you kept;
+  - what you said **Not for me** to, with your one-tap reason (*wrong country · not my stage · already applied · not interested*);
+  - the one-line lesson it wrote for itself at the end of each run.
+
+  The next run starts from all of this. It doesn't repeat searches that found nothing, it skips refused sites, and it rules out things like the ones you dismissed.
+- **It sees links ranked, not raw.** Before Wonder reads a page's links, code drops menus, footers, tag pages, logins, social links and opportunity blogs. Links that leave the site come first, because a blog links out to the official page. Links about applying come next. That way its few page opens go where the source usually is.
+- **Its memory is kept short.** Older page texts shrink to their opening lines once read. Its leads, its links and its latest 3 pages stay whole. Code still checks against the full page.
 
 The limits:
 - **Turns:** at most 12 for finds more, 8 for finding a source.

@@ -1,4 +1,4 @@
-"""Keep watching: every 12 hours the agents look again, without being asked.
+"""Keep watching: twice a day (5 am and 5 pm Lagos) the agents look again, without being asked.
 
 - Is it true? re-reads the official pages of saves that can still change (not closed, not
   ruled out, closing date ahead). Code compares each page with our last copy: unchanged costs
@@ -11,7 +11,7 @@ One `watch.tick` job is always waiting: the worker makes sure of it at start, an
 queues the next. Each tick queues one `watch.user` job per person active lately.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -24,7 +24,7 @@ from app.events.emitter import emit
 from app.jobs import queue
 from app.jobs.runner import JobContext
 
-EVERY = timedelta(hours=12)
+WATCH_AT = (time(5, 0), time(17, 0))  # Lagos time
 ACTIVE_FOR = timedelta(days=45)
 MAX_PAGES = 15
 MAX_GOALS = 3
@@ -36,12 +36,39 @@ def start_watching(db: Any) -> None:
         select(Job.id).where(Job.kind == "watch.tick", Job.status.in_(("queued", "running")))
     )
     if waiting is None:
-        queue.enqueue(db, "watch.tick", {}, priority=queue.PRIORITY_BACKLOG, max_attempts=1)
+        _queue_tick(db, next_watch(datetime.now(UTC)))
         db.commit()
+
+
+def next_watch(now: datetime) -> datetime:
+    """The next of WATCH_AT in Lagos time: early morning, so "while you slept" is literal."""
+    lagos = ZoneInfo("Africa/Lagos")
+    local = now.astimezone(lagos)
+    for days in (0, 1):
+        for at in WATCH_AT:
+            when = datetime.combine(local.date() + timedelta(days=days), at, tzinfo=lagos)
+            if when > local:
+                return when.astimezone(UTC)
+    raise AssertionError("unreachable")
+
+
+def _queue_tick(db: Any, when: datetime) -> None:
+    queue.enqueue(
+        db,
+        "watch.tick",
+        {},
+        priority=queue.PRIORITY_BACKLOG,
+        run_after=when,
+        dedupe_key=f"watch:tick:{when:%Y%m%d%H}",
+        max_attempts=1,
+    )
 
 
 def tick(ctx: JobContext, payload: dict[str, Any]) -> None:
     now = datetime.now(UTC)
+    # The next tick first: if anything below fails, watching still goes on.
+    _queue_tick(ctx.db, next_watch(now))
+    ctx.db.commit()
     users = ctx.db.scalars(
         select(Save.user_id).where(Save.created_at > now - ACTIVE_FOR).group_by(Save.user_id)
     ).all()
@@ -55,16 +82,6 @@ def tick(ctx: JobContext, payload: dict[str, Any]) -> None:
             dedupe_key=f"watch:{user_id}:{now:%Y%m%d%H}",
             max_attempts=2,
         )
-    nxt = now + EVERY
-    queue.enqueue(
-        ctx.db,
-        "watch.tick",
-        {},
-        priority=queue.PRIORITY_BACKLOG,
-        run_after=nxt,
-        dedupe_key=f"watch:tick:{nxt:%Y%m%d%H}",
-        max_attempts=1,
-    )
 
 
 def _same(a: str, b: str) -> bool:
@@ -116,7 +133,7 @@ def _recheck_pages(ctx: JobContext, user: User, now: datetime) -> None:
     if changed:
         names = ", ".join(changed[:3]) + (" and more" if len(changed) > 3 else "")
         they = "it's" if len(changed) == 1 else "they're"
-        said += f"{len(changed)} changed since last time ({names}), so {they} checked again."
+        said += f"{len(changed)} had new words ({names}), so {they} checked again."
     else:
         said += "Nothing changed."
     if gone:
@@ -149,6 +166,5 @@ def watch_user(ctx: JobContext, payload: dict[str, Any]) -> None:
         return
     now = datetime.now(UTC)
     _recheck_pages(ctx, user, now)
-    today = now.astimezone(ZoneInfo(user.tz)).date().isoformat()
     for thread_id in _goals_to_grow(ctx, user):
-        queue_find(ctx.db, user.id, thread_id, today=today, priority=queue.PRIORITY_BACKLOG)
+        queue_find(ctx.db, user.id, thread_id, priority=queue.PRIORITY_BACKLOG)

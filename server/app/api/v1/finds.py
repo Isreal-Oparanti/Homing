@@ -3,20 +3,21 @@
 Keep turns a find into an ordinary save, so every agent reads it like anything else saved.
 """
 
-from datetime import UTC, datetime
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.agents import goal_memory
 from app.agents.finds_more import queue_find
 from app.agents.web_tools import host_of
 from app.core.auth import CurrentUser, require_user
 from app.core.errors import AppError
-from app.db.models import Find, Thread, User
+from app.db.models import AgentEvent, Find, Thread, User
 from app.db.repo import saves as saves_repo
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
@@ -25,10 +26,12 @@ from app.jobs import queue
 
 router = APIRouter(tags=["finds"])
 
+TAPS_A_DAY = 3  # Find more runs a goal can have in a day: web agents cost real money
+
 FIT = {
     "fits_you": "Fits you",
-    "needs_your_answer": "One question to see if it fits you",
-    "checked": "Open to apply",
+    "needs_your_answer": "Check one thing to see if it fits you",
+    "checked": "Open to apply · the page doesn't say who can",
 }
 
 
@@ -120,6 +123,10 @@ def keep(
     assert me is not None
     find = _get(db, user.id, find_id)
     if find.save_id is None:
+        if find.thread_id:
+            goal_memory.remember(
+                db, user.id, find.thread_id, kept=[{"name": find.name, "site": host_of(find.url)}]
+            )
         save = saves_repo.new_save_from_text(user.id, find.url, origin="found")
         db.add(save)
         db.flush()
@@ -148,18 +155,35 @@ def keep(
     return _out(find, goal, me.tz)
 
 
+class DismissIn(BaseModel):
+    why: Literal["wrong_country", "not_my_stage", "already_applied", "not_interested"] | None = None
+
+
 @router.post("/finds/{find_id}/dismiss", status_code=204)
 def dismiss(
-    find_id: str, user: CurrentUser = Depends(require_user), db: Session = Depends(get_db)
+    find_id: str,
+    body: DismissIn | None = None,
+    user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db),
 ) -> None:
+    """Not for me, with an optional reason: the next run for this goal rules out the like."""
     find = _get(db, user.id, find_id)
     find.state = "dismissed"
+    why = body.why if body else None
+    if find.thread_id:
+        goal_memory.remember(
+            db,
+            user.id,
+            find.thread_id,
+            dismissed=[{"name": find.name, "site": host_of(find.url), "why": why}],
+        )
+    reason = f" ({goal_memory.WHY_NOT[why]})" if why else ""
     emit(
         db,
         user_id=user.id,
         agent="for",
         action="find_dismissed",
-        summary=f"Not for you: {find.name}. Won't suggest it again.",
+        summary=f"Not for you: {find.name}{reason}. Next time Homing rules out the like.",
         thread_id=find.thread_id,
         models=[],
     )
@@ -177,7 +201,22 @@ def find_now(
     thread = db.get(Thread, thread_id)
     if thread is None or thread.user_id != user.id:
         raise AppError("thread_not_found", "That goal doesn't exist.", status=404)
-    today = datetime.now(ZoneInfo(me.tz)).date().isoformat()
-    queue_find(db, user.id, thread.id, today=today, priority=queue.PRIORITY_USER, asked=True)
+    since = datetime.now(UTC) - timedelta(hours=24)
+    runs = db.scalar(
+        select(func.count())
+        .select_from(AgentEvent)
+        .where(
+            AgentEvent.thread_id == thread.id,
+            AgentEvent.action == "find_started",
+            AgentEvent.created_at > since,
+        )
+    )
+    if (runs or 0) >= TAPS_A_DAY:
+        raise AppError(
+            "looked_enough",
+            "Homing already looked for this goal a few times today. It looks again overnight.",
+            status=429,
+        )
+    queue_find(db, user.id, thread.id, priority=queue.PRIORITY_USER, asked=True)
     db.commit()
     return {"queued": True}
