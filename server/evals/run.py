@@ -141,6 +141,29 @@ def finds_gate() -> list[str]:
     ]
 
 
+# What a refusal says (agents/finds_more.py `_gate`), grouped into plain reasons. The step's
+# text is "Homing refused <name>: <problem>.", and a name or a quoted date can hold a colon.
+REFUSAL_KINDS = (
+    ("open this year", "No sign it's open this year"),
+    ("closed", "It's closed, or its deadline has passed"),
+    ("isn't the organisation's own site", "Not the organisation's own site"),
+    ("lists many opportunities", "A page listing many opportunities"),
+    ("isn't a page for that one", "Not the page for that one opportunity"),
+    ("word for word", "A quote isn't on the page word for word"),
+    ("a number its quote", "Uses a number its quote doesn't state"),
+    ("already in their saves", "Already in the person's saves"),
+    ("Already found", "Already found before"),
+    ("doesn't name", "The page doesn't name it"),
+)
+
+
+def _refusal_kind(said: str) -> str:
+    for marker, kind in REFUSAL_KINDS:
+        if marker in said:
+            return kind
+    return said.split(": ", 1)[-1].rstrip(".")
+
+
 def finds_runs() -> list[str]:
     with session_factory()() as db:
         counts = dict(
@@ -160,9 +183,9 @@ def finds_runs() -> list[str]:
     runs = counts.get("find_started", 0)
     reasons: dict[str, int] = {}
     for said in why:
-        reason = said.split(": ", 1)[-1].rstrip(".")
+        reason = _refusal_kind(" ".join(said.split()))
         reasons[reason] = reasons.get(reason, 0) + 1
-    top = sorted(reasons.items(), key=lambda kv: -kv[1])[:6]
+    top = sorted(reasons.items(), key=lambda kv: -kv[1])
     return [
         "## 5. Finding more on real runs",
         "",

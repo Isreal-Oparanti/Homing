@@ -114,8 +114,8 @@ What you would have seen if the model's output went straight to you, against wha
 |---|---|---|
 | 12 real opportunity pages, labelled by hand | all 12 shown, **9 of them wrong** (closed, last year's, a list, a blog, no open call) | **3 shown, all 3 right** |
 | Find more, live runs | 17 shown, **15 that failed a check** (closed, last year's, a list, not the official site, not for you) | **2 shown** |
-| Prep sheets, tips from saved videos | 45 tips, **1 pointing at a second where it isn't said** | **44 tips**, each at the right second |
-| Ask, quotes in answers | 68 quotes | **68 of 68** found word for word in the save |
+| Prep sheets, tips from saved videos | 80 tips, **2 pointing at a second where they aren't said** | **78 tips**, each at the right second |
+| Ask, quotes in answers | 65 quotes | **65 of 65** found word for word in the save |
 
 The gate is strict on purpose: a run that keeps nothing beats one that shows you a call that already closed.
 
