@@ -8,7 +8,7 @@
 
 Built for the **Meta Global AI Developer Hackathon · Indie track**. Every model call runs on Meta's models (**Muse Spark**, **Muse Wonder**, **Muse Voice Transcribe**) through one gateway, `server/app/llm/gateway.py`. No other model provider, ever.
 
-**Live:** https://homing-rho.vercel.app (press **Try the demo**) · **Video:** _link added at submission_
+**Live:** https://homing-rho.vercel.app (press **Try the demo**) · **Video:** https://youtu.be/n3XILic3pms
 
 ## Why
 
