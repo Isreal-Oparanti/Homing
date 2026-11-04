@@ -1,10 +1,14 @@
 # Homing evaluation
 
-_Run 04 Nov 2026, 14:28. Every number below is computed by `evals/run.py` from fixed test sets or the stored record of real runs._
+_Run 04 Nov 2026, 23:19. Every number below is computed by `evals/run.py` from fixed test sets or the stored record of real runs._
 
 ## 1. Reading dates
 
-**30 of 30 right** (100%). Each phrase was read as of when it was written, in Lagos time; the right answer was worked out by hand. No model: dates are read by code.
+**29 of 30 right** (96%). Each phrase was read as of when it was written, in Lagos time; the right answer was worked out by hand. No model: dates are read by code.
+
+| Phrase | Right answer | Homing read |
+|---|---|---|
+| APRIL 6TH - MAY 11TH | no date | 2026-05-11 22:59Z |
 
 ## 2. Search by meaning
 
@@ -30,29 +34,30 @@ _Run 04 Nov 2026, 14:28. Every number below is computed by `evals/run.py` from f
 
 ## 3. What the checks did on real runs
 
-- **Ask:** 11 answers. The model proposed 68 points from 313 candidate saves; code found 68 quotes word for word in the cited save and dropped 0.
-- **Prep sheets:** 1 sheet. Of 45 points taken from videos, 44 were found in the captions at the stated second and 1 was dropped.
+- **Ask:** 10 answers. The model proposed 65 points from 302 candidate saves; code found 65 quotes word for word in the cited save and dropped 0.
+- **Prep sheets:** 2 sheets. Of 80 points taken from videos, 78 were found in the captions at the stated second and 2 were dropped.
 
-**Model use so far:** 654 calls, 2,708,278 tokens in all.
+**Model use so far:** 799 calls, 4,049,369 tokens in all.
 
 | Purpose | Calls | Tokens per call |
 |---|---|---|
-| read.text | 183 | 2,618 |
-| place.assign | 174 | 1,809 |
-| check.compare | 94 | 6,477 |
+| read.text | 185 | 2,620 |
+| place.assign | 176 | 1,803 |
+| find.agent | 109 | 9,960 |
+| check.compare | 102 | 6,689 |
 | read.batch | 37 | 6,094 |
+| video.points | 36 | 8,688 |
 | transcribe.voice | 31 | not reported |
-| video.points | 30 | 8,258 |
 | read.file | 24 | 3,302 |
-| find.agent | 18 | 9,191 |
-| ask.agent | 17 | 6,485 |
+| find.compare | 24 | 9,822 |
+| ask.agent | 21 | 6,388 |
 | read.video | 14 | 9,022 |
+| check.agent | 9 | 3,355 |
 | place.rebuild | 9 | 21,339 |
-| prep.sheet | 7 | 10,310 |
-| ask.answer | 5 | 8,005 |
+| prep.sheet | 8 | 10,639 |
 | ask.select | 5 | 2,494 |
-| find.compare | 3 | 9,928 |
-| when.match_moment | 3 | 1,388 |
+| ask.answer | 5 | 8,005 |
+| when.match_moment | 4 | 1,383 |
 
 ## 4. The finds gate on real pages
 
@@ -75,11 +80,11 @@ _Run 04 Nov 2026, 14:28. Every number below is computed by `evals/run.py` from f
 
 ## 5. Finding more on real runs
 
-2 runs of What's it for? on the web so far: **1 finds kept**, 5 proposals refused by code, 0 left out as not for the person. Every refusal is a proposal the person never saw.
+7 runs of What's it for? on the web so far: **2 finds kept**, 14 proposals refused by code, 1 left out as not for the person. Every refusal is a proposal the person never saw.
 
 | Why code refused | Times |
 |---|---|
-| The page gives no sign it's open this year | 2 |
-| That one is already in their saves | 1 |
-| The name quote isn't on P2 word for word | 1 |
-| The name quote isn't on the careers.twosigma.com page word for word | 1 |
+| No sign it's open this year | 8 |
+| It's closed, or its deadline has passed | 3 |
+| The page doesn't name it | 2 |
+| Uses a number its quote doesn't state | 1 |

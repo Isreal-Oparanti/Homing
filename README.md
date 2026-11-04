@@ -113,7 +113,7 @@ What you would have seen if the model's output went straight to you, against wha
 | Where | Without the gate | With the gate |
 |---|---|---|
 | 12 real opportunity pages, labelled by hand | all 12 shown, **9 of them wrong** (closed, last year's, a list, a blog, no open call) | **3 shown, all 3 right** |
-| Find more, live runs | 17 shown, **15 that failed a check** (closed, last year's, a list, not the official site, not for you) | **2 shown** |
+| Find more, live runs | 17 shown, **15 that failed a check** (no sign it's open this year, closed, not named on the page, a number its quote doesn't state, not for you) | **2 shown** |
 | Prep sheets, tips from saved videos | 80 tips, **2 pointing at a second where they aren't said** | **78 tips**, each at the right second |
 | Ask, quotes in answers | 65 quotes | **65 of 65** found word for word in the save |
 
