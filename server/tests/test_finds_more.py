@@ -358,3 +358,30 @@ def test_the_agents_refs_never_reach_the_person() -> None:
         "The name quote isn't on the acceler8.africa page word for word"
     )
     assert plain("Open W1, not P9", web) == "Open the example.org page, not that page"
+
+
+def test_code_finds_the_name_on_the_page_itself() -> None:
+    from app.agents.finds_more import named_on
+
+    page = "Welcome to the ACCELERATE  AFRICA programme. Apply by 30 November 2026."
+    assert named_on(page, "Accelerate Africa", "a quote Wonder got wrong") == "ACCELERATE  AFRICA"
+    assert named_on(page, "Lagos Fund", "nothing like it") is None
+
+
+def test_the_traps_the_live_runs_met() -> None:
+    from app.agents.finds_more import is_list_page, open_this_year
+    from app.verify.status import is_closed
+
+    now = datetime(2026, 11, 4, tzinfo=UTC)
+    # "Our 2026 submissions are now closed!" (socialshifters.co)
+    assert is_closed("Our 2026 submissions are now closed! What's in it for you?")
+    # Last edition: every date has passed and no later year is named (Google for Startups)
+    past = "The accelerator will kick off in April 2026 and run until June, 2026. Apply."
+    assert not open_this_year(past, now)
+    assert open_this_year("Applications for the 2027 intake open on 29 September 2026.", now)
+    # A list of calls is a lead, never a find (menterprise.africa); YC's own page isn't a list
+    assert is_list_page("A [Deadline: Oct 6] B [Deadline: Oct 7] C [Deadline: Nov 1]")
+    assert not is_list_page(
+        "The deadline to apply on-time was November 2. If you applied before the deadline, "
+        "you'll hear by December 11. If you apply after the deadline, we'll still consider it."
+    )

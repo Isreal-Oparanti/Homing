@@ -27,7 +27,7 @@ from app.jobs.runner import JobContext
 WATCH_AT = (time(5, 0), time(17, 0))  # Lagos time
 ACTIVE_FOR = timedelta(days=45)
 MAX_PAGES = 15
-MAX_GOALS = 3
+MAX_GOALS = 2
 
 
 def start_watching(db: Any) -> None:

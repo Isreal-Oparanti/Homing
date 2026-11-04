@@ -4,6 +4,8 @@ Keys look like `u/{user_id}/{sha256}.{ext}` (docs/02-data-model.md · media). On
 reads and writes them; models get the bytes inline, never a public link.
 """
 
+import logging
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Protocol
@@ -11,6 +13,13 @@ from typing import Protocol
 import httpx
 
 from app.core.config import Settings, get_settings
+
+log = logging.getLogger(__name__)
+PUT_RETRIES = (0, 1.0, 3.0)  # seconds to wait before each try
+
+
+class StorageError(Exception):
+    """The file couldn't be stored, even after trying again. The message is for our logs."""
 
 
 class Storage(Protocol):
@@ -73,13 +82,26 @@ class SupabaseStorage:
         return True
 
     def put(self, key: str, data: bytes, mime: str) -> None:
-        res = httpx.post(
-            f"{self.base}/{key}",
-            content=data,
-            headers={**self.headers, "Content-Type": mime, "x-upsert": "true"},
-            timeout=60,
-        )
-        res.raise_for_status()
+        """Store the file, trying again on a passing failure (Supabase has answered a valid
+        upload with 400 once, then taken the same file a minute later)."""
+        why = ""
+        for wait in PUT_RETRIES:
+            time.sleep(wait)
+            try:
+                res = httpx.post(
+                    f"{self.base}/{key}",
+                    content=data,
+                    headers={**self.headers, "Content-Type": mime, "x-upsert": "true"},
+                    timeout=60,
+                )
+            except httpx.HTTPError as exc:
+                why = f"{type(exc).__name__}: {exc}"
+                continue
+            if res.is_success:
+                return
+            why = f"{res.status_code}: {res.text[:300]}"
+            log.warning("storage put failed", extra={"key": key, "why": why})
+        raise StorageError(why)
 
     def get(self, key: str) -> bytes:
         res = httpx.get(f"{self.base}/{key}", headers=self.headers, timeout=60)

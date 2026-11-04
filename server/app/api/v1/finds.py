@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.agents import goal_memory
@@ -17,7 +17,7 @@ from app.agents.finds_more import queue_find
 from app.agents.web_tools import host_of
 from app.core.auth import CurrentUser, require_user
 from app.core.errors import AppError
-from app.db.models import AgentEvent, Find, Thread, User
+from app.db.models import AgentEvent, Find, Job, Thread, User
 from app.db.repo import saves as saves_repo
 from app.db.repo.users import ensure_user
 from app.db.session import get_db
@@ -88,19 +88,26 @@ def list_finds(
     user: CurrentUser = Depends(require_user),
     db: Session = Depends(get_db),
 ) -> list[FindOut]:
-    """New finds whose closing date hasn't passed, soonest first."""
+    """New finds whose closing date hasn't passed: what fits you first, then soonest first."""
     ensure_user(db, user)
     me = db.get(User, user.id)
     assert me is not None
     now = datetime.now(UTC)
-    where = [Find.user_id == user.id, Find.state == "new"]
+    where = [Find.user_id == user.id, Find.state == "new", Find.verdict != "not_for_you"]
     if thread_id:
         where.append(Find.thread_id == thread_id)
     rows = db.execute(
         select(Find, Thread.title)
         .outerjoin(Thread, Thread.id == Find.thread_id)
         .where(*where)
-        .order_by(Find.deadline_at.asc().nulls_last(), Find.created_at.desc())
+        # Best first: what fits you, then what needs one check, then the rest; soonest first.
+        .order_by(
+            case(
+                (Find.verdict == "fits_you", 0), (Find.verdict == "needs_your_answer", 1), else_=2
+            ),
+            Find.deadline_at.asc().nulls_last(),
+            Find.created_at.desc(),
+        )
         .limit(20)
     ).all()
     return [
@@ -222,3 +229,19 @@ def find_now(
     queue_find(db, user.id, thread.id, priority=queue.PRIORITY_USER, asked=True)
     db.commit()
     return {"queued": True}
+
+
+@router.get("/threads/{thread_id}/find")
+def find_status(
+    thread_id: str, user: CurrentUser = Depends(require_user), db: Session = Depends(get_db)
+) -> dict[str, bool]:
+    """Whether What's it for? is looking on the web for this goal right now (or about to)."""
+    thread = db.get(Thread, thread_id)
+    if thread is None or thread.user_id != user.id:
+        raise AppError("thread_not_found", "That goal doesn't exist.", status=404)
+    busy = db.scalar(
+        select(Job.id).where(
+            Job.dedupe_key == f"find:{thread_id}", Job.status.in_(("queued", "running"))
+        )
+    )
+    return {"looking": busy is not None}

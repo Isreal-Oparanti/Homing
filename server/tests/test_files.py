@@ -30,7 +30,7 @@ from app.schemas.agents import (
     ProposedRule,
     Reading,
 )
-from app.storage import LocalStorage, get_storage
+from app.storage import LocalStorage, StorageError, get_storage
 
 ALICE = CurrentUser(id="u-alice", email="alice@example.com")
 HEADERS = {
@@ -252,6 +252,21 @@ def test_the_same_file_twice_is_stored_once(client: TestClient, tmp_path: Path) 
     _upload(client, [("a.png", png)])
     _upload(client, [("b.png", png)])
     assert len(list(tmp_path.rglob("*.png"))) == 1
+
+
+class DownStorage:
+    def put(self, key: str, data: bytes, mime: str) -> None:
+        raise StorageError("400: storage said no")
+
+
+@pytest.mark.integration
+def test_a_storage_failure_says_so_instead_of_looking_like_the_server_is_down(
+    client: TestClient,
+) -> None:
+    client.app.dependency_overrides[get_storage] = DownStorage  # type: ignore[attr-defined]
+    res = _upload(client, [("cv.pdf", _pdf_with_text("Israel Oparanti CV"))])
+    assert res.status_code == 503
+    assert res.json()["error"]["message"].startswith("Homing couldn't store your file just now")
 
 
 @pytest.mark.integration

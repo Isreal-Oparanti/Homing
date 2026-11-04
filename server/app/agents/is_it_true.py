@@ -18,7 +18,7 @@ from sqlalchemy.orm import object_session
 from app.agents.source_agent import find_source
 from app.agents.web_tools import Web
 from app.core.config import get_settings
-from app.db.models import Check, Profile, Reading, Save, Snapshot, User
+from app.db.models import Check, Find, Profile, Reading, Save, Snapshot, User
 from app.db.repo import saves as saves_repo
 from app.events.emitter import emit
 from app.ingest.ats import is_workable, read_workable
@@ -578,6 +578,19 @@ def _set_profile(profile: Profile, qid: str, value: Any) -> None:
         raise BadAnswer("We don't know that question.")
 
 
+def rejudge_finds(db: Any, user_id: str) -> None:
+    """What What's it for? found on the web, judged again by code against what the person
+    just told Homing: one that turns out not to be for them leaves the list."""
+    facts = facts_for(db, user_id, None)
+    now = datetime.now(UTC)
+    for find in db.scalars(select(Find).where(Find.user_id == user_id, Find.state == "new")):
+        if not find.rules:
+            continue  # the page doesn't say who can apply: nothing to judge
+        judged = assess(find.rules, facts, ref_year=(find.deadline_at or now).year).rules
+        find.rules = judged
+        find.verdict = decide(closed=False, past_deadline=False, source_opened=True, rules=judged)
+
+
 def rejudge_all(db: Any, user_id: str) -> list[tuple[Check, str, str]]:
     """Re-judge every opportunity by code. Returns (check, old verdict, new verdict) changes."""
     checks = db.scalars(
@@ -621,6 +634,7 @@ def answer(db: Any, user_id: str, save_id: str, qid: str, value: Any) -> str:
             db.add(profile)
         _set_profile(profile, qid, value)
     db.flush()
+    rejudge_finds(db, user_id)
     changed = rejudge_all(db, user_id)
     counts = Counter(new for _, _, new in changed)
     if not changed:
@@ -671,6 +685,7 @@ def update_profile(db: Any, user_id: str, qid: str, value: Any) -> None:
     else:
         _set_profile(profile, qid, value)
     db.flush()
+    rejudge_finds(db, user_id)
     changed = rejudge_all(db, user_id)
     if changed:
         things = "opportunity" if len(changed) == 1 else "opportunities"

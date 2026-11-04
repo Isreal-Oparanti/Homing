@@ -128,26 +128,45 @@ function FindRow({ find }: { find: Find }) {
  * On a goal's page, `threadId` narrows it to that goal and adds Find more. */
 export function FoundForYou({ threadId }: { threadId?: string }) {
   const queryClient = useQueryClient();
-  const [looking, setLooking] = useState(false);
   const { data } = useQuery({
     queryKey: ["finds", threadId ?? "all"],
     queryFn: () => findsApi.list(threadId),
   });
+  // Asked of the server, so "Looking now" is still there after leaving the page and coming back.
+  const status = useQuery({
+    queryKey: ["finding", threadId],
+    queryFn: () => findsApi.looking(threadId ?? ""),
+    enabled: Boolean(threadId),
+  });
+  const looking = status.data ?? false;
   const onEvent = useCallback(
     (event: AgentEvent) => {
       if (event.agent !== "for" || (threadId && event.threadId !== threadId)) return;
       if (event.action === "found") void queryClient.invalidateQueries({ queryKey: ["finds"] });
-      if (event.action === "find_done") setLooking(false);
+      if (event.action === "find_done" || event.action === "find_started") {
+        void queryClient.invalidateQueries({ queryKey: ["finding", threadId] });
+      }
     },
     [queryClient, threadId],
   );
   useEventStream(onEvent);
   const findNow = useMutation({
     mutationFn: () => findsApi.findNow(threadId ?? ""),
-    onSuccess: () => setLooking(true),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["finding", threadId] }),
   });
   const finds = data ?? [];
-  if (!threadId && finds.length === 0) return null;
+  if (!threadId && finds.length === 0) {
+    return (
+      <p className="mt-5 px-1 text-sm text-muted">
+        Every morning, What&apos;s it for? looks on the web for more for your goals, and keeps only what
+        it checked on the organisation&apos;s own page. Open a goal in{" "}
+        <Link href="/threads" className="font-semibold underline">
+          Threads
+        </Link>{" "}
+        to look now.
+      </p>
+    );
+  }
   return (
     <section className="mt-5">
       <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.07em] text-muted">

@@ -5,18 +5,23 @@ Run from server/: python -m uv run python -m evals.run
 1. Dates: real and post-style date phrases, each with the answer worked out by hand.
 2. Search: questions about Isreal's pile and the saves that should come back.
 3. Verification and cost on real runs: what the models proposed, what code kept, tokens.
+4. The finds gate: real recorded pages, labelled by hand, through code's checks.
+5. Finding more on real runs: finds kept and why code refused the rest.
 """
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import func, select
 
-from app.db.models import Ask, Card, ModelCall
+from app.agents.finds_more import _official_host, is_list_page, named_on, open_this_year
+from app.agents.web_tools import host_of
+from app.db.models import AgentEvent, Ask, Card, ModelCall
 from app.db.session import session_factory
 from app.search.hybrid import search
 from app.verify.dates import parse_deadline
+from app.verify.status import is_closed
 
 HERE = Path(__file__).parent
 OWNER = "google:103295685264461966275"
@@ -88,6 +93,91 @@ def searches() -> list[str]:
     ]
 
 
+def gate_problem(url: str, text: str, name: str, now: datetime) -> str | None:
+    """Code's own checks on a proposed find, in the order the gate runs them (finds_more),
+    for a page with no closing date read from it. None: code would keep it."""
+    host = host_of(url)
+    if not _official_host(host):
+        return "not the organisation's own site"
+    if named_on(text, name, "") is None:
+        return "doesn't name it"
+    if is_list_page(text):
+        return "lists many opportunities"
+    if is_closed(text):
+        return "says it's closed"
+    if not open_this_year(text, now):
+        return "no sign it's open now"
+    return None
+
+
+def finds_gate() -> list[str]:
+    cases = _rows("finds_pages.jsonl")
+    right, rows = 0, []
+    for c in cases:
+        now = datetime.fromisoformat(c["recorded"]).replace(tzinfo=UTC)
+        problem = gate_problem(c["url"], c["text"], c["name"], now)
+        got = "keep" if problem is None else "refuse"
+        ok = got == c["expect"]
+        right += ok
+        rows.append(
+            f"| {host_of(c['url'])} | {c['expect']}: {c['why']} | "
+            f"{got}{f' ({problem})' if problem else ''} | {'yes' if ok else '**no**'} |"
+        )
+    keeps = [c for c in cases if c["expect"] == "keep"]
+    return [
+        "## 4. The finds gate on real pages",
+        "",
+        f"**{right} of {len(cases)} right.** Real pages recorded on "
+        f"{cases[0]['recorded']} (`evals/finds_pages.jsonl`, by `evals/record_pages.py`), each "
+        "labelled by hand from reading it: would a careful person show it as open? Code's checks "
+        "only (official site, named on the page, not a list, not closed, open now), no model. "
+        f"{len(keeps)} should be kept; the rest are the traps the live runs met: an opportunity "
+        "blog, a call that says it's closed, last year's programme, a list of 14 calls, and "
+        "pages with no sign a call is open.",
+        "",
+        "| Page | Right answer | Code | Right? |",
+        "|---|---|---|---|",
+        *rows,
+    ]
+
+
+def finds_runs() -> list[str]:
+    with session_factory()() as db:
+        counts = dict(
+            db.execute(
+                select(AgentEvent.action, func.count())
+                .where(
+                    AgentEvent.action.in_(
+                        ("find_started", "found", "find_refused", "find_left_out")
+                    )
+                )
+                .group_by(AgentEvent.action)
+            ).all()
+        )
+        why = db.scalars(
+            select(AgentEvent.summary).where(AgentEvent.action == "find_refused")
+        ).all()
+    runs = counts.get("find_started", 0)
+    reasons: dict[str, int] = {}
+    for said in why:
+        reason = said.split(": ", 1)[-1].rstrip(".")
+        reasons[reason] = reasons.get(reason, 0) + 1
+    top = sorted(reasons.items(), key=lambda kv: -kv[1])[:6]
+    return [
+        "## 5. Finding more on real runs",
+        "",
+        f"{runs} runs of What's it for? on the web so far: **{counts.get('found', 0)} "
+        f"{'find' if counts.get('found', 0) == 1 else 'finds'} kept**, "
+        f"{counts.get('find_refused', 0)} proposals refused by code, "
+        f"{counts.get('find_left_out', 0)} left out as not for the person. Every refusal is a "
+        "proposal the person never saw.",
+        "",
+        "| Why code refused | Times |",
+        "|---|---|",
+        *[f"| {r} | {n} |" for r, n in top],
+    ]
+
+
 def verification() -> list[str]:
     with session_factory()() as db:
         kept = dropped = considered = asks = 0
@@ -144,7 +234,7 @@ def verification() -> list[str]:
 
 
 def main() -> None:
-    sections = [dates(), searches(), verification()]
+    sections = [dates(), searches(), verification(), finds_gate(), finds_runs()]
     report = [
         "# Homing evaluation",
         "",

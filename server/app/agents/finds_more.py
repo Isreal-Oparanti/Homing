@@ -227,8 +227,9 @@ def _gate(run: Run, args: dict[str, Any]) -> tuple[Find | None, str | None, bool
         return None, f"{host} isn't the organisation's own site. Follow its links to it.", False
     if _key(page.url) in run.known:
         return None, "That one is already in their saves. Look for others.", False
-    if not name or not match_quote(str(args.get("name_quote", "")), page.text):
-        return None, f"The name quote isn't on {page.ref} word for word. Copy it exactly.", False
+    named = named_on(page.text, name, str(args.get("name_quote", "")))
+    if named is None:
+        return None, f"{page.ref} doesn't name {name or 'it'}. Propose it from its own page.", False
     backing = match_quote(str(args.get("what_quote", "")), page.text)
     if backing is None:
         return (
@@ -239,6 +240,8 @@ def _gate(run: Run, args: dict[str, Any]) -> tuple[Find | None, str | None, bool
     backed = page.text[backing.start : backing.end]
     if not what or not numbers_supported(what, backed):
         return None, "The summary uses a number its quote doesn't state. Drop it.", False
+    if is_list_page(page.text):
+        return None, f"{page.ref} lists many opportunities. Open the one you want from it.", False
     if closed := is_closed(page.text):
         return None, f"The page says it's closed (“{closed.quote}”). Look for others.", False
 
@@ -272,9 +275,8 @@ def _gate(run: Run, args: dict[str, Any]) -> tuple[Find | None, str | None, bool
     if verdict == "not_for_you":
         return None, "Code left that one out: it isn't for this person. Look for others.", True
 
-    name_said = match_quote(str(args.get("name_quote", "")), page.text)
     quotes = [
-        {"label": "Named on the page", "quote": page.text[name_said.start : name_said.end]},
+        {"label": "Named on the page", "quote": named},
         {"label": "What the page says", "quote": backed},
     ]
     if deadline is not None:
@@ -330,9 +332,51 @@ APPLY_WORDS = (
 FOOTER_WORDS = ("©", "copyright", "rights reserved")
 
 
+MONTHS = (
+    "january|february|march|april|may|june|july|august|september|october|november|december"
+    "|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec"
+)
+DATED = re.compile(
+    rf"\b(?:(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?({MONTHS})\.?,?\s+(20\d\d)"
+    rf"|({MONTHS})\.?,?\s+(?:(\d{{1,2}})(?:st|nd|rd|th)?,?\s+)?(20\d\d))\b",
+    re.IGNORECASE,
+)
+# "Deadline: 6 October" as a list item. A page with several of these lists calls; it isn't one.
+DEADLINE_WORD = re.compile(r"\bdeadline\s*[:\-–]", re.IGNORECASE)
+LIST_PAGE_DEADLINES = 3  # a page giving this many deadlines lists opportunities; it isn't one
+
+
+def _page_dates(text: str) -> list[datetime]:
+    """Every full date the page states (day or month, with a year), as the end of that day."""
+    out = []
+    for m in DATED.finditer(text):
+        day, month, year = (
+            (m.group(1), m.group(2), m.group(3))
+            if m.group(3)
+            else (
+                m.group(5),
+                m.group(4),
+                m.group(6),
+            )
+        )
+        try:
+            month_n = datetime.strptime(month[:3].title(), "%b").month
+            last = 28 if not day else int(day)
+            out.append(datetime(int(year), month_n, last, 23, 59, tzinfo=UTC))
+        except ValueError:
+            continue
+    return out
+
+
 def open_this_year(text: str, now: datetime) -> bool:
-    """With no closing date: the page names this year or next beside words about applying.
-    A year in a copyright footer says nothing about whether a call is open."""
+    """With no closing date: the page names this year or next beside words about applying,
+    and isn't a past edition. A year in a copyright footer says nothing about a call; a page
+    whose every full date has passed (and that names no later year) is last time's call."""
+    dates = _page_dates(text)
+    if dates and max(dates) < now:
+        later = rf"\b{now.year + 1}\b"
+        if not re.search(later, text):
+            return False
     for m in re.finditer(rf"\b(?:{now.year}|{now.year + 1})\b", text):
         near = text[max(0, m.start() - 160) : m.end() + 160].lower()
         if any(w in near for w in FOOTER_WORDS):
@@ -340,6 +384,24 @@ def open_this_year(text: str, now: datetime) -> bool:
         if any(w in near for w in APPLY_WORDS):
             return True
     return False
+
+
+def is_list_page(text: str) -> bool:
+    """A blog post or newsletter listing many calls: a lead to follow, never a find."""
+    return len(DEADLINE_WORD.findall(text)) >= LIST_PAGE_DEADLINES
+
+
+def named_on(text: str, name: str, quote: str) -> str | None:
+    """The page's own words naming the opportunity: its name found by code (any case, any
+    spacing), else Wonder's quote found word for word. None: the page doesn't name it."""
+    words = name.split()
+    if len(" ".join(words)) >= 8:
+        pattern = r"\s+".join(re.escape(w) for w in words)
+        if m := re.search(pattern, text, re.IGNORECASE):
+            return m.group(0)
+    if m := match_quote(quote, text):
+        return text[m.start : m.end]
+    return None
 
 
 def _instructions(run: Run, saves: list[tuple[Save, Reading]]) -> str:
@@ -352,9 +414,12 @@ def _instructions(run: Run, saves: list[tuple[Save, Reading]]) -> str:
         )
         for _, r in saves
     ]
+    saved = sorted({k.split("/", 1)[0] for k in run.known if _official_host(k.split("/", 1)[0])})
     return (
         f"GOAL: {run.thread.title}\n\nWHAT THEY SAVED FOR IT:\n"
         + "\n".join(lines)
+        + "\n\nSITES ALREADY IN THEIR SAVES OR FOUND BEFORE (don't propose these again): "
+        + (", ".join(saved[:40]) or "none")
         + "\n\n"
         + goal_memory.brief(goal_memory.load(run.ctx.db, run.user.id, run.thread.id))
     )

@@ -25,7 +25,7 @@ from app.ingest.gather import transcript_text
 from app.ingest.pasted import parse_transcript
 from app.ingest.urls import canonical_url
 from app.jobs import queue
-from app.storage import Storage, get_storage
+from app.storage import Storage, StorageError, get_storage
 from app.verify.dates import display
 from app.verify.eligibility import assess
 from app.verify.secrets import screen
@@ -311,7 +311,16 @@ def _store_file(db: Session, storage: Storage, user_id: str, upload: UploadFile)
         mime = sniff(data)
     except UnsupportedFile as exc:
         raise AppError("unsupported_file", str(exc), status=415) from exc
-    return media_repo.store(db, storage, user_id, data, mime, upload.filename)[0]
+    try:
+        return media_repo.store(db, storage, user_id, data, mime, upload.filename)[0]
+    except StorageError as exc:
+        # A handled error, so the browser can read it (an unhandled one carries no CORS
+        # headers and looks like the server is down).
+        raise AppError(
+            "storage_unavailable",
+            "Homing couldn't store your file just now. Try again in a minute.",
+            status=503,
+        ) from exc
 
 
 @router.post("/file", status_code=202, response_model=SaveOut)

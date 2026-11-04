@@ -20,7 +20,7 @@ from app.ingest.gather import web_page
 from app.llm.search import SearchProvider
 from app.verify.sources import NEVER_OFFICIAL
 
-PAGE_CHARS_FOR_MODEL = 4_000
+PAGE_CHARS_FOR_MODEL = 8_000  # the newest pages; older ones shrink (trim_context)
 MAX_LINKS = 20
 # Context engineering for links: what a page links to, ranked before Wonder sees it, so its
 # few page opens go to the organisation's own pages rather than menus and footers.

@@ -1065,4 +1065,8 @@ export const findsApi = {
   async findNow(threadId: string): Promise<void> {
     await api(`threads/${encodeURIComponent(threadId)}/find`, { method: "POST" });
   },
+  /** Whether a look for this goal is running or about to. */
+  async looking(threadId: string): Promise<boolean> {
+    return (await api<{ looking: boolean }>(`threads/${encodeURIComponent(threadId)}/find`)).looking;
+  },
 };

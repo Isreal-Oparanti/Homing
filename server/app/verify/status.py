@@ -4,7 +4,8 @@ import re
 from dataclasses import dataclass
 
 _CLOSED = re.compile(
-    r"applications? (?:are |is )?(?:now )?closed"
+    r"(?:applications?|submissions?|entries|nominations?|registrations?|call for "
+    r"(?:applications|proposals|submissions)) (?:are |is |has |have )?(?:now )?(?:been )?closed"
     r"|no longer accepting"
     r"|this (?:position|opportunity|call|programme|program) (?:has|is) (?:now )?(?:closed|expired)"
     r"|deadline (?:has )?passed"
