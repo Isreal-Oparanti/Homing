@@ -141,23 +141,28 @@ def _open(s: Seen, ref: str) -> dict[str, Any]:
     return {"save": ref, "title": reading.title, "saved": f"{save.saved_at:%d %b %Y}", "text": text}
 
 
-def _check(s: Seen, args: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
-    """The gate: the points that hold up, and a named problem for each one that doesn't."""
-    kept, problems = [], []
+def _check(s: Seen, args: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+    """The gate: the points that hold up, a named problem for Wonder for each one that doesn't,
+    and the same problems in the person's words (save titles, never Wonder's short ids)."""
+    kept, problems, plain = [], [], []
     for n, p in enumerate(args.get("points") or [], 1):
         ref = str(p.get("save", "")).strip()
         point, quote = str(p.get("point", "")).strip(), str(p.get("quote", ""))
         text = s.opened.get(ref)
         if text is None:
             problems.append(f"Point {n}: {ref or 'no save'} wasn't opened. Open it, then quote it.")
+            plain.append("it quoted a save it hadn't opened")
             continue
+        title = s.refs[ref][1].title
         found = match_quote(quote, text)
         if found is None:
             problems.append(f"Point {n}: that quote isn't in {ref}'s text word for word.")
+            plain.append(f"a quote wasn't word for word in “{title}”")
             continue
         exact = text[found.start : found.end]
         if not numbers_supported(point, exact):
             problems.append(f"Point {n}: it uses a number its quote from {ref} doesn't say.")
+            plain.append(f"a number wasn't in its quote from “{title}”")
             continue
         save, reading = s.refs[ref]
         kept.append(
@@ -169,7 +174,7 @@ def _check(s: Seen, args: dict[str, Any]) -> tuple[list[dict[str, Any]], list[st
                 "saved_at": save.saved_at.isoformat(),
             }
         )
-    return kept[:MAX_POINTS], problems
+    return kept[:MAX_POINTS], problems, plain
 
 
 def _step(ctx: JobContext, ask: Ask, s: Seen, kind: str, text: str) -> None:
@@ -233,13 +238,13 @@ def run_agent(ctx: JobContext, ask: Ask) -> dict[str, Any] | None:
                     )
                     _step(ctx, ask, s, "open", said)
             elif name == "submit_answer":
-                kept, problems = _check(s, args)
+                kept, problems, plain = _check(s, args)
                 if problems and s.refusals < MAX_REFUSALS and not last:
                     s.refusals += 1
                     said = (
-                        f"Code refused the answer: {len(problems)} of "
+                        f"Homing refused the answer: {len(problems)} of "
                         f"{len(args.get('points') or [])} points didn't hold up "
-                        f"({problems[0].split(': ', 1)[1]}). Sent back to fix."
+                        f"({plain[0]}). Sent back to Muse Wonder to fix."
                     )
                     emit(
                         ctx.db,
@@ -256,7 +261,7 @@ def run_agent(ctx: JobContext, ask: Ask) -> dict[str, Any] | None:
                     s.steps.append(
                         {
                             "kind": "accepted",
-                            "text": f"Code found every quote word for word: {len(kept)} "
+                            "text": f"Homing found every quote word for word: {len(kept)} "
                             f"{'point holds' if len(kept) == 1 else 'points hold'} up"
                             + (f", {s.dropped} left out." if s.dropped else "."),
                         }

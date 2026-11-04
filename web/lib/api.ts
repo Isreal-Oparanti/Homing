@@ -549,6 +549,13 @@ export const savesApi = {
       body: JSON.stringify({ text }),
     });
   },
+  /** A page's text, pasted by the person when Homing couldn't read the link itself. */
+  async pastePageText(id: string, text: string): Promise<{ chars: number }> {
+    return api<{ chars: number }>(`saves/${encodeURIComponent(id)}/text`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    });
+  },
   /** The owner's own text of a private save, fetched only when they tap Show. */
   async reveal(id: string): Promise<string> {
     const raw = await api<{ text: string }>(`saves/${encodeURIComponent(id)}/reveal`, {

@@ -153,3 +153,29 @@ def test_reading_again_uses_the_captions_we_already_have(
         db.commit()
     kinds = [c["kind"] for c in SeesInputs.seen["content"]]
     assert kinds == ["metadata", "transcript"]
+
+
+@pytest.mark.integration
+def test_a_blocked_page_is_read_from_the_text_the_person_pasted(
+    client: TestClient, sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The site asks programs not to read it: nothing comes back, so the save waits for the person.
+    blocked = "This site asks programs like Homing not to read it, and Homing respects that."
+    monkeypatch.setattr(what_is_it, "_gather", lambda save: Gathered(notes=[blocked]))
+    monkeypatch.setattr(what_is_it, "gateway_factory", SeesInputs)
+    client.get("/api/v1/me", headers=HEADERS)
+    with sessions() as db:
+        page_id, video_id = _video(db, "web").id, _video(db).id
+        db.commit()
+
+    video = client.post(f"/api/v1/saves/{video_id}/text", json={"text": COPIED}, headers=HEADERS)
+    assert video.status_code == 422  # a video takes its transcript instead
+    text = "Open call for builders: apply by 20 November. Grants of up to 5,000 euros."
+    ok = client.post(f"/api/v1/saves/{page_id}/text", json={"text": text}, headers=HEADERS)
+    assert ok.status_code == 202 and ok.json() == {"chars": len(text)}
+
+    with sessions() as db:
+        what_is_it.read_one(JobContext(db, 0, "save.read", ALICE.id), {"save_id": page_id})
+        db.commit()
+    kinds = [c["kind"] for c in SeesInputs.seen["content"]]
+    assert kinds == ["pasted_text"]

@@ -76,6 +76,7 @@ COPY_LABELS = {
     "page_text": "Our copy of the page",
     "post_text": "Our copy of the post",
     "transcript": "Our copy of the captions",
+    "pasted_text": "What you pasted from the page",
     "metadata": "Our copy of the title and description",
 }
 
@@ -352,12 +353,15 @@ def read_one(ctx: JobContext, payload: dict[str, Any]) -> None:
         ]
         ctx.db.add_all([s for s in snapshots if s.id is None])
         ctx.db.flush()
-        if save.kind == "link" and not any(s.kind == "transcript" for s in snapshots):
-            # Captions we already have (pasted by the person, or fetched from a home connection)
-            # are read again too: YouTube won't give this server the captions itself.
+        for kind in ("transcript", "pasted_text"):
+            # What we already have that this server can't fetch itself is read again too:
+            # captions (pasted, or fetched from a home connection; YouTube won't give them to
+            # this server) and a page's text the person pasted (a site that blocks programs).
+            if save.kind != "link" or any(s.kind == kind for s in snapshots):
+                continue
             kept = ctx.db.scalars(
                 select(Snapshot)
-                .where(Snapshot.save_id == save.id, Snapshot.kind == "transcript")
+                .where(Snapshot.save_id == save.id, Snapshot.kind == kind)
                 .order_by(Snapshot.fetched_at.desc())
                 .limit(1)
             ).first()

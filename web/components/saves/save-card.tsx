@@ -37,6 +37,7 @@ const COPY_KIND: Record<string, string> = {
   page_text: "Page text",
   post_text: "Post text",
   transcript: "Captions",
+  pasted_text: "What you pasted",
   metadata: "Title and description",
   official_text: "Official page",
   ocr_text: "Words on it",
@@ -61,7 +62,7 @@ function ordinal(n: number) {
 }
 
 const WORKING: Record<Exclude<Answer, "what">, string> = {
-  true: "Checking the official page…",
+  true: "Checking the source…",
   for: "Finding what it's for…",
   when: "Working out when you'll need it…",
 };
@@ -758,31 +759,62 @@ function Copies({ copies }: { copies: Copy[] }) {
   );
 }
 
-/** YouTube shares captions only with a video's owner, and not with our server: the person can
- * copy the transcript YouTube shows anyone, and Homing reads it with its timestamps. */
-function PasteTranscript({ saveId }: { saveId: string }) {
+const PASTE = {
+  transcript: {
+    offer: "YouTube didn't share this video's captions with us.",
+    button: "Paste its transcript",
+    after: "and Homing can point to the exact second.",
+    how: (
+      <>
+        On YouTube, open the video, choose <b>…</b> then <b>Show transcript</b>, select it all
+        and copy it here.
+      </>
+    ),
+    placeholder: "0:00\nWelcome back to the channel…",
+    label: "The video's transcript",
+    submit: "Add transcript",
+  },
+  page: {
+    offer: "Homing couldn't read this link itself.",
+    button: "Paste what it says",
+    after: "and every agent carries on from your copy.",
+    how: <>Open the link, select the text that matters and copy it here.</>,
+    placeholder: "Applications are open until…",
+    label: "The page's text",
+    submit: "Add the text",
+  },
+};
+
+/** What Homing can't fetch itself, the person can copy. A video's transcript: YouTube shares
+ * captions only with a video's owner; Homing reads it with its timestamps. A page's text: the
+ * site asks programs not to read it, or it's a post Homing can't see inside. */
+function PasteText({ saveId, kind }: { saveId: string; kind: keyof typeof PASTE }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
+  const words = PASTE[kind];
   const paste = useMutation({
-    mutationFn: () => savesApi.pasteTranscript(saveId, text),
+    mutationFn: async () => {
+      if (kind === "page") {
+        await savesApi.pastePageText(saveId, text);
+        return "Got it. Reading it now…";
+      }
+      const { lines } = await savesApi.pasteTranscript(saveId, text);
+      return `Got ${lines} timed lines. Reading the video again with them…`;
+    },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["save", saveId] }),
   });
   if (paste.isSuccess) {
-    return (
-      <p className="mt-2 text-sm text-ink-2">
-        Got {paste.data.lines} timed lines. Reading the video again with them…
-      </p>
-    );
+    return <p className="mt-2 text-sm text-ink-2">{paste.data}</p>;
   }
   if (!open) {
     return (
       <p className="mt-2 text-sm text-ink-2">
-        YouTube didn&apos;t share this video&apos;s captions with us.{" "}
+        {words.offer}{" "}
         <button type="button" onClick={() => setOpen(true)} className="font-semibold underline">
-          Paste its transcript
+          {words.button}
         </button>{" "}
-        and Homing can point to the exact second.
+        {words.after}
       </p>
     );
   }
@@ -794,16 +826,13 @@ function PasteTranscript({ saveId }: { saveId: string }) {
         if (text.trim().length >= 20) paste.mutate();
       }}
     >
-      <p className="text-sm text-ink-2">
-        On YouTube, open the video, choose <b>…</b> then <b>Show transcript</b>, select it all
-        and copy it here.
-      </p>
+      <p className="text-sm text-ink-2">{words.how}</p>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={5}
-        placeholder={"0:00\nWelcome back to the channel…"}
-        aria-label="The video's transcript"
+        placeholder={words.placeholder}
+        aria-label={words.label}
         className="w-full rounded-2xl border border-line bg-white/70 p-3 text-sm outline-none focus:border-ink/30"
       />
       {paste.isError && <p className="text-sm text-red">{paste.error.message}</p>}
@@ -813,7 +842,7 @@ function PasteTranscript({ saveId }: { saveId: string }) {
           disabled={text.trim().length < 20 || paste.isPending}
           className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
         >
-          {paste.isPending ? "Reading…" : "Add transcript"}
+          {paste.isPending ? "Reading…" : words.submit}
         </button>
         <button
           type="button"
@@ -903,8 +932,11 @@ function Card({ card }: { card: SaveCard }) {
               )}
               {save.platform === "youtube" &&
                 !copies.some((c) => c.kind === "transcript") && (
-                  <PasteTranscript saveId={save.id} />
+                  <PasteText saveId={save.id} kind="transcript" />
                 )}
+              {save.kind === "link" && save.platform !== "youtube" && copies.length === 0 && (
+                <PasteText saveId={save.id} kind="page" />
+              )}
             </>
           ) : save.status === "failed" ? (
             <p className="text-amber">

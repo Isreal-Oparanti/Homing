@@ -138,7 +138,9 @@ def test_wonder_answers_and_code_is_the_gate(
         assert actions[:3] == ["ask_searched", "ask_opened", "ask_refused"]
         refused = next(e for e in steps if e.action == "ask_refused")
         assert refused.models == []  # code refused it, not a model
-        assert "isn't in S1's text word for word" in refused.summary
+        assert "Homing refused the answer" in refused.summary
+        assert "wasn't word for word in “" in refused.summary
+        assert "S1" not in refused.summary  # Wonder's short ids never reach the person
         assert answer["agent"]["turns"] == 5
         assert [s["kind"] for s in answer["steps"]] == [
             "search",

@@ -565,6 +565,58 @@ def paste_transcript(
     return {"lines": len(segments)}
 
 
+class PageTextIn(BaseModel):
+    text: str = Field(min_length=20, max_length=300_000)
+
+
+@router.post("/{save_id}/text", status_code=202)
+def paste_page_text(
+    save_id: str,
+    body: PageTextIn,
+    user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """A page's text, copied by the person when Homing couldn't read the link itself (the site
+    asks programs not to, or it's a post we can't see inside). Kept as the save's copy, then the
+    save is read again, so every agent carries on."""
+    save = saves_repo.get_save(db, user.id, save_id)
+    if save is None:
+        raise AppError("save_not_found", "That save doesn't exist.", status=404)
+    if save.visibility == "private":
+        raise AppError("private", "Private saves are never sent to AI.", status=409)
+    if save.kind != "link" or save.platform == "youtube":
+        raise AppError("not_a_page", "Text can be added to a saved web page or post.", status=422)
+    snapshot = Snapshot(
+        save_id=save.id,
+        kind="pasted_text",
+        source_url=save.url,
+        text=body.text.strip(),
+        meta={"source": "pasted"},
+    )
+    db.add(snapshot)
+    save.status = "received"
+    db.flush()
+    emit(
+        db,
+        user_id=user.id,
+        agent="what",
+        action="text_added",
+        summary=f"Got the page's text you pasted ({len(snapshot.text):,} characters). Reading it.",
+        save_id=save.id,
+        models=[],
+    )
+    queue.enqueue(
+        db,
+        "save.read",
+        {"save_id": save.id},
+        user_id=user.id,
+        priority=queue.PRIORITY_USER,
+        dedupe_key=f"read:{save.id}:{snapshot.id}",
+    )
+    db.commit()
+    return {"chars": len(snapshot.text)}
+
+
 @router.post("/{save_id}/answer", response_model=AnswerOut)
 def answer(
     save_id: str,

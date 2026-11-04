@@ -26,7 +26,7 @@ export const AGENTS: Record<
   true: {
     label: "Is it true?",
     short: "True",
-    job: "Opens the official page",
+    job: "Checks the source",
     color: "#1f7a4d",
     shape: "hex",
   },

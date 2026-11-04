@@ -120,7 +120,10 @@ class SafeFetcher:
 
     def get(self, url: str, *, respect_robots: bool = True, accept: str = "*/*") -> Fetched:
         if respect_robots and not self.robots_allowed(url):
-            raise FetchError("blocked", "This site doesn't allow automated reading.")
+            raise FetchError(
+                "blocked",
+                "This site asks programs like Homing not to read it, and Homing respects that.",
+            )
         for _ in range(MAX_REDIRECTS + 1):
             self.check_url(url)
             try:
