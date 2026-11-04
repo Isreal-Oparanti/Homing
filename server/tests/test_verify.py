@@ -204,3 +204,53 @@ def test_bring_back_two_days_before_a_near_deadline() -> None:
 def test_bring_back_now_when_under_48_hours_and_never_once_past() -> None:
     assert bring_back_at(NOW + timedelta(hours=20), now=NOW, user_tz=LAGOS) == NOW
     assert bring_back_at(NOW - timedelta(hours=1), now=NOW, user_tz=LAGOS) is None
+
+
+@pytest.mark.parametrize(
+    "words, expected",
+    [
+        ("Applications for Cohort 2 are open 1 September – 18 November 2026.", "2026-11-18"),
+        ("Applications open from 1 Sept to 18 Nov 2026", "2026-11-18"),
+        ("Apply between 3 March and 30 April 2027", "2027-04-30"),
+    ],
+)
+def test_a_window_closes_where_it_ends(words: str, expected: str) -> None:
+    from app.verify.dates import parse_deadline
+
+    got = parse_deadline(words, base=datetime(2026, 11, 4, 15, tzinfo=UTC), user_tz="Africa/Lagos")
+    assert (
+        got is not None
+        and got.at.astimezone(ZoneInfo("Africa/Lagos")).date().isoformat() == expected
+    )
+
+
+def test_a_rule_about_states_is_asked_not_assumed_from_the_country() -> None:
+    from app.verify.eligibility import accept_rule
+
+    page = (
+        "Cohort 2 applicants must be resident in one of the seven Cohort 2 states. "
+        "Also open to residents of the United States."
+    )
+    states = accept_rule(
+        {
+            "rule": "residence",
+            "strength": "required",
+            "quote": "Cohort 2 applicants must be resident in one of the seven Cohort 2 states",
+            "plain": "Live in one of the seven Cohort 2 states",
+            "countries": ["NG"],
+        },
+        page,
+    )
+    assert states is not None and states["rule"] == "other"
+    assert states["question"] == "Does this describe you: live in one of the seven Cohort 2 states?"
+    country = accept_rule(
+        {
+            "rule": "residence",
+            "strength": "required",
+            "quote": "Also open to residents of the United States",
+            "plain": "Live in the US",
+            "countries": ["US"],
+        },
+        page,
+    )
+    assert country is not None and country["rule"] == "residence"

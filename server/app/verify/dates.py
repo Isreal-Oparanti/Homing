@@ -124,6 +124,19 @@ def _this_year_if_just_past(words: str, parsed: datetime, local_base: datetime) 
     return earlier if local_base - JUST_PAST <= earlier < local_base else parsed
 
 
+_MONTH_WORD = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"
+_DAY_NUM = r"\d{1,2}(?:st|nd|rd|th)?"
+_DATE_WORDS = (
+    rf"(?:{_DAY_NUM}\s+(?:of\s+)?{_MONTH_WORD}|{_MONTH_WORD}\s+{_DAY_NUM})"
+    r"(?:,?\s+(?:19|20)\d{2})?"
+)
+# "open 1 September – 18 November 2026", "from 1 Sept to 18 Nov", "between 3 March and 30 April
+# 2027": a call's window. Its deadline is where the window ends.
+_RANGE = re.compile(
+    rf"({_DATE_WORDS})\s*(?:–|—|-|to|until|till|through|and)\s*({_DATE_WORDS})", re.IGNORECASE
+)
+
+
 def parse_deadline(
     source_text: str,
     *,
@@ -135,6 +148,8 @@ def parse_deadline(
     if not source_text or not source_text.strip():
         return None
     stated_zone, text = _zone(source_text)
+    if window := _RANGE.search(text):
+        text = text[window.start(2) :]  # the end of the window, and any time given after it
     zone = stated_zone or source_tz_hint or user_tz
     tz = ZoneInfo(zone)
     hit = _find(text, base.astimezone(tz).replace(tzinfo=None))

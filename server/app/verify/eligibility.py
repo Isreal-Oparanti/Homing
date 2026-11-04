@@ -5,6 +5,7 @@ its details match the quote, then judges it: `meets`, `fails` or `unknown`. Ever
 becomes one plain question; one answer re-judges every opportunity that depends on it.
 """
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -52,6 +53,18 @@ def _names(code: str) -> tuple[str, ...]:
     return LANGUAGE_NAMES.get(code.lower(), (code.lower(),))
 
 
+_SUBNATIONAL = re.compile(
+    r"\b(?:states?|regions?|provinces?|count(?:y|ies)|cit(?:y|ies)|districts?|lgas?|"
+    r"local government|municipalit(?:y|ies)|prefectures?)\b",
+    re.IGNORECASE,
+)
+_UNITED = re.compile(r"united\s+states|united\s+arab\s+emirates", re.IGNORECASE)
+
+
+def _lower_first(text: str) -> str:
+    return text[:1].lower() + text[1:]
+
+
 def accept_rule(rule: dict[str, Any], page: str) -> dict[str, Any] | None:
     """The rule with its quote as it appears on the page, or None if it doesn't hold up."""
     found = match_quote(rule.get("quote", ""), page)
@@ -70,6 +83,18 @@ def accept_rule(rule: dict[str, Any], page: str) -> dict[str, Any] | None:
             return None
     if kind in ("nationality", "residence") and not rule.get("countries"):
         return None
+    if kind == "residence" and _SUBNATIONAL.search(_UNITED.sub("", quote)):
+        # "Resident in one of the seven Cohort 2 states": living in the country isn't enough to
+        # meet it, and code can't know the state. So the person is asked, once.
+        return {
+            **rule,
+            "rule": "other",
+            "countries": [],
+            "question": f"Does this describe you: {_lower_first(rule.get('plain') or quote)}?",
+            "yes_meets": True,
+            "quote": quote,
+            "verified": True,
+        }
     if kind == "other" and not rule.get("question"):
         return None
     return {**rule, "quote": quote, "verified": True}
