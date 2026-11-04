@@ -78,3 +78,44 @@ body {
     backdrop-filter: blur(18px) saturate(140%);
   }
 }
+
+/* Landing page life (app/page.tsx). Everything stops for people who prefer less motion. */
+@keyframes float-y {
+  0%, 100% { transform: translateY(0) rotate(var(--tilt, 0deg)); }
+  50% { transform: translateY(-14px) rotate(calc(var(--tilt, 0deg) * -1)); }
+}
+@keyframes blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes step-loop {
+  0% { opacity: 0; transform: translateY(8px); }
+  6%, 88% { opacity: 1; transform: none; }
+  96%, 100% { opacity: 0; transform: translateY(-4px); }
+}
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(4%, -3%) scale(1.08); }
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(210 64 47 / 0.45); }
+  70% { box-shadow: 0 0 0 9px rgb(210 64 47 / 0); }
+}
+
+.float { animation: float-y var(--dur, 6s) ease-in-out infinite; animation-delay: var(--delay, 0s); }
+.blink ellipse { transform-box: fill-box; transform-origin: center; animation: blink 4.5s infinite; animation-delay: var(--delay, 0s); }
+.rise { animation: rise-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: var(--delay, 0s); }
+.step { opacity: 0; animation: step-loop 14s infinite; animation-delay: var(--delay, 0s); }
+.drift { animation: drift 16s ease-in-out infinite; }
+.live-dot { animation: pulse-dot 2s infinite; }
+.lift { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.lift:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgb(22 24 27 / 0.1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .float, .blink ellipse, .rise, .drift, .live-dot { animation: none; }
+  .step { animation: none; opacity: 1; }
+}
