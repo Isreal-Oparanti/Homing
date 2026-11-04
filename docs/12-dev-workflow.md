@@ -109,7 +109,7 @@ npm run lint && npm run typecheck
 2. The unit tests for its pure logic exist and pass.
 3. The UI states are all handled: empty, loading, partial, error and private.
 4. It emits `agent_events` with evidence (for agent work).
-5. The docs are updated, and PLAN.md if scope changed.
+5. The docs are updated.
 
 ## What we kept and changed from today's Crowscap
 

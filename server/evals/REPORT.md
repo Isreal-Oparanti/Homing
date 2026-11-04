@@ -8,7 +8,7 @@ _Run 04 Nov 2026, 14:28. Every number below is computed by `evals/run.py` from f
 
 ## 2. Search by meaning
 
-**12 of 15 questions** had a right save in the top 5; on average **78%** of the right saves were in the top 10. Run on Isreal's real pile. The right saves for each question are in `evals/search.jsonl`; Isreal checks them (draft until then).
+**12 of 15 questions** had a right save in the top 5; on average **78%** of the right saves were in the top 10. Run on a real pile of saves. The right saves for each question are in `evals/search.jsonl`.
 
 | Question | Right save in top 5 | Right saves in top 10 |
 |---|---|---|

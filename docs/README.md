@@ -1,10 +1,9 @@
 # Homing developer docs
 
-Start with [PLAN.md](PLAN.md) for what we're building and why. These docs cover how it's built.
+Start with the [project README](../README.md) for what Homing is and why. These docs cover how it's built.
 
 | # | Doc | Read it when you're… |
 |---|---|---|
-| — | [PLAN.md](PLAN.md) | deciding *what* to build, or checking whether something is in scope |
 | 01 | [Architecture](01-architecture.md) | getting the big picture: services, flows, vocabulary |
 | 02 | [Data model](02-data-model.md) | touching the database or adding a field |
 | 03 | [Agents](03-agents.md) | working on any of the four questions, or on Ask and Audit |
@@ -18,7 +17,6 @@ Start with [PLAN.md](PLAN.md) for what we're building and why. These docs cover 
 | 11 | [Testing and evals](11-testing-evals.md) | writing tests, or measuring accuracy |
 | 12 | [Dev workflow](12-dev-workflow.md) | setting up locally, following conventions, or committing |
 | 13 | [Brand](13-brand.md) | choosing colours, type, the logo, or wording |
-| 14 | [Build slices](14-build-slices.md) | deciding what to build next, and checking whether a piece is done |
 | — | [Decisions (ADRs)](adr/) | asking "why did we do it this way?" |
 
 ## Rules for these docs

@@ -19,3 +19,10 @@ Thumbs.db
 
 # Files people upload in local development (STORAGE_DIR)
 server/data/
+
+# Kept on the machine, not in the repo
+docs/14-build-slices.md
+docs/DEMO-PATH.md
+docs/PLAN.md
+# Written by `next dev` for coding agents
+web/AGENTS.md

@@ -3,7 +3,7 @@ real runs. Writes evals/REPORT.md.
 
 Run from server/: python -m uv run python -m evals.run
 1. Dates: real and post-style date phrases, each with the answer worked out by hand.
-2. Search: questions about Isreal's pile and the saves that should come back.
+2. Search: questions about a real pile and the saves that should come back.
 3. Verification and cost on real runs: what the models proposed, what code kept, tokens.
 4. The finds gate: real recorded pages, labelled by hand, through code's checks.
 5. Finding more on real runs: finds kept and why code refused the rest.
@@ -84,8 +84,8 @@ def searches() -> list[str]:
         "",
         f"**{hits} of {len(cases)} questions** had a right save in the top 5; on average "
         f"**{100 * recall / len(cases):.0f}%** of the right saves were in the top 10. "
-        f"Run on Isreal's real pile. The right saves for each question are in "
-        "`evals/search.jsonl`; Isreal checks them (draft until then).",
+        f"Run on a real pile of saves. The right saves for each question are in "
+        "`evals/search.jsonl`.",
         "",
         "| Question | Right save in top 5 | Right saves in top 10 |",
         "|---|---|---|",

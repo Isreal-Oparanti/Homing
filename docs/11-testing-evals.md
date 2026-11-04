@@ -94,7 +94,7 @@ Grading uses the in-app **feedback** buttons (Right · Wrong · Nonsense) on sav
 - `GET /feedback/summary` gives the counts. Copy them into the README "How well it works" table, with the sample size and date.
 - **Never round up, and never drop a bad category.**
 
-**When:** grading takes about 1 hour on Monday 2 Nov ([PLAN §12](PLAN.md#12-build-plan)), with a second pass after fixes if time allows.
+**When:** grading takes about 1 hour on Monday 2 Nov, with a second pass after fixes if time allows.
 
 ### What is it? on the real pile (31 Oct)
 
