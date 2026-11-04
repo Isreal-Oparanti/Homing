@@ -125,6 +125,14 @@ class _NoWonder:
 def no_real_wonder(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ask's agent never reaches the real model in tests: it fails at once and the Spark
     pipeline (with each test's own fake) answers; tests of the agent pass their own fake."""
+    from app.agents import finds_more
     from app.search import ask_agent
 
     monkeypatch.setattr(ask_agent, "gateway_factory", _NoWonder)
+    # Finding more never reaches the real web or Wonder either; its own tests pass fakes.
+    monkeypatch.setattr(finds_more, "gateway_factory", _NoWonder)
+    monkeypatch.setattr(finds_more, "search_factory", lambda: None)
+    # Is it true? takes its fixed path in tests; the source agent's own tests pass fakes.
+    from app.agents import is_it_true
+
+    monkeypatch.setattr(is_it_true, "_agent_source", lambda ctx, save, reading: None)

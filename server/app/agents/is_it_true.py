@@ -5,6 +5,7 @@ verdict here is `closed` or `couldnt_confirm`, decided by code; the verified fin
 what the person reads.
 """
 
+import logging
 from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
@@ -13,6 +14,8 @@ from urllib.parse import urlsplit
 from sqlalchemy import select
 from sqlalchemy.orm import object_session
 
+from app.agents.source_agent import find_source
+from app.agents.web_tools import Web
 from app.core.config import get_settings
 from app.db.models import Check, Profile, Reading, Save, Snapshot, User
 from app.db.repo import saves as saves_repo
@@ -34,6 +37,8 @@ from app.verify.quotes import match_quote
 from app.verify.sources import official_candidates
 from app.verify.status import is_closed
 from app.verify.verdict import decide
+
+log = logging.getLogger(__name__)
 
 SOURCE_CHARS_FOR_MODEL = 40_000
 MIN_SOURCE_CHARS = 200  # less than this is a shell page, not the posting
@@ -80,6 +85,28 @@ def _searched_candidates(reading: Reading) -> list[str]:
     except Exception:  # a search outage just means we say we couldn't find the page
         return []
     return official_candidates([r.url for r in results], orgs)[:TRIES]
+
+
+def _agent_source(ctx: JobContext, save: Save, reading: Reading) -> tuple[str, SnapshotIn] | None:
+    """Muse Wonder looks for the source of a save the person added; imports keep the fixed
+    path (hundreds at a time). Any failure falls back to the fixed path, never to an error."""
+    if save.import_id or not get_settings().check_agent:
+        return None
+    try:
+        return find_source(
+            ctx,
+            save,
+            reading,
+            words_of(save),
+            gateway=gateway_factory(ctx.db),
+            web=Web(search_factory(), fetcher_factory()),
+        )
+    except DeferredError:
+        raise
+    except Exception:
+        log.exception("source agent failed; the fixed path takes over")
+        ctx.db.rollback()
+        return None
 
 
 def _find_official(save: Save, reading: Reading) -> tuple[str, SnapshotIn] | None:
@@ -275,7 +302,16 @@ def check(ctx: JobContext, payload: dict[str, Any]) -> None:
     user_tz = user.tz if user else "Africa/Lagos"
 
     try:
-        found = _find_official(save, reading)
+        by_agent = False
+        prior = ctx.db.scalar(select(Check).where(Check.save_id == save.id))
+        if payload.get("recheck") and prior is not None and prior.official_url:
+            # Keep watching saw the official page change: read the same page again.
+            again = _fetch_source(prior.official_url, reading.title, fetcher_factory())
+            found = (prior.official_url, again) if again is not None else None
+        else:
+            found = _agent_source(ctx, save, reading)
+            by_agent = found is not None
+            found = found or _find_official(save, reading)
         if found is None:
             tried = _candidates(save, reading)
             if tried:
@@ -404,7 +440,9 @@ def check(ctx: JobContext, payload: dict[str, Any]) -> None:
         save,
         verdict="couldnt_confirm",
         official_url=official,
-        official_found_by="post_link" if url in _candidates(save, reading) else "search",
+        official_found_by="agent"
+        if by_agent
+        else ("post_link" if url in _candidates(save, reading) else "search"),
         deadline_at=deadline.at if deadline else None,
         deadline_source_text=deadline.source_text if deadline else None,
         deadline_tz_stated=deadline.tz_stated if deadline else False,

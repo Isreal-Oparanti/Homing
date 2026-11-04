@@ -328,8 +328,8 @@ These aren't extra agents. They're jobs that use what the four agents have alrea
 
 **Never:** answers from outside the user's saves; cites a private save; keeps a point it can't verify.
 
-**As built (3 Nov): Muse Wonder runs Ask as an agent** (`search/ask_agent.py`). Wonder picks its own steps with three tools: `search_saves(query)` (hybrid search, 8 results, short ids S1, S2…), `open_save(S3)` (the save's own text; under 300 characters it says to list it in `also`), and `submit_answer(points, not_covered, also)`. Submitting is the gate it can't skip: code checks that each point's save was opened, that its quote is in that text word for word, and that its numbers are in its quote; a refused answer comes back with the problems named. At most 10 turns and 3 refusals; then only verified points are kept. Every search, open and refusal is a step in Your agents (credited to Muse Wonder; refusals to code). If Wonder errors, the Spark pipeline above answers and the answer says which ran. First real run (demo pile, "funding without giving up equity"): 6 searches in its own words, 6 saves opened, 4 points, every quote found, 0 refused, 52 s; it also said which grants' equity terms the saves don't confirm.
-
+**As built (3 Nov): Muse Wonder runs Ask as an agent** (`search/ask_agent.py`). Wonder picks its own steps with three tools: `search_saves(query)` (hybrid search, 8 results, short ids S1, S2…), `open_save(S3)` (the save's own text; under 300 characters it says to list it in `also`), and `submit_answer(points, not_covered, also)`. Submitting is the gate it can't skip: code checks that each point's save was opened, that its quote is in that text word for word, and that its numbers are in its quote; a refused answer comes back with the problems named. At most 10 turns and 3 refusals; then only verified points are kept. Every search, open and refusal is a step in Your agents (credited to Muse Wonder; refusals to code). If Wonder errors, the Spark pipeline above answers and the answer says which ran. First real run (demo pile, "funding without giving up equity"): 6 searches in its own words, 6 saves opened, 4 points, every quote found, 0 refused, 52 s; it also said which grants' equity terms the saves don't confirm.
+
 ### Audit
 
 `server/app/audit/run.py`. Scope: one thread, or the whole library.
@@ -345,6 +345,35 @@ These aren't extra agents. They're jobs that use what the four agents have alrea
 Each item gets a suggested action (`merge` · `archive` · `recheck` · `none`). The user acts with one tap. "Archive" hides a save from Today and search; it never deletes.
 
 **Never:** deletes anything; presents a gap or let-go suggestion as fact; audits private saves' content (they're only counted).
+
+## Going out on the web: Muse Wonder as an agent, code as the gate
+
+Three jobs hand Muse Wonder tools and let it choose its own steps. The pattern is the same as Ask: **the model proposes, code disposes.** Every refusal is named and sent back to Wonder, and every step shows in Your agents as it happens.
+
+The toolbox (`agents/web_tools.py`) has two tools:
+- `web_search`: Google, through Serper. It returns leads only; titles and snippets are never facts.
+- `open_page`: opens a page through SafeFetcher, which respects robots.txt and blocks private addresses.
+
+Wonder only ever names refs: W1 for a search result, L12 for a link on a page it opened. It can't type a URL, so text on a page can only lead it to links that page really has.
+
+| Job | Agent | What Wonder does | What code checks before anything is kept |
+|---|---|---|---|
+| `save.check` (finding the source) | Is it true? | Starts from the save's links. If a link is a blog or a post, it follows it to the organisation's own page; if the save has no useful link, it searches. Then it chooses the source (`agents/source_agent.py`). | The page was opened, it's the organisation's own site (not a blog, list or social post), and the words naming the thing are on it word for word. Then the usual compare runs, and every quote is verified. If Wonder fails or gives up, the fixed path takes over. Bulk imports use the fixed path. |
+| `goal.find` | What's it for? (finds more) | From a goal and its saves, it searches, opens pages, follows lists to official pages and proposes opportunities (`agents/finds_more.py`). | Every rule below must pass (list after this table). |
+| `watch.tick` / `watch.user` | Is it true? + What's it for? (Keep watching) | Every 12 hours, without being asked (`agents/keep_watching.py`). | Code re-reads each official page that can still change. An unchanged page costs no model call. A changed page sends the save back to be checked again. Then a finds-more run is queued for active goals. |
+
+Code keeps a `goal.find` proposal only when all of these hold:
+- It's the organisation's own page, and the name is on it word for word.
+- Every number in the summary is on the page.
+- The page doesn't say it's closed.
+- The closing date, read by code and stated with a year, is ahead. With no date given, the page must name this year or next.
+- Who can apply is judged by code against the profile, and the profile never goes to Wonder. A find that isn't for the person is left out quietly.
+
+The limits:
+- **Turns:** at most 12 for finds more, 8 for finding a source.
+- **Web:** at most 5 searches and 9 pages per run.
+- **Finds:** at most 4 per run.
+- **How often finds more runs on its own:** once a day per goal, triggered by a newly saved opportunity or by Keep watching. Tapping **Find more** on a goal always runs it.
 
 ## Orchestration at a glance
 

@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     meta_transcribe_model: str = "muse-voice-transcribe-1.0"
     # Ask runs as a Muse Wonder agent; off, the Spark pipeline answers (search/ask.py).
     ask_agent: bool = True
+    # Is it true? finds a save's source with a Muse Wonder agent; off, the fixed path does.
+    check_agent: bool = True
     youtube_api_key: str = ""
     # YouTube captions via youtube-transcript-api (Isreal's decision, docs/adr/0008).
     feature_yt_captions: bool = True

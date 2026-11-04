@@ -2,7 +2,9 @@
 
 from typing import Any
 
+from app.agents.finds_more import find_more
 from app.agents.is_it_true import check, check_item
+from app.agents.keep_watching import tick, watch_user
 from app.agents.prep import prepare
 from app.agents.today import match_moment
 from app.agents.what_is_it import read_batch, read_one
@@ -43,4 +45,7 @@ HANDLERS: dict[str, Handler] = {
     "card.prep": prepare,
     "save.when": set_when,
     "import.whatsapp": import_whatsapp,
+    "goal.find": find_more,
+    "watch.tick": tick,
+    "watch.user": watch_user,
 }

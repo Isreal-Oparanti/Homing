@@ -87,6 +87,8 @@ JOB_AGENT = {
     "save.check_item": "true",
     "save.place": "for",
     "threads.rebuild": "for",
+    "goal.find": "for",
+    "watch.user": "true",
     "save.when": "when",
     "moment.match": "when",
     "card.prep": "when",

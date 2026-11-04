@@ -5,7 +5,8 @@
 
 The snapshot keeps what visitors can change on existing saves (the profile and its answers,
 goals and placements, checks, dates, what agents remember) plus the time it was taken. A reset
-deletes what visitors added after that time (saves, imports, moments, questions, steps), clears
+deletes what visitors added after that time (saves, imports, moments, questions, steps,
+finds), clears
 Today's cards so they're chosen afresh, and puts the recorded rows back exactly.
 Model calls are kept: they're the record of what was spent.
 
@@ -29,6 +30,7 @@ from app.db.models import (
     Ask,
     Card,
     Check,
+    Find,
     Import,
     Moment,
     Profile,
@@ -84,6 +86,7 @@ def reset() -> None:
             ),
             "moments": db.execute(delete(Moment).where(Moment.user_id == demo)),
             "cards": db.execute(delete(Card).where(Card.user_id == demo)),
+            "finds": db.execute(delete(Find).where(Find.user_id == demo, Find.created_at > at)),
             "questions": db.execute(delete(Ask).where(Ask.user_id == demo, Ask.created_at > at)),
             "steps": db.execute(
                 delete(AgentEvent).where(AgentEvent.user_id == demo, AgentEvent.created_at > at)

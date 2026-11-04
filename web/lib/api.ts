@@ -1018,3 +1018,45 @@ export const askApi = {
     return (await api<RawAsk[]>("asks")).map(toAsk);
   },
 };
+
+/** Something What's it for? found on the web for a goal, after code's checks. */
+export type Find = {
+  id: string;
+  goal: string | null;
+  threadId: string | null;
+  name: string;
+  what: string;
+  url: string;
+  site: string;
+  closes: string | null;
+  fit: string;
+  verdict: string;
+  rules: { plain: string | null; quote: string | null; result: string | null }[];
+  quotes: { label: string; quote: string }[];
+  saveId: string | null;
+};
+
+type RawFind = Omit<Find, "threadId" | "saveId"> & { thread_id: string | null; save_id: string | null };
+
+function toFind(raw: RawFind): Find {
+  const { thread_id: threadId, save_id: saveId, ...rest } = raw;
+  return { ...rest, threadId, saveId };
+}
+
+export const findsApi = {
+  async list(threadId?: string): Promise<Find[]> {
+    const query = threadId ? `?thread_id=${encodeURIComponent(threadId)}` : "";
+    return (await api<RawFind[]>(`finds${query}`)).map(toFind);
+  },
+  /** Save it: from here every agent reads it like anything the person saved. */
+  async keep(id: string): Promise<Find> {
+    return toFind(await api<RawFind>(`finds/${encodeURIComponent(id)}/keep`, { method: "POST" }));
+  },
+  async dismiss(id: string): Promise<void> {
+    await api(`finds/${encodeURIComponent(id)}/dismiss`, { method: "POST" });
+  },
+  /** Look on the web for more for this goal now. */
+  async findNow(threadId: string): Promise<void> {
+    await api(`threads/${encodeURIComponent(threadId)}/find`, { method: "POST" });
+  },
+};

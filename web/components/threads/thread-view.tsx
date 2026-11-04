@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
+import { FoundForYou } from "@/components/finds/found-for-you";
 import { SaveRows } from "@/components/saves/save-list";
 import { threadsApi } from "@/lib/api";
 import { Loading } from "@/components/shell/loading";
@@ -87,6 +88,7 @@ export function ThreadView() {
           </>
         )}
       </p>
+      <FoundForYou threadId={id} />
       <SaveRows saves={data.items} />
     </article>
   );

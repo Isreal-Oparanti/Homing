@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
+import { FoundForYou } from "@/components/finds/found-for-you";
 import { EmptyState } from "@/components/shell/empty-state";
 import { Loading } from "@/components/shell/loading";
 import { type AgentEvent, meApi, type Moment, type TodayCard, todayApi } from "@/lib/api";
@@ -319,6 +320,7 @@ export function TodayList() {
           ))}
         </ul>
       )}
+      <FoundForYou />
       {data.comingBack.length > 0 && (
         <section className="mt-5">
           <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.07em] text-muted">

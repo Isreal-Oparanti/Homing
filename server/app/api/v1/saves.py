@@ -155,7 +155,12 @@ def _by(
             if check.official_url
             else "read the post's own rules; code found every quote word for word"
         )
-        by["true"] = By(models=[model_name(check.model)], how=how)
+        models = [model_name(check.model)]
+        if check.official_found_by == "agent":
+            # Muse Wonder went looking for the official page itself; Spark compared it.
+            models.insert(0, "Muse Wonder")
+            how = "found the official page, then compared it; code found every quote word for word"
+        by["true"] = By(models=models, how=how)
     placed = db.scalars(
         select(AgentEvent.models)
         .where(

@@ -13,10 +13,12 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 
+from app.agents.finds_more import queue_find
 from app.db.models import Reading, Save, Snapshot, Thread, ThreadSave, User
 from app.db.repo import saves as saves_repo
 from app.events.emitter import emit
 from app.ingest.urls import find_urls
+from app.jobs import queue
 from app.jobs.errors import DeferredError, PermanentError
 from app.jobs.runner import JobContext
 from app.llm.gateway import ModelGateway
@@ -185,6 +187,11 @@ def place(ctx: JobContext, payload: dict[str, Any]) -> None:
         save_id=save.id,
         thread_id=thread.id,
     )
+    if reading.is_opportunity and not save.import_id:
+        # An opportunity saved for a goal: look on the web for more like it (once a day a goal).
+        user = ctx.db.get(User, save.user_id)
+        today = datetime.now(ZoneInfo(user.tz if user else "Africa/Lagos")).date().isoformat()
+        queue_find(ctx.db, save.user_id, thread.id, today=today, priority=queue.PRIORITY_NORMAL)
 
 
 def _when_in(save: Save, tz: str) -> str:

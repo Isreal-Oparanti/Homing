@@ -15,7 +15,7 @@ from typing import Any
 import trafilatura
 
 from app.core.config import Settings
-from app.ingest.fetch import FetchError, SafeFetcher
+from app.ingest.fetch import Fetched, FetchError, SafeFetcher
 from app.ingest.urls import is_youtube_short, platform_of, x_status_id, youtube_id
 
 MAX_SNAPSHOT_CHARS = 200_000
@@ -77,7 +77,11 @@ def _app_text(page: str) -> str:
 
 
 def gather_web(url: str, fetcher: SafeFetcher) -> Gathered:
-    got = fetcher.get(url, accept="text/html,application/xhtml+xml,*/*;q=0.8")
+    return web_page(fetcher.get(url, accept="text/html,application/xhtml+xml,*/*;q=0.8"))
+
+
+def web_page(got: Fetched) -> Gathered:
+    """Our copy of a fetched web page: its main text and what the page says about itself."""
     if got.status >= 400:
         return Gathered(notes=[f"Couldn't open this link (the site answered {got.status})."])
     if "pdf" in got.content_type:

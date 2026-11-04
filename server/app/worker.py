@@ -3,6 +3,7 @@
 import signal
 import threading
 
+from app.agents.keep_watching import start_watching
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.db.session import session_factory
@@ -16,6 +17,8 @@ def build_runner() -> Runner:
 
 def main() -> None:
     setup_logging()
+    with session_factory()() as db:
+        start_watching(db)  # one Keep watching tick is always waiting
     runner = build_runner()
     runner.start()
     stop = threading.Event()

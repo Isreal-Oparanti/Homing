@@ -104,6 +104,14 @@ PURPOSES: dict[str, Purpose] = {
     "ask.agent": Purpose(
         "ask.agent", "ask_agent.v1.md", AskAnswer, 120, "low", model="muse-wonder-1.0"
     ),
+    # Is it true? finds the source with Wonder; code checks the page it chooses (source_agent).
+    "check.agent": Purpose(
+        "check.agent", "check_source.v1.md", AskAnswer, 120, "low", model="muse-wonder-1.0"
+    ),
+    # What's it for? finds more: Wonder goes on the web for a goal; code is the gate (finds_more).
+    "find.agent": Purpose(
+        "find.agent", "find_more.v1.md", AskAnswer, 120, "low", model="muse-wonder-1.0"
+    ),
     # The whole pile in one long-context call: it sees every save, so it groups them well.
     "place.rebuild": Purpose("place.rebuild", "place_rebuild.v1.md", Rebuild, 300),
     "video.points": Purpose("video.points", "video_points.v1.md", VideoPoints, 120, "low"),

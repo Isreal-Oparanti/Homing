@@ -1,0 +1,102 @@
+import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.agents import is_it_true, keep_watching
+from app.core.auth import CurrentUser
+from app.db.models import AgentEvent, Check, Job, Reading, Save, Snapshot, Thread, ThreadSave
+from app.db.repo.users import ensure_user
+from app.jobs.runner import JobContext
+from tests.test_finds_more import FakeFetcher
+
+ALICE = CurrentUser(id="u-alice", email="alice@example.com")
+URL = "https://fund.example.org/apply"
+
+
+def _watched(db: Session, last_copy: str) -> Save:
+    ensure_user(db, ALICE)
+    save = Save(
+        user_id=ALICE.id,
+        kind="link",
+        origin="paste",
+        url=URL,
+        content_hash="w",
+        status="ready",
+    )
+    thread = Thread(user_id=ALICE.id, title="Finding funding")
+    db.add_all([save, thread])
+    db.flush()
+    db.add_all(
+        [
+            Reading(
+                save_id=save.id,
+                title="Lagos Founders Fund",
+                what="A grant.",
+                key_facts={},
+                is_opportunity=True,
+                model="spark",
+                prompt_version="v",
+            ),
+            Check(
+                save_id=save.id,
+                verdict="fits_you",
+                official_url=URL,
+                model="spark",
+                prompt_version="v",
+            ),
+            Snapshot(save_id=save.id, kind="official_text", source_url=URL, text=last_copy),
+            ThreadSave(thread_id=thread.id, save_id=save.id),
+        ]
+    )
+    db.commit()
+    return save
+
+
+@pytest.fixture
+def web(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(is_it_true, "fetcher_factory", FakeFetcher)
+
+
+@pytest.mark.integration
+def test_a_changed_official_page_is_checked_again(
+    sessions: sessionmaker[Session], web: None
+) -> None:
+    with sessions() as db:
+        save = _watched(db, "Applications close on 30 November. Open to everyone.")
+        keep_watching.watch_user(JobContext(db, 0, "watch.user", ALICE.id), {})
+        db.commit()
+        jobs = {(j.kind, j.payload.get("recheck")) for j in db.scalars(select(Job))}
+        assert ("save.check", True) in jobs  # the changed page is checked again
+        assert ("goal.find", None) in jobs  # and What's it for? looks for more for the goal
+        said = db.scalar(select(AgentEvent.summary).where(AgentEvent.action == "watched"))
+        assert said == (
+            "Kept watching: re-read 1 official page. 1 changed since last time "
+            "(Lagos Founders Fund), so it's checked again."
+        )
+        assert save.id
+
+
+@pytest.mark.integration
+def test_an_unchanged_page_costs_nothing(sessions: sessionmaker[Session], web: None) -> None:
+    same = is_it_true._fetch_source(URL, "Lagos Founders Fund", FakeFetcher())
+    assert same is not None
+    with sessions() as db:
+        _watched(db, same.text)
+        keep_watching.watch_user(JobContext(db, 0, "watch.user", ALICE.id), {})
+        db.commit()
+        assert db.scalar(select(Job.id).where(Job.kind == "save.check")) is None
+        said = db.scalar(select(AgentEvent.summary).where(AgentEvent.action == "watched"))
+        assert said == "Kept watching: re-read 1 official page. Nothing changed."
+
+
+@pytest.mark.integration
+def test_one_tick_is_always_waiting(sessions: sessionmaker[Session]) -> None:
+    with sessions() as db:
+        keep_watching.start_watching(db)
+        keep_watching.start_watching(db)  # the worker restarting doesn't add a second
+        ticks = db.scalars(select(Job).where(Job.kind == "watch.tick")).all()
+        assert len(ticks) == 1
+        keep_watching.tick(JobContext(db, 0, "watch.tick", None), {})
+        db.commit()
+        nxt = db.scalars(select(Job).where(Job.kind == "watch.tick").order_by(Job.id)).all()[-1]
+        assert nxt.run_after > ticks[0].run_after
