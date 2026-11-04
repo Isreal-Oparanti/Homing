@@ -33,7 +33,7 @@ export const AGENTS: Record<
   for: {
     label: "What's it for?",
     short: "For",
-    job: "Finds your goals, and more for them",
+    job: "Finds goals, and more",
     color: "#16181b",
     shape: "square",
   },
