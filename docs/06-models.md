@@ -70,7 +70,7 @@ Every call declares a purpose. Each purpose fixes the model, prompt file, output
 | `place.rebuild` | Spark (long context) | `place_rebuild.v1.md` | `ThreadPlan` | 180s |
 | `when.match_moment` | Spark | `when_match_moment.v1.md` | `MomentMatch` | 30s |
 | `video.points` | Spark | `video_points.v1.md` | `VideoPoints` | 180s |
-| `prep.sheet` | Spark | `prep_sheet.v1.md` | `PrepSheet` | 120s |
+| `prep.sheet` | Spark | `prep_sheet.v3.md` | `PrepSheet` | 120s |
 | `ask.select` | Spark | `ask_select.v1.md` | `Selection` | 30s |
 | `ask.answer` | Spark | `ask_answer.v1.md` | `Answer` | 90s |
 | `audit.contradictions` | Spark (long context) | `audit_contradictions.v1.md` | `list[ProposedContradiction]` | 180s |

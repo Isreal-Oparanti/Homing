@@ -1,6 +1,6 @@
 # Homing
 
-[![CI](https://github.com/Isreal-Oparanti/Homing/actions/workflows/ci.yml/badge.svg)](https://github.com/Isreal-Oparanti/Homing/actions/workflows/ci.yml)
+[![CI](https://github.com/Isreal-Oparanti/Homing/actions/workflows/ci.yml/badge.svg)](https://github.com/Isreal-Oparanti/Homing/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 **Homing** (like a homing pigeon): everything you save finds its way back to you, at the moment it matters, with proof.
 
@@ -173,6 +173,10 @@ npm run dev
 ```
 
 More: [docs/PLAN.md](docs/PLAN.md) (what and why) · [docs/README.md](docs/README.md) (how it's built)
+
+## License
+
+MIT. See [LICENSE](LICENSE). Use it, fork it, build on it.
 
 ## Origin
 
