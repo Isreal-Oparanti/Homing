@@ -2,118 +2,168 @@
 
 [![CI](https://github.com/Isreal-Oparanti/Homing/actions/workflows/ci.yml/badge.svg)](https://github.com/Isreal-Oparanti/Homing/actions/workflows/ci.yml)
 
+**Homing** (like a homing pigeon): everything you save finds its way back to you, at the moment it matters, with proof.
+
 **You saved it because it mattered. Homing makes sure it comes back.**
 
-- **Live app:** https://homing-rho.vercel.app (press **Try the demo**: a full pile, shared with other visitors; or sign in with Google for your own, empty and private)
-- **3-minute video:** _link added at submission_
-- Built for the Meta Global AI Developer Hackathon (Indie track) on **Muse Spark**, **Muse Wonder** and **Muse Voice Transcribe**.
+Built for the **Meta Global AI Developer Hackathon · Indie track**. Every model call runs on Meta's models: **Muse Spark**, **Muse Wonder** and **Muse Voice Transcribe**, through one gateway (`server/app/llm/gateway.py`) that names the model behind every step.
 
-## The problem
+- **Live:** https://homing-rho.vercel.app. Press **Try the demo** (a full pile, shared with other visitors) or sign in with Google (your own, empty and private).
+- **Video (3 min):** _link added at submission_
 
-Everyone saves things "for later": a video that could change how you speak, a scholarship, a book someone swore by, a trick to try tomorrow. Then later never comes. The day you need it (the interview, the pitch, the deadline), it's buried somewhere you'll never scroll back to.
+## Why
 
-Isreal, who built this, has 624 of them in a WhatsApp chat to himself.
+Everyone saves things "for later". A video that could change how you speak. A scholarship. A book someone swore by. A trick to try tomorrow. Then later never comes. The day you need it (the interview, the pitch, the deadline), it's buried somewhere you'll never scroll back to. The person who built this has 624 of them in a WhatsApp chat to himself.
 
-Saving is easy. Getting the right thing back, at the right moment, and knowing it's true: that's the hard part. Homing does that part.
+And when a save does come back, it's often wrong. A real example from building this: a blog post said the UNDP Young Africa Innovates programme was *"for young Nigerian innovators"*. The official page says applicants *"must be resident in one of the seven Cohort 2 states"*. The post left out the one rule that decides whether you can apply.
 
-## What it does
+So the hard part isn't saving. It's two things: **bringing it back at the right moment**, and **only with what can be proven.**
 
-Homing answers four questions about every save, each answered by its own agent:
+## In one line
 
-| Agent | Answers | How |
+> **A save should come back on its own, when it matters, saying only what its source can prove.**
+
+Every save gets four answers, each from its own agent: *What is it? Is it true? What's it for? When will you need it?* Models read, search and reason. Code checks every quote, number, date and rule before you see it.
+
+Reading links with a model exists. Reminders exist. Web search exists. We don't claim the parts. **We claim the loop:** agents that act on your saves without being asked (they check the source, find more for your goals, keep watching for changes, and prepare you for what's coming), with code as the gate on every word, and memory that makes each run smarter than the last.
+
+## How it works
+
+```mermaid
+flowchart LR
+  S[You save a link, post, flyer, PDF, voice note, video] --> W[What is it?<br/>Muse Spark reads it<br/>Voice Transcribe hears it]
+  W --> T[Is it true?<br/>Muse Wonder finds the official page<br/>Muse Spark compares]
+  W --> F[What's it for?<br/>Muse Spark places it in a goal<br/>Muse Wonder finds more]
+  T --> N[When will you need it?<br/>code reads the deadline<br/>in your time zone]
+  T & F & N --> G{{Code is the gate<br/>quotes word for word<br/>numbers, dates, rules}}
+  G --> Y[Today: it comes back<br/>with the next step]
+  K[Keep watching<br/>5 am and 5 pm] --> T
+  K --> F
+```
+
+The mechanisms that carry the weight:
+
+- **Code is the gate.** A quote is kept only if code finds it word for word in the source. A number only if its quote states it. Dates are read by code, never by a model, in your time zone ("open 1 September to 18 November 2026" closes on 18 November). Who can apply is judged by code against what you told Homing; your profile is never sent to a model.
+- **Muse Wonder works as an agent, three times.** In **Ask** it searches your saves and answers. In **Is it true?** it follows a blog or post to the organisation's own page. In **What's it for?** it searches the web for more for your goals. Each time it chooses its own steps, and each time code refuses what it can't prove and tells it why. Wonder fixes it or moves on.
+- **It plans, and it learns.** Finding more always starts with a plan you can read. Each goal keeps a memory: the searches it ran and what they gave, the sites refused and why, what you kept, what you said wasn't for you (with a one-tap reason), and the lesson Wonder wrote at the end of the run. The next run starts from that memory.
+- **The context stays sharp.** Wonder can only name refs (W1, L12), never type a URL, so words on a page can't send it anywhere. Code ranks a page's links before Wonder sees them (links to other sites and about applying first; menus, footers and social links dropped). Pages it has read shrink in its context; code always checks against the full page.
+- **It acts on its own.** Keep watching runs at 5 am and 5 pm (Lagos time). It re-reads official pages that can still change. An unchanged page costs no model call. A changed one is checked again, and you're told exactly what changed: "the deadline moved from 12 Nov to 15 Nov", "it's now closed".
+- **It prepares you.** Type something coming up ("recording my demo video tomorrow evening"). Homing goes through the videos you saved for that goal and writes a prep sheet. Every tip plays its video from the second it's said, checked against the captions.
+
+Details: [docs/03-agents.md](docs/03-agents.md) · verification: [docs/05-verification.md](docs/05-verification.md)
+
+## A real run, step by step
+
+Saving `opportunitiesforafricans.com/the-undp-africa-young-innovates-programme…` on the live demo, 4 Nov, from the Agents feed:
+
+| Time | Agent | Step |
 |---|---|---|
-| **What is it?** | What the save is | Muse Spark reads links, posts, screenshots, flyers, PDFs and videos; Muse Voice Transcribe hears voice notes and video sound |
-| **Is it true?** | What the official source says | Muse Wonder finds the organisation's own page (following a blog or post to it), Muse Spark compares, and code keeps only quotes found word for word; who can apply is judged by code against what you've told Homing |
-| **What's it for?** | Which of your goals it serves | Muse Spark places it in a goal; Muse Wonder then **looks on the web for more** for that goal |
-| **When will you need it?** | When it comes back | Code reads the deadline in your time zone; a moment you type ("recording my demo video tomorrow evening") brings back a **prep sheet** made from your saved videos, each tip playing from the second it's said |
+| 17:14 | Is it true? · Muse Wonder | Opened opportunitiesforafricans.com (the blog) |
+| 17:14 | Is it true? · Muse Wonder | Opened youngafricainnovates.ng |
+| 17:14 | Is it true? · Muse Wonder | Searched the web for "site:undp.org Nigeria Young Africa Innovates Programme Cohort 2" |
+| 17:14 | Is it true? · **Code** | **Homing refused that source: those words aren't on the youngafricainnovates.ng page word for word** |
+| 17:14 | Is it true? · Muse Wonder | Chose youngafricainnovates.ng as the source to check against |
+| 17:16 | Is it true? · Muse Wonder + Spark | Checked against youngafricainnovates.ng: 3 things the post left out. 1 question to see if it fits you |
+| 17:16 | When will you need it? · **Code** | Will bring this back on Wed 11 Nov, from "open 1 September to 18 November 2026" |
 
-And it keeps working without being asked: **Keep watching** runs at 5 am and 5 pm (Lagos time), re-reading official pages that can still change and saying exactly what changed ("the deadline moved from 12 Nov to 15 Nov", "it's now closed").
+The card then asks one thing, and remembers the answer: *"Does this describe you: resident in Abia, Akwa Ibom, Cross River, Katsina, Niger, Plateau or Taraba?"*
 
-**Ask** answers questions from your own saves only, with every quote checked word for word.
+And the learning, from two runs of Find more on the same goal:
+- **Run 1, 17:37.** "Next time: Avoid 500 Sustainable Innovation (closed Sep 2025) and Google South Africa (not eligible for this person)."
+- **Run 2, 17:40.** "Plan: … Ruling out: … 500 Sustainable Innovation (closed Sep 2025), Madica (no open date), Google South Africa (not eligible)."
 
-## Try it in two minutes
+## Results
 
-1. Open https://homing-rho.vercel.app and press **Try the demo**.
-2. Go to **Agents**. Press **Add** and paste a blog post about an opportunity, e.g. `https://www.opportunitiesforafricans.com/the-undp-africa-young-innovates-programme-2026-2027-for-young-nigerian-innovators/`. Stay on Agents and watch: Muse Wonder opens the blog, follows it to `youngafricainnovates.ng`, and Homing refuses any source it can't prove.
-3. Open the save (about 2 minutes later): what the post left out, each point quoted from the official page; the one thing it needs to ask you ("resident in one of seven states?"); the deadline, read from "open 1 September – 18 November 2026".
-4. On **Today**, type *recording my demo video tomorrow evening* and add it. Open the **Get ready** card: a prep sheet from the saved speaking videos. Tap a tip's chip: the video plays from that second.
-5. Open a goal in **Threads** and press **Find more**. On Agents, watch the plan, the searches, the pages opened, and what code throws out (closed, last year's, not for you). Run it again later: the new plan rules out what the last run learned.
-6. **Ask**: *How do I get better at speaking on camera?* Watch Muse Wonder search, open saves, and answer.
+Every number comes from the committed scripts ([`server/evals/run.py`](server/evals/run.py)) or the stored record of real runs. Full report: [server/evals/REPORT.md](server/evals/REPORT.md).
 
-## How the agents work: the model proposes, code disposes
+**What the models proposed, and what code let through**
 
-Three jobs give **Muse Wonder** tools and let it choose its own steps, each with code as the gate:
+| Where | Proposed by the model | Kept by code | Refused or dropped |
+|---|---|---|---|
+| Ask: quotes in answers | 68 | **68** | 0 |
+| Prep sheets: video points at a stated second | 45 | **44** | 1 not in the captions at that second |
+| Finding more on the web (stored record of live runs) | 17 | **2** | 14 refused (closed, last year's, a list, not the official site), 1 not for the person |
 
-| Agent | Wonder's tools | Code refuses, and says why |
+The gate is strict on purpose. A run that keeps nothing is better than one that shows you a call that already closed.
+
+**The finds gate on real pages: 12 of 12 right**
+
+Twelve real pages, recorded on 4 Nov ([`evals/finds_pages.jsonl`](server/evals/finds_pages.jsonl)), each labelled by hand. Code only, no model.
+
+| Trap | Example | Code |
 |---|---|---|
-| **Ask** | search your saves, open a save, submit an answer | a quote that isn't word for word in the save it cites; a number its quote doesn't state |
-| **Is it true? (finding the source)** | open the save's links, search the web, follow links, choose a source | a blog, list or social page; a page that doesn't name the thing |
-| **What's it for? (finds more)** | plan, search the web, open pages, follow links, propose, finish with a lesson | not the organisation's own site; a list of many calls; closed; no closing date ahead and no sign it's open this year; who can apply rules the person out (judged by code: the profile never reaches the model) |
+| An opportunity blog, not the organisation | opportunitiesforafricans.com | refused |
+| "Our 2026 submissions are now closed!" | socialshifters.co | refused |
+| Last year's programme ("April to June 2026") | startup.google.com | refused |
+| A list of 14 calls | menterprise.africa | refused |
+| No sign a call is open now | acceler8.africa, africabusinessheroes.org, and 4 more | refused |
+| Really open | ycombinator.com, anzisha.org, onevectasummit.com | **kept** |
 
-What makes it an agent rather than a script:
-- **It plans.** Finds more always starts with a plan the person can read ("Plan: looking for equity-free grants… Ruling out: …"), with more thinking time for that turn.
-- **It corrects itself.** A refusal goes back to Wonder with the problem named; it fixes it or moves on.
-- **It remembers.** Each goal keeps the searches it ran and what they gave, the sites refused and why, what the person kept or dismissed (with a one-tap reason), and the lesson Wonder wrote at the end of each run. The next run starts from that memory: in a real run, the plan ruled out three programmes the previous run had been refused on.
-- **It acts on its own schedule** (Keep watching), and its findings come back to the person.
+Building this eval caught three gaps before anyone else could: the "submissions are now closed" wording, last year's programme, and the list page. The live demo caught two more: a deadline window read from its start, and a rule about states judged as met from the country. All five are fixed, with tests.
 
-Context engineering keeps it sharp and cheap: Wonder only ever names refs (W1, L12), so words on a page can't send it anywhere; a page's links are ranked by code before Wonder sees them (links to other sites and about applying first; menus, footers and social links dropped); older pages shrink in its context once read, while code always checks against the full page.
-
-Details: [docs/03-agents.md](docs/03-agents.md).
-
-## How Homing uses Meta's models
-
-The app names the model behind every step (on Your agents and on each save card), and says "Code" when no model was used.
-
-| Model | What it does in Homing |
-|---|---|
-| **Muse Spark** | Reads every save (notes, links, X posts, screenshots, flyers, PDFs, videos from a short-lived private link); compares a post with its official page; organises a whole pile into goals in one long-context pass (340 of 405 saves into 24 goals for 42,560 tokens); pulls points from saved videos at the second they're said and writes prep sheets |
-| **Muse Wonder** | Runs three agents with tools: Ask, finding a save's official source, and finding more for a goal (plan, search, open, propose, learn) |
-| **Muse Voice Transcribe** | Turns voice notes and the sound of videos into words, so they can be read and checked (31 recordings) |
-
-Code, not a model, decides dates and time zones, eligibility, whether a quote really appears in its source, whether a video point is said at that second, whether a call is open, and when a save comes back.
-
-## Proof
-
-Every number is computed by [`server/evals/run.py`](server/evals/run.py); full report: [server/evals/REPORT.md](server/evals/REPORT.md).
+**More checks**
 
 | Check | Result |
 |---|---|
 | Dates read by code (real and post-style phrases, answers worked out by hand) | **30 of 30** |
-| The finds gate on 12 real pages, labelled by hand (open calls; a blog; a call that says it's closed; last year's programme; a list of 14 calls; pages with no sign a call is open) | **12 of 12** |
-| Ask on real runs: quotes found word for word in the cited save | **68 of 68** (0 dropped) |
-| Prep sheets: video points found in the captions at the stated second | **44 of 45** (1 dropped by code) |
 | Search by meaning on the real pile (labels are drafts) | 12 of 15 questions with a right save in the top 5 |
+| Prompt injection: a page telling the agent to open another site | the agent can't: there's no ref to it (test) |
 
-Building the eval found real bugs before judges could: a page saying "Our 2026 submissions are now closed!" would have passed; so would last year's programme and a list of 14 calls. All are now refused, with tests. The live demo found two more: a deadline window ("open 1 September – 18 November 2026") read as its start, and a rule about states judged as met from the country. Both fixed, with tests.
+**What it costs** (tokens, from the gateway's counters; Meta hasn't published Muse prices)
 
-CI runs 250+ server tests, lint and the web build on every push.
+| Job | Per run, about |
+|---|---|
+| Read a save (Muse Spark) | 2,600 tokens |
+| Ask, as an agent (Muse Wonder) | 30,000 tokens |
+| Find the official source (Muse Wonder) | 13,000 tokens |
+| Find more for a goal (Muse Wonder, plus Spark to read who can apply) | 190,000 tokens |
+| Keep watching an unchanged page | **0** (code only) |
+| Organise a whole pile into goals (one long-context pass) | 340 of 405 saves into 24 goals for 42,560 tokens, against about 900,000 one at a time |
+
+Budgets protect the live demo: a daily cap per person and in total, a smaller separate share for the web agents (so finding more can never pause reading or Ask), one long web job at a time, time limits on every agent run, and a cap on Find more taps.
+
+## Status and tests (4 Nov)
+
+- **251 server tests pass** (`pytest`), plus lint, types and the web production build, on every push in CI.
+- Live on EC2 (API and worker) and Vercel (web), with the demo account reset between judging days.
+- Every screen in the video is the live product, recorded on the demo account.
+
+## Try it in two minutes
+
+1. Open https://homing-rho.vercel.app and press **Try the demo**.
+2. Go to **Agents**, press **Add**, paste the UNDP link above, and watch the steps arrive.
+3. Two minutes later, open the save: what the post left out, quoted from the official page; the one question; the deadline.
+4. On **Today**, type *recording my demo video tomorrow evening*. Open the **Get ready** card. Tap a chip: the video plays from that second.
+5. In **Threads**, open a goal and press **Find more**. Watch the plan, the pages, and what code throws out.
+6. In **Ask**, try *How do I get better at speaking on camera?*
 
 ## Guardrails
 
-- **Prompt injection:** every prompt treats saved and web content as data, not instructions; agents can only name refs, never type URLs; nothing a model writes is run; code checks every quote, number and date. Tested with a page that tells the agent to open another site.
-- **Privacy:** what Homing knows about you (country, age, study, company) is used only by code and never sent to a model. Saves that look private (passwords, codes, account numbers) are never sent to AI, pasted text included.
-- **Fetching:** one guarded fetcher for every URL: public addresses only (re-checked on redirects), robots.txt respected, size-capped.
-- **Cost:** daily token budgets per person and in total, a separate smaller share for the web agents (so finding more can never pause reading or Ask), one long web job at a time, time limits on every agent run, and a cap on Find more taps.
+- **Prompt injection.** Saved and web content is data, never instructions, in every prompt. Agents name refs, not URLs. Nothing a model writes is run.
+- **Privacy.** What Homing knows about you is used only by code, never sent to a model. Saves that look private (passwords, codes, account numbers) never go to AI, pasted text included.
+- **Fetching.** One guarded fetcher for every URL: public addresses only, checked again on every redirect, robots.txt respected, size-capped.
 
 ## Limits, said plainly
 
-- YouTube shares captions only with a video's owner: a video without captions shows its description and offers **Paste its transcript**.
-- Pages that only render in a browser (some application forms) can't be read; Homing says so and offers **Paste what it says**.
-- The finds gate is strict on purpose: a run can come back with nothing kept rather than show a call it couldn't prove open.
-- The demo account is shared by every visitor and is reset between judging days.
-- Search eval labels are drafts until the owner confirms them.
+- YouTube shares captions only with a video's owner. A video without them shows its description and offers **Paste its transcript**.
+- Pages that only render in a browser can't be read. Homing says so and offers **Paste what it says**.
+- Finding more is strict, so some runs keep nothing.
+- The demo account is shared by every visitor.
+- The search eval's labels are drafts until the owner confirms them.
 
-## Run it locally
+## Quickstart
 
 ```bash
-# server (needs Postgres with pgvector: docker compose up -d db, or a Supabase dev database)
+# server (Postgres with pgvector: docker compose up -d db, or a Supabase dev database)
 cd server
 python -m pip install uv
-cp .env.example .env
+cp .env.example .env            # set META_API_KEY
 python -m uv sync
 python -m uv run alembic upgrade head
-python -m uv run uvicorn app.main:app --reload --timeout-graceful-shutdown 3
-python -m uv run python -m app.worker   # the agents
+python -m uv run uvicorn app.main:app --reload
+python -m uv run python -m app.worker      # the agents
+python -m uv run pytest                    # the tests
+python -m uv run python -m evals.run       # the eval report
 
 # web
 cd web
@@ -122,11 +172,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-## For developers
-
-- What we're building and why: [docs/PLAN.md](docs/PLAN.md)
-- How it's built: [docs/README.md](docs/README.md)
-- The agents: [docs/03-agents.md](docs/03-agents.md)
+More: [docs/PLAN.md](docs/PLAN.md) (what and why) · [docs/README.md](docs/README.md) (how it's built)
 
 ## Origin
 
