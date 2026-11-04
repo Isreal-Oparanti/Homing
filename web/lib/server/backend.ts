@@ -27,6 +27,16 @@ export function identityHeaders(session: Session): Record<string, string> | null
   };
 }
 
+/**
+ * The visitor's address, so the API can count requests per visitor on the shared demo account
+ * (server/app/core/ratelimit.py). Vercel sets these headers itself.
+ */
+export function clientHeaders(req: Request): Record<string, string> {
+  const ip =
+    req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return ip && ASCII.test(ip) ? { "X-Homing-Client-IP": ip.slice(0, 64) } : {};
+}
+
 const TICKET_SECONDS = 300; // server/app/core/auth.py
 
 /**

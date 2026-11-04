@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { authOptions } from "@/lib/auth";
-import { BACKEND_URL, errorResponse, identityHeaders } from "@/lib/server/backend";
+import { BACKEND_URL, clientHeaders, errorResponse, identityHeaders } from "@/lib/server/backend";
 
 /** Forwards /api/backend/* to the Homing API with the user's identity attached. */
 async function proxy(req: NextRequest, ctx: RouteContext<"/api/backend/[...path]">) {
@@ -26,6 +26,7 @@ async function proxy(req: NextRequest, ctx: RouteContext<"/api/backend/[...path]
         Accept: "application/json",
         ...(hasBody ? { "Content-Type": req.headers.get("content-type") ?? "application/json" } : {}),
         ...identity,
+        ...clientHeaders(req),
       },
       body: hasBody ? await req.arrayBuffer() : undefined,
       cache: "no-store",

@@ -13,6 +13,7 @@ from app.api.v1 import router as v1_router
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
+from app.core.ratelimit import limit_requests
 
 
 @asynccontextmanager
@@ -39,6 +40,9 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json" if settings.is_local else None,
         lifespan=lifespan,
     )
+    if settings.rate_limits:
+        # Added before CORS, so CORS wraps it: a browser can read a 429 too.
+        app.middleware("http")(limit_requests)
     # Browsers send files straight here with an upload ticket. The API never reads cookies,
     # so letting any page call it gives nothing away: every route still needs the proxy
     # secret or a signed ticket.

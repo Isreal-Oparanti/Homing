@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     ask_agent: bool = True
     # Is it true? finds a save's source with a Muse Wonder agent; off, the fixed path does.
     check_agent: bool = True
+    # What is it? digs with a Muse Wonder agent when a save's first read is thin.
+    read_agent: bool = True
+    # Per-person request limits (core/ratelimit.py).
+    rate_limits: bool = True
     youtube_api_key: str = ""
     # YouTube captions via youtube-transcript-api (Isreal's decision, docs/adr/0008).
     feature_yt_captions: bool = True

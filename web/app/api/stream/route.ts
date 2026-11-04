@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import type { NextRequest } from "next/server";
 
 import { authOptions } from "@/lib/auth";
-import { BACKEND_URL, errorResponse, identityHeaders } from "@/lib/server/backend";
+import { BACKEND_URL, clientHeaders, errorResponse, identityHeaders } from "@/lib/server/backend";
 
 /** Relays the API's live event stream. EventSource reconnects with Last-Event-ID on its own. */
 export async function GET(req: NextRequest) {
@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
       headers: {
         Accept: "text/event-stream",
         ...identity,
+        ...clientHeaders(req),
         ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}),
       },
       cache: "no-store",

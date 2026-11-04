@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.auth import CurrentUser, require_uploader, require_user
+from app.core.auth import DEMO_USER_ID, CurrentUser, require_uploader, require_user
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError
 from app.db.models import Import
@@ -45,6 +45,13 @@ def upload_whatsapp(
 ) -> ImportOut:
     """The `.zip` WhatsApp makes with "Include media", or the chat `.txt` alone. It waits on
     the server's disk until the import job has read it, then it's deleted."""
+    if user.id == DEMO_USER_ID:
+        # The demo is one pile shared by every visitor: a chat (up to 1 GB) belongs in your own.
+        raise AppError(
+            "demo_import",
+            "The demo is shared with other visitors. Sign in with Google to import your own chat.",
+            status=403,
+        )
     ensure_user(db, user)
     imp = Import(user_id=user.id, storage_key="", status="received", counts={})
     db.add(imp)

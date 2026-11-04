@@ -11,6 +11,8 @@ from collections.abc import Iterator
 # Tests never hold a real model key (a placeholder lets the client be built; every model call
 # in tests is a fake). Set before any Settings is read, so it wins over server/.env.
 os.environ["META_API_KEY"] = "test-placeholder-not-a-key"
+# Request limits are tested on their own (test_ratelimit.py); other tests send freely.
+os.environ["RATE_LIMITS"] = "false"
 
 import pytest  # noqa: E402
 from alembic import command
