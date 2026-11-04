@@ -28,7 +28,15 @@ from sqlalchemy.exc import IntegrityError
 
 from app.agents import goal_memory
 from app.agents.is_it_true import facts_for
-from app.agents.web_tools import OPEN_TOOL, SEARCH_TOOL, Page, Web, host_of, trim_context
+from app.agents.web_tools import (
+    OPEN_TOOL,
+    SEARCH_TOOL,
+    Page,
+    Web,
+    host_of,
+    plain,
+    trim_context,
+)
 from app.db.models import AgentEvent, Check, Find, Job, Reading, Save, Thread, ThreadSave, User
 from app.events.emitter import emit
 from app.ingest.fetch import SafeFetcher
@@ -477,7 +485,7 @@ def _loop(run: Run, gateway: Any, messages: list[dict[str, Any]]) -> None:
                     )
                     run.step(
                         "find_refused",
-                        f"Homing refused {label}: {problem.split('. ')[0]}.",
+                        f"Homing refused {label}: {plain(problem.split('. ')[0], run.web)}.",
                         models=[],
                     )
                     result = {"accepted": False, "problem": problem}

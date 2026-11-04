@@ -11,7 +11,7 @@ import json
 import time
 from typing import Any
 
-from app.agents.web_tools import OPEN_TOOL, SEARCH_TOOL, Web, host_of, trim_context
+from app.agents.web_tools import OPEN_TOOL, SEARCH_TOOL, Web, host_of, plain, trim_context
 from app.db.models import Reading, Save
 from app.events.emitter import emit
 from app.ingest.gather import SnapshotIn
@@ -163,7 +163,11 @@ def find_source(
                     return page.url, SnapshotIn(
                         "page_text", page.text, page.url, {"title": page.title}
                     )
-                step("source_refused", f"Homing refused that source: {problem}", models=[])
+                step(
+                    "source_refused",
+                    f"Homing refused that source: {plain(problem, web)}",
+                    models=[],
+                )
                 result = {"accepted": False, "problem": problem}
             elif name == "give_up":
                 return None

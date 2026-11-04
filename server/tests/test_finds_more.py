@@ -345,3 +345,15 @@ def test_code_holds_every_step_until_there_is_a_plan(
         )
     assert actions[:3] == ["find_started", "find_planned", "find_searched"]  # no search first
     assert "found" in actions
+
+
+def test_the_agents_refs_never_reach_the_person() -> None:
+    from app.agents.web_tools import Page, Web, plain
+
+    web = Web(None, None)  # type: ignore[arg-type]
+    web.pages["P2"] = Page("P2", "https://acceler8.africa/apply", "Apply", "text")
+    web.leads["W1"] = "https://www.example.org/x"
+    assert plain("The name quote isn't on P2 word for word", web) == (
+        "The name quote isn't on the acceler8.africa page word for word"
+    )
+    assert plain("Open W1, not P9", web) == "Open the example.org page, not that page"

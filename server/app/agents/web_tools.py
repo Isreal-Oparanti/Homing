@@ -8,6 +8,7 @@ titles and snippets are shown as leads, never trusted as facts: facts come from 
 """
 
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urljoin, urlsplit
@@ -303,6 +304,18 @@ class Web:
             "text": page.text[:PAGE_CHARS_FOR_MODEL],
             "links": links,
         }
+
+
+def plain(text: str, web: "Web") -> str:
+    """A message for the person: the agent's refs (P2, W3, L12) become the sites they name."""
+
+    def site(m: re.Match[str]) -> str:
+        ref = m.group(0)
+        page = web.pages.get(ref)
+        url = page.url if page else web.leads.get(ref)
+        return f"the {host_of(url)} page" if url else "that page"
+
+    return re.sub(r"\b[PWL]\d+\b", site, text)
 
 
 KEEP_FULL_PAGES = 3  # the latest pages Wonder opened stay whole in its context
