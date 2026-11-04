@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, CalendarPlus, Check, Clock, Copy, Sparkles, X } from "lucide-react";
+import { CalendarClock, CalendarPlus, Check, Clock, Copy, ListChecks, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -233,7 +233,7 @@ function Card({ card }: { card: TodayCard }) {
   return (
     <li className="glass rounded-[var(--radius-card)] p-5">
       <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.07em] text-amber">
-        {prep ? <Sparkles className="size-3.5" aria-hidden /> : <CalendarClock className="size-3.5" aria-hidden />}
+        {prep ? <ListChecks className="size-3.5" aria-hidden /> : <CalendarClock className="size-3.5" aria-hidden />}
         {card.whyNow}
       </p>
       <p className="font-display mt-1 text-lg font-bold leading-snug tracking-[-0.02em]">{card.title}</p>

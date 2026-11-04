@@ -1,4 +1,4 @@
-import { Cpu, Sparkles } from "lucide-react";
+import { Cpu } from "lucide-react";
 import Image from "next/image";
 
 /** muse-spark-1.3 -> Muse Spark: the names people know. */
@@ -16,7 +16,7 @@ export function ModelIcon({ name, size = 14 }: { name: string; size?: number }) 
   if (name.startsWith("Muse")) {
     return <Image src="/brand/muse.png" alt="" width={size} height={size} className="shrink-0" />;
   }
-  return <Sparkles className="shrink-0" style={{ width: size, height: size }} aria-hidden />;
+  return <Cpu className="shrink-0" style={{ width: size, height: size }} aria-hidden />;
 }
 
 /**

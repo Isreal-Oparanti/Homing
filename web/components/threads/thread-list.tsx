@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, Sparkles } from "lucide-react";
+import { Layers, Lock } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 
@@ -52,7 +52,7 @@ export function ThreadList() {
         disabled={organise.isPending || asked}
         className="glass flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-60"
       >
-        <Sparkles className="size-4" aria-hidden />
+        <Layers className="size-4" aria-hidden />
         {asked ? "Organising your saves…" : "Organise my saves"}
       </button>
       {asked && (

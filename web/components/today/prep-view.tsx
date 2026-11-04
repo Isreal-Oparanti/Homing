@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Play, Sparkles } from "lucide-react";
+import { ListChecks, Play } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -156,7 +156,7 @@ export function PrepView() {
         ← Today
       </Link>
       <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.07em] text-amber">
-        <Sparkles className="size-3.5" aria-hidden />
+        <ListChecks className="size-3.5" aria-hidden />
         {data.whyNow}
       </p>
       <h1 className="font-display mt-1 text-[26px] font-extrabold leading-tight tracking-[-0.03em]">
